@@ -191,7 +191,7 @@
       [showDiff]="type !== 'member'"
       [showModifiedMeta]="false"
       (viewObject)="onView($event.object_ref)"
-      (diffObject)="onDiff($event.object_ref)">
+      (diffObject)="onDiff($event)">
       <app-status-chip
         *ngIf="item.object_status"
         card-header-action

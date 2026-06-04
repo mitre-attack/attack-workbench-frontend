@@ -21,7 +21,12 @@ import {
   WorkflowStatusType,
 } from 'src/app/utils/types';
 import { MultipleChoiceDialogComponent } from 'src/app/components/multiple-choice-dialog/multiple-choice-dialog.component';
-import { take } from 'rxjs/operators';
+import { map, take } from 'rxjs/operators';
+import { MatSnackBar } from '@angular/material/snack-bar';
+import { forkJoin, Observable, of } from 'rxjs';
+import { StixObject } from 'src/app/classes/stix';
+import { ReleaseTrackObjectItem } from 'src/app/components/release-track-object-card/release-track-object-card.component';
+import { StixDialogComponent } from 'src/app/views/stix/stix-dialog/stix-dialog.component';
 
 @Component({
   selector: 'app-release-track-page',
@@ -39,7 +44,8 @@ export class ReleaseTrackPageComponent implements OnInit {
     private route: ActivatedRoute,
     private router: Router,
     private dialog: MatDialog,
-    private restApiConnectorService: RestApiConnectorService
+    private restApiConnectorService: RestApiConnectorService,
+    private snackbar: MatSnackBar
   ) {}
 
   ngOnInit(): void {
@@ -252,9 +258,60 @@ export class ReleaseTrackPageComponent implements OnInit {
     this.router.navigate([this.getViewUrl(id)]);
   }
 
-  public onDiff(item: any): void {
-    // TODO: open diff modal for item
-    console.log('onDiff', item);
+  public onDiff(item: ReleaseTrackObjectItem): void {
+    if (!item?.object_ref) {
+      this.snackbar.open(
+        'Unable to determine which object to compare.',
+        undefined,
+        {
+          duration: 3000,
+        }
+      );
+      return;
+    }
+
+    const tier = this.getDiffTier(item);
+    if (!tier) {
+      this.snackbar.open(
+        'Unable to determine which lane to compare.',
+        undefined,
+        {
+          duration: 3000,
+        }
+      );
+      return;
+    }
+
+    const diff =
+      tier === 'candidate'
+        ? this.resolveCandidateDiffObjects(item)
+        : this.resolveStagedDiffObjects(item);
+
+    diff.pipe(take(1)).subscribe(({ current, prior, expectedBaseline }) => {
+      if (!current) {
+        this.snackbar.open(
+          'Unable to load the current object version.',
+          undefined,
+          {
+            duration: 3000,
+          }
+        );
+        return;
+      }
+
+      if (expectedBaseline && !prior) {
+        this.snackbar.open(
+          'Unable to load the comparison baseline version.',
+          undefined,
+          {
+            duration: 3000,
+          }
+        );
+        return;
+      }
+
+      this.openDiffDialog(current, prior);
+    });
   }
 
   public onReviewAndApprove(item: any): void {
@@ -401,6 +458,156 @@ export class ReleaseTrackPageComponent implements OnInit {
     if (!item?.object_ref) return null;
     const modified = this.toIsoString(item.object_modified);
     return modified ? { id: item.object_ref, modified } : item.object_ref;
+  }
+
+  private getDiffTier(
+    item: ReleaseTrackObjectItem
+  ): 'candidate' | 'staged' | null {
+    return this.getReleaseTrackTier(item);
+  }
+
+  private findStagedEntry(objectRef: string): ReleaseTrackObjectItem | null {
+    return (
+      this.releaseTrack?.staged?.find(item => item.object_ref === objectRef) ??
+      null
+    );
+  }
+
+  private findMemberEntry(objectRef: string): ReleaseTrackObjectItem | null {
+    return (
+      this.releaseTrack?.members?.find(item => item.object_ref === objectRef) ??
+      null
+    );
+  }
+
+  private resolveCandidateDiffObjects(item: ReleaseTrackObjectItem): Observable<{
+    current: StixObject | null;
+    prior: StixObject | null;
+    expectedBaseline: boolean;
+  }> {
+    const stagedEntry = this.findStagedEntry(item.object_ref);
+    const memberEntry = stagedEntry ? null : this.findMemberEntry(item.object_ref);
+    const baselineEntry = stagedEntry ?? memberEntry;
+
+    return forkJoin({
+      current: this.fetchObjectVersion(item.object_ref),
+      prior: baselineEntry
+        ? this.fetchObjectVersion(
+            baselineEntry.object_ref,
+            baselineEntry.object_modified
+          )
+        : of(null),
+    }).pipe(
+      map(({ current, prior }) => ({
+        current,
+        prior,
+        expectedBaseline: !!baselineEntry,
+      }))
+    );
+  }
+
+  private resolveStagedDiffObjects(item: ReleaseTrackObjectItem): Observable<{
+    current: StixObject | null;
+    prior: StixObject | null;
+    expectedBaseline: boolean;
+  }> {
+    const memberEntry = this.findMemberEntry(item.object_ref);
+
+    return forkJoin({
+      current: this.fetchObjectVersion(item.object_ref, item.object_modified),
+      prior: memberEntry
+        ? this.fetchObjectVersion(
+            memberEntry.object_ref,
+            memberEntry.object_modified
+          )
+        : of(null),
+    }).pipe(
+      map(({ current, prior }) => ({
+        current,
+        prior,
+        expectedBaseline: !!memberEntry,
+      }))
+    );
+  }
+
+  private fetchObjectVersion(
+    objectRef: string,
+    modified?: Date | string
+  ): Observable<StixObject | null> {
+    const stixType = objectRef.split('--')[0] as StixType;
+    const attackType = StixTypeToAttackType[stixType];
+
+    let requestObject: Observable<StixObject[]>;
+    switch (attackType) {
+      case 'technique':
+        requestObject = this.restApiConnectorService.getTechnique(objectRef, modified);
+        break;
+      case 'tactic':
+        requestObject = this.restApiConnectorService.getTactic(objectRef, modified);
+        break;
+      case 'group':
+        requestObject = this.restApiConnectorService.getGroup(objectRef, modified);
+        break;
+      case 'campaign':
+        requestObject = this.restApiConnectorService.getCampaign(objectRef, modified);
+        break;
+      case 'asset':
+        requestObject = this.restApiConnectorService.getAsset(objectRef, modified);
+        break;
+      case 'software':
+        requestObject = this.restApiConnectorService.getSoftware(objectRef, modified);
+        break;
+      case 'mitigation':
+        requestObject = this.restApiConnectorService.getMitigation(
+          objectRef,
+          modified
+        );
+        break;
+      case 'matrix':
+        requestObject = this.restApiConnectorService.getMatrix(objectRef, modified);
+        break;
+      case 'data-source':
+        requestObject = this.restApiConnectorService.getDataSource(
+          objectRef,
+          modified
+        );
+        break;
+      case 'data-component':
+        requestObject = this.restApiConnectorService.getDataComponent(
+          objectRef,
+          modified
+        );
+        break;
+      case 'detection-strategy':
+        requestObject = this.restApiConnectorService.getDetectionStrategy(
+          objectRef,
+          modified
+        );
+        break;
+      case 'analytic':
+        requestObject = this.restApiConnectorService.getAnalytic(objectRef, modified);
+        break;
+      default:
+        return of(null);
+    }
+
+    return requestObject.pipe(
+      take(1),
+      map(results => results[0] ?? null)
+    );
+  }
+
+  private openDiffDialog(current: StixObject, prior: StixObject | null): void {
+    this.dialog.open(StixDialogComponent, {
+      data: {
+        object: [current, prior],
+        mode: 'diff',
+        editable: false,
+        sidebarControl: 'disable',
+      },
+      maxHeight: '75vh',
+      autoFocus: false,
+    });
   }
 
   private getReleaseTrackTier(item: any): 'candidate' | 'staged' | null {
