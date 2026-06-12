@@ -14,6 +14,7 @@ import { MatDialog } from '@angular/material/dialog';
 import { BreadcrumbService } from 'src/app/services/helpers/breadcrumb.service';
 import { RestApiConnectorService } from 'src/app/services/connectors/rest-api/rest-api-connector.service';
 import { MultipleChoiceDialogComponent } from 'src/app/components/multiple-choice-dialog/multiple-choice-dialog.component';
+import { FormsModule } from '@angular/forms';
 
 describe('ReleaseTrackPageComponent', () => {
   let component: ReleaseTrackPageComponent;
@@ -27,6 +28,7 @@ describe('ReleaseTrackPageComponent', () => {
       getLatestSnapshot: vi.fn(() => createAsyncObservable(null)),
       exportLatestSnapshot: vi.fn(() => createAsyncObservable({})),
       reviewCandidates: vi.fn(() => createAsyncObservable({})),
+      updateMetadataByLatest: vi.fn(() => createAsyncObservable({})),
     });
     mockDialog = {
       open: vi.fn(),
@@ -46,6 +48,7 @@ describe('ReleaseTrackPageComponent', () => {
 
     await TestBed.configureTestingModule({
       declarations: [ReleaseTrackPageComponent],
+      imports: [FormsModule],
       providers: [
         {
           provide: ReleaseTracksConnectorService,
@@ -144,8 +147,59 @@ describe('ReleaseTrackPageComponent', () => {
     expect(mockDialog.open).not.toHaveBeenCalled();
   });
 
-  it('should combine candidates and staged objects for review lanes', () => {
+  it('should split auto-promotion release tracks into workflow lanes', () => {
     component.releaseTrack = {
+      config: { auto_promote: true },
+      candidates: [
+        {
+          object_ref: 'attack-pattern--wip',
+        },
+        {
+          object_ref: 'attack-pattern--candidate',
+          object_status: 'awaiting-review',
+        },
+        {
+          object_ref: 'attack-pattern--reviewed-candidate',
+          object_status: 'reviewed',
+        },
+      ],
+      staged: [
+        {
+          object_ref: 'attack-pattern--staged',
+          object_status: 'reviewed',
+        },
+      ],
+      members: [
+        {
+          object_ref: 'attack-pattern--member',
+        },
+      ],
+    } as any;
+
+    const lanes = component.workspaceLanes;
+
+    expect(lanes.map(lane => lane.title)).toEqual([
+      'Candidates WIP',
+      'Candidates Awaiting Review',
+      'Staged/Reviewed',
+      'Released Members',
+    ]);
+    expect(lanes.map(lane => lane.items.map(item => item.object_ref))).toEqual([
+      ['attack-pattern--wip'],
+      ['attack-pattern--candidate'],
+      ['attack-pattern--reviewed-candidate', 'attack-pattern--staged'],
+      ['attack-pattern--member'],
+    ]);
+    expect(component.canReviewAndApprove(lanes[1].items[0], lanes[1])).toBe(
+      true
+    );
+    expect(component.canManuallyPromote(lanes[0])).toBe(false);
+    expect(lanes[3].isReleasedMembers).toBe(true);
+  });
+
+  it('should keep manual release tracks in candidate and staged lanes', () => {
+    component.releaseTrack = {
+      config: { auto_promote: false },
       candidates: [
         {
           object_ref: 'attack-pattern--candidate',
@@ -155,21 +209,58 @@ describe('ReleaseTrackPageComponent', () => {
       staged: [
         {
           object_ref: 'attack-pattern--staged',
-          object_status: 'reviewed',
         },
       ],
+      members: [],
     } as any;
 
-    expect(component.reviewItems).toEqual([
-      expect.objectContaining({
-        object_ref: 'attack-pattern--candidate',
-        release_track_tier: 'candidate',
-      }),
-      expect.objectContaining({
-        object_ref: 'attack-pattern--staged',
-        release_track_tier: 'staged',
-      }),
+    const lanes = component.workspaceLanes;
+
+    expect(lanes.map(lane => lane.title)).toEqual([
+      'Candidates',
+      'Staged',
+      'Released Members',
     ]);
+    expect(lanes[0].items.map(item => item.object_ref)).toEqual([
+      'attack-pattern--candidate',
+    ]);
+    expect(component.canManuallyPromote(lanes[0])).toBe(true);
+    expect(component.canManuallyDemote(lanes[1])).toBe(true);
+    expect(component.canReviewAndApprove(lanes[0].items[0], lanes[0])).toBe(
+      false
+    );
+  });
+
+  it('should hide released members until toggled open', () => {
+    expect(component.showReleasedMembers).toBe(false);
+
+    component.toggleReleasedMembers();
+
+    expect(component.showReleasedMembers).toBe(true);
+  });
+
+  it('should update the release track description', () => {
+    const refreshSpy = vi
+      .spyOn(component, 'getReleaseTrack')
+      .mockImplementation(() => undefined);
+    mockReleaseTrackApiConnector.updateMetadataByLatest.mockReturnValue(of({}));
+    component.id = 'release-track--123';
+    component.releaseTrack = {
+      name: 'Enterprise Release',
+      description: 'Original description',
+    } as any;
+
+    component.onEditDescription();
+    component.descriptionDraft = 'Updated description';
+    component.onSaveDescription();
+
+    expect(
+      mockReleaseTrackApiConnector.updateMetadataByLatest
+    ).toHaveBeenCalledWith('release-track--123', {
+      description: 'Updated description',
+    });
+    expect(component.isEditingDescription).toBe(false);
+    expect(refreshSpy).toHaveBeenCalled();
   });
 
   it('should review and approve a single awaiting-review candidate', () => {
@@ -198,77 +289,5 @@ describe('ReleaseTrackPageComponent', () => {
       }
     );
     expect(refreshSpy).toHaveBeenCalled();
-  });
-
-  it('should bulk review all awaiting-review candidates', () => {
-    mockReleaseTrackApiConnector.reviewCandidates.mockReturnValue(of({}));
-    component.id = 'release-track--123';
-
-    component.onBulkReviewAll([
-      {
-        object_ref: 'attack-pattern--123',
-        object_modified: '2024-04-20T00:00:00.000Z',
-      },
-      {
-        object_ref: 'x-mitre-tactic--456',
-      },
-    ]);
-
-    expect(mockReleaseTrackApiConnector.reviewCandidates).toHaveBeenCalledWith(
-      'release-track--123',
-      {
-        from: 'awaiting-review',
-        to: 'reviewed',
-        object_refs: [
-          {
-            id: 'attack-pattern--123',
-            modified: '2024-04-20T00:00:00.000Z',
-          },
-          'x-mitre-tactic--456',
-        ],
-      }
-    );
-  });
-
-  it('should not send staged objects to the candidate review endpoint', () => {
-    const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => null);
-    mockReleaseTrackApiConnector.reviewCandidates.mockReturnValue(of({}));
-    component.id = 'release-track--123';
-
-    component.onBulkReviewAll([
-      {
-        object_ref: 'attack-pattern--candidate',
-        object_modified: '2024-04-20T00:00:00.000Z',
-        release_track_tier: 'candidate',
-      },
-      {
-        object_ref: 'attack-pattern--staged',
-        object_modified: '2024-04-21T00:00:00.000Z',
-        release_track_tier: 'staged',
-      },
-    ]);
-
-    expect(mockReleaseTrackApiConnector.reviewCandidates).toHaveBeenCalledWith(
-      'release-track--123',
-      {
-        from: 'awaiting-review',
-        to: 'reviewed',
-        object_refs: [
-          {
-            id: 'attack-pattern--candidate',
-            modified: '2024-04-20T00:00:00.000Z',
-          },
-        ],
-      }
-    );
-    expect(consoleSpy).toHaveBeenCalledWith(
-      'onBulkReviewAll staged objects',
-      expect.arrayContaining([
-        expect.objectContaining({
-          object_ref: 'attack-pattern--staged',
-        }),
-      ])
-    );
-    consoleSpy.mockRestore();
   });
 });

@@ -165,7 +165,9 @@
 }
 
 .object-footer-right {
+  justify-content: flex-end;
   margin-left: auto;
+  min-width: 0;
 }
 
 .object-actions {

@@ -22,6 +22,20 @@ import {
 } from 'src/app/utils/types';
 import { MultipleChoiceDialogComponent } from 'src/app/components/multiple-choice-dialog/multiple-choice-dialog.component';
 import { take } from 'rxjs/operators';
+import { ReleaseTrackObjectItem } from 'src/app/components/release-track-object-card/release-track-object-card.component';
+
+type ReleaseTrackLaneType = 'candidate' | 'staged' | 'member';
+
+interface ReleaseTrackWorkspaceLane {
+  key: string;
+  title: string;
+  type: ReleaseTrackLaneType;
+  modifier: string;
+  items: ReleaseTrackObjectItem[];
+  emptyLabel: string;
+  statusFallback: WorkflowStatusType;
+  isReleasedMembers?: boolean;
+}
 
 @Component({
   selector: 'app-release-track-page',
@@ -32,6 +46,10 @@ import { take } from 'rxjs/operators';
 export class ReleaseTrackPageComponent implements OnInit {
   public id = '';
   public releaseTrack: ReleaseTrackSnapshot | null = null;
+  public showReleasedMembers = false;
+  public descriptionDraft = '';
+  public isEditingDescription = false;
+  public isSavingDescription = false;
 
   constructor(
     private connector: ReleaseTracksConnectorService,
@@ -44,6 +62,7 @@ export class ReleaseTrackPageComponent implements OnInit {
 
   ngOnInit(): void {
     this.route.params.subscribe(params => {
+      if (this.id !== params.id) this.showReleasedMembers = false;
       this.id = params.id;
       if (this.id) this.getReleaseTrack();
     });
@@ -51,6 +70,10 @@ export class ReleaseTrackPageComponent implements OnInit {
 
   public get releaseTrackName(): string {
     return this.releaseTrack?.name ?? '';
+  }
+
+  public get releaseTrackDescription(): string {
+    return this.releaseTrack?.description?.trim() ?? '';
   }
 
   public get candidates(): any[] {
@@ -61,21 +84,91 @@ export class ReleaseTrackPageComponent implements OnInit {
     return this.releaseTrack?.staged ?? [];
   }
 
-  public get reviewItems(): any[] {
+  public get members(): any[] {
+    return this.releaseTrack?.members ?? [];
+  }
+
+  public get autoPromotionEnabled(): boolean {
+    return !!this.releaseTrack?.config?.auto_promote;
+  }
+
+  public get workspaceLanes(): ReleaseTrackWorkspaceLane[] {
+    if (this.autoPromotionEnabled) {
+      return [
+        {
+          key: 'candidates-wip',
+          title: 'Candidates WIP',
+          type: 'candidate',
+          modifier: 'candidates',
+          items: this.candidates.filter(
+            item => this.getObjectStatus(item) === WorkflowStatus.WorkInProgress
+          ),
+          emptyLabel: 'No work in progress candidates',
+          statusFallback: WorkflowStatus.WorkInProgress,
+        },
+        {
+          key: 'candidates-awaiting-review',
+          title: 'Candidates Awaiting Review',
+          type: 'candidate',
+          modifier: 'awaiting-review',
+          items: this.candidates.filter(
+            item => this.getObjectStatus(item) === WorkflowStatus.AwaitingReview
+          ),
+          emptyLabel: 'No candidates awaiting review',
+          statusFallback: WorkflowStatus.AwaitingReview,
+        },
+        {
+          key: 'staged-reviewed',
+          title: 'Staged/Reviewed',
+          type: 'staged',
+          modifier: 'staged',
+          items: [
+            ...this.candidates.filter(
+              item => this.getObjectStatus(item) === WorkflowStatus.Reviewed
+            ),
+            ...this.staged,
+          ],
+          emptyLabel: 'No staged or reviewed objects',
+          statusFallback: WorkflowStatus.Reviewed,
+        },
+        this.releasedMembersLane,
+      ];
+    }
+
     return [
-      ...this.candidates.map(item => ({
-        ...item,
-        release_track_tier: 'candidate',
-      })),
-      ...this.staged.map(item => ({
-        ...item,
-        release_track_tier: 'staged',
-      })),
+      {
+        key: 'candidates',
+        title: 'Candidates',
+        type: 'candidate',
+        modifier: 'candidates',
+        items: this.candidates,
+        emptyLabel: 'No candidates',
+        statusFallback: WorkflowStatus.WorkInProgress,
+      },
+      {
+        key: 'staged',
+        title: 'Staged',
+        type: 'staged',
+        modifier: 'staged',
+        items: this.staged,
+        emptyLabel: 'No staged objects',
+        statusFallback: WorkflowStatus.Reviewed,
+      },
+      this.releasedMembersLane,
     ];
   }
 
-  public get members(): any[] {
-    return this.releaseTrack?.members ?? [];
+  private get releasedMembersLane(): ReleaseTrackWorkspaceLane {
+    return {
+      key: 'released-members',
+      title: 'Released Members',
+      type: 'member',
+      modifier: 'members',
+      items: this.members,
+      emptyLabel: 'No released members',
+      statusFallback: WorkflowStatus.Reviewed,
+      isReleasedMembers: true,
+    };
   }
 
   public getReleaseTrack(): void {
@@ -265,24 +358,95 @@ export class ReleaseTrackPageComponent implements OnInit {
     );
   }
 
-  public onBulkReviewAll(items: any[]): void {
-    const candidateItems = items.filter(
-      item => this.getReleaseTrackTier(item) === 'candidate'
-    );
-    const stagedItems = items.filter(
-      item => this.getReleaseTrackTier(item) === 'staged'
-    );
+  public canAddCandidates(lane: ReleaseTrackWorkspaceLane): boolean {
+    return lane.key === 'candidates' || lane.key === 'candidates-wip';
+  }
 
-    if (stagedItems.length) {
-      // TODO: wire staged object review transition once the API is available.
-      console.log('onBulkReviewAll staged objects', stagedItems);
+  public canReviewAndApprove(
+    item: ReleaseTrackObjectItem,
+    lane: ReleaseTrackWorkspaceLane
+  ): boolean {
+    return (
+      this.autoPromotionEnabled &&
+      lane.type === 'candidate' &&
+      this.getLaneStatus(item, lane) === WorkflowStatus.AwaitingReview
+    );
+  }
+
+  public canManuallyPromote(lane: ReleaseTrackWorkspaceLane): boolean {
+    return !this.autoPromotionEnabled && lane.type === 'candidate';
+  }
+
+  public canManuallyDemote(lane: ReleaseTrackWorkspaceLane): boolean {
+    return !this.autoPromotionEnabled && lane.type === 'staged';
+  }
+
+  public getLaneStatus(
+    item: ReleaseTrackObjectItem,
+    lane: ReleaseTrackWorkspaceLane
+  ): WorkflowStatusType {
+    return item.object_status || lane.statusFallback;
+  }
+
+  public shouldShowLaneDescription(lane: ReleaseTrackWorkspaceLane): boolean {
+    return this.autoPromotionEnabled && !lane.isReleasedMembers;
+  }
+
+  public toggleReleasedMembers(): void {
+    this.showReleasedMembers = !this.showReleasedMembers;
+  }
+
+  public onEditDescription(): void {
+    this.descriptionDraft = this.releaseTrack?.description ?? '';
+    this.isEditingDescription = true;
+  }
+
+  public onCancelDescriptionEdit(): void {
+    this.descriptionDraft = '';
+    this.isEditingDescription = false;
+  }
+
+  public onSaveDescription(): void {
+    if (!this.id || !this.releaseTrack || this.isSavingDescription) return;
+
+    const description = this.descriptionDraft.trim();
+    if (description === this.releaseTrackDescription) {
+      this.onCancelDescriptionEdit();
+      return;
     }
 
-    this.reviewCandidateStatus(
-      WorkflowStatus.AwaitingReview,
-      WorkflowStatus.Reviewed,
-      candidateItems
-    );
+    this.isSavingDescription = true;
+    this.connector
+      .updateMetadataByLatest(this.id, { description })
+      .pipe(take(1))
+      .subscribe({
+        next: () => {
+          this.isEditingDescription = false;
+          this.descriptionDraft = '';
+          this.getReleaseTrack();
+        },
+        error: err => {
+          this.isSavingDescription = false;
+          console.error('Failed to update release track description', err);
+        },
+        complete: () => {
+          this.isSavingDescription = false;
+        },
+      });
+  }
+
+  public trackByLaneKey(
+    _index: number,
+    lane: ReleaseTrackWorkspaceLane
+  ): string {
+    return lane.key;
+  }
+
+  public trackByObjectRef(
+    _index: number,
+    item: ReleaseTrackObjectItem
+  ): string {
+    return `${item.object_ref}-${item.object_modified || ''}`;
   }
 
   public onExport(): void {
@@ -403,10 +567,8 @@ export class ReleaseTrackPageComponent implements OnInit {
     return modified ? { id: item.object_ref, modified } : item.object_ref;
   }
 
-  private getReleaseTrackTier(item: any): 'candidate' | 'staged' | null {
-    if (item?.release_track_tier) return item.release_track_tier;
-    if (item?.object_staged_at || item?.object_staged_by) return 'staged';
-    return item?.object_ref ? 'candidate' : null;
+  private getObjectStatus(item: ReleaseTrackObjectItem): WorkflowStatusType {
+    return item.object_status || WorkflowStatus.WorkInProgress;
   }
 
   private toIsoString(value: Date | string | undefined): string | undefined {

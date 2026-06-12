@@ -24,7 +24,6 @@
     [showHistory]="false"
     [showNotes]="false"
     [customTabs]="[
-      { label: 'Review', template: reviewTpl },
       { label: 'History', template: historyTpl },
       { label: 'Config', template: configTpl },
     ]"></app-stix-page-tabs>
@@ -32,204 +31,229 @@
   <ng-template #detailsTpl>
     <!-- stats summary -->
     <div class="release-track-board">
-      <div class="summary-grid">
-        <div class="labelled-box summary-card candidates-summary">
-          <div class="content no-label">
-            <p class="summary-label">
-              <strong>Candidates</strong>
-              <span class="text-deemphasis">(in this draft)</span>
-            </p>
-            <div class="summary-value view-color">
-              {{ candidates.length || 0 }}
+      <div class="labelled-box summary-frame">
+        <div
+          class="summary-overview content no-label"
+          aria-label="Release track summary">
+          <section class="summary-description">
+            <div class="summary-section-header">
+              <h2>Description</h2>
+              <button
+                *ngIf="!isEditingDescription"
+                class="description-edit-button"
+                mat-icon-button
+                type="button"
+                aria-label="Edit release track description"
+                (click)="onEditDescription()">
+                <mat-icon>edit</mat-icon>
+              </button>
             </div>
-          </div>
-        </div>
-        <div class="labelled-box summary-card staged-summary">
-          <div class="content no-label">
-            <p class="summary-label">
-              <strong>Staged</strong>
-              <span class="text-deemphasis">(for next release)</span>
+
+            <p
+              *ngIf="!isEditingDescription"
+              class="summary-description-text"
+              [ngClass]="{ empty: !releaseTrackDescription }">
+              {{ releaseTrackDescription || 'No description provided.' }}
             </p>
-            <div class="summary-value promote-color">
-              {{ staged.length || 0 }}
+
+            <div *ngIf="isEditingDescription" class="description-editor">
+              <mat-form-field appearance="outline">
+                <textarea
+                  matInput
+                  rows="3"
+                  placeholder="Describe this release track..."
+                  [(ngModel)]="descriptionDraft"></textarea>
+              </mat-form-field>
+              <div class="small-buttons description-actions">
+                <button
+                  mat-stroked-button
+                  type="button"
+                  (click)="onCancelDescriptionEdit()">
+                  Cancel
+                </button>
+                <button
+                  mat-raised-button
+                  color="primary"
+                  type="button"
+                  [disabled]="isSavingDescription"
+                  (click)="onSaveDescription()">
+                  Save
+                </button>
+              </div>
             </div>
-          </div>
-        </div>
-        <div class="labelled-box summary-card members-summary">
-          <div class="content no-label">
-            <p class="summary-label">
-              <strong>Members</strong>
-              <span class="text-deemphasis">(published)</span>
-            </p>
-            <div class="summary-value">
-              {{ members.length || 0 }}
+          </section>
+
+          <div class="summary-stats" aria-label="Release track object counts">
+            <div class="summary-metric candidates-summary">
+              <strong class="summary-count view-color">
+                {{ candidates.length || 0 }}
+              </strong>
+              <div class="summary-copy">
+                <strong class="summary-heading">Candidates</strong>
+                <span class="text-deemphasis">in this draft</span>
+              </div>
+            </div>
+
+            <div class="summary-metric staged-summary">
+              <strong class="summary-count promote-color">
+                {{ staged.length || 0 }}
+              </strong>
+              <div class="summary-copy">
+                <strong class="summary-heading">Staged</strong>
+                <span class="text-deemphasis">for next release</span>
+              </div>
+            </div>
+
+            <div class="summary-metric members-summary">
+              <strong class="summary-count">
+                {{ members.length || 0 }}
+              </strong>
+              <div class="summary-copy">
+                <strong class="summary-heading">Released Members</strong>
+                <span class="text-deemphasis">published</span>
+              </div>
             </div>
           </div>
         </div>
       </div>
 
       <div class="release-columns">
-        <div class="release-column">
-          <!-- candidates list -->
-          <div class="labelled-box track-panel candidates-panel">
-            <div class="content no-label">
-              <div class="card-header member-list">
-                <h3 class="view-color">Candidates ({{ candidates.length }})</h3>
-                <div class="small-buttons">
-                  <button
-                    class="view-color"
-                    mat-stroked-button
-                    (click)="onAddCandidate()">
-                    <mat-icon>add</mat-icon>
-                    Add
-                  </button>
-                  <button
-                    class="promote-color"
-                    mat-stroked-button
-                    (click)="onPromoteAll()">
-                    Promote All
-                  </button>
+        <div
+          class="release-column"
+          [ngClass]="{
+            'released-members-column': lane.isReleasedMembers,
+            'released-members-collapsed':
+              lane.isReleasedMembers && !showReleasedMembers,
+          }"
+          *ngFor="let lane of workspaceLanes; trackBy: trackByLaneKey">
+          <div
+            class="labelled-box track-panel"
+            [ngClass]="'track-panel-' + lane.modifier">
+            <button
+              *ngIf="
+                lane.isReleasedMembers && !showReleasedMembers;
+                else expandedLanePanel
+              "
+              class="released-members-rail"
+              type="button"
+              (click)="toggleReleasedMembers()">
+              <span class="released-members-label">
+                Released Members ({{ lane.items.length }})
+              </span>
+            </button>
+
+            <ng-template #expandedLanePanel>
+              <div class="content no-label">
+                <div class="card-header member-list">
+                  <h3
+                    [ngClass]="{
+                      'view-color': lane.modifier === 'candidates',
+                      'review-color': lane.modifier === 'awaiting-review',
+                      'promote-color': lane.modifier === 'staged',
+                    }">
+                    {{ lane.title }} ({{ lane.items.length }})
+                  </h3>
+                  <div class="small-buttons">
+                    <button
+                      *ngIf="canAddCandidates(lane)"
+                      class="view-color"
+                      mat-stroked-button
+                      (click)="onAddCandidate()">
+                      <mat-icon>add</mat-icon>
+                      Add
+                    </button>
+                    <button
+                      *ngIf="lane.isReleasedMembers"
+                      mat-stroked-button
+                      type="button"
+                      (click)="toggleReleasedMembers()">
+                      <mat-icon>
+                        {{
+                          showReleasedMembers ? 'visibility_off' : 'visibility'
+                        }}
+                      </mat-icon>
+                      {{ showReleasedMembers ? 'Hide' : 'Show' }}
+                    </button>
+                  </div>
+                </div>
+
+                <mat-divider></mat-divider>
+
+                <div class="card-body list">
+                  <div class="empty-state" *ngIf="!lane.items.length">
+                    {{ lane.emptyLabel }}
+                  </div>
+                  <div
+                    *ngFor="let item of lane.items; trackBy: trackByObjectRef">
+                    <ng-container
+                      *ngTemplateOutlet="
+                        memberTpl;
+                        context: {
+                          $implicit: item,
+                          lane: lane,
+                        }
+                      "></ng-container>
+                  </div>
                 </div>
               </div>
-
-              <mat-divider></mat-divider>
-
-              <div class="card-body list">
-                <div class="empty-state" *ngIf="!candidates.length">
-                  No candidates
-                </div>
-                <div *ngFor="let item of candidates">
-                  <ng-container
-                    *ngTemplateOutlet="
-                      memberTpl;
-                      context: {
-                        $implicit: item,
-                        type: 'candidate',
-                      }
-                    "></ng-container>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div class="release-column">
-          <!-- staged -->
-          <div class="labelled-box track-panel staged-panel">
-            <div class="content no-label">
-              <div class="card-header member-list">
-                <h3 class="promote-color">Staged ({{ staged.length }})</h3>
-                <div class="small-buttons">
-                  <button
-                    class="demote-color"
-                    mat-stroked-button
-                    (click)="onDemoteAll()">
-                    Demote All
-                  </button>
-                </div>
-              </div>
-
-              <mat-divider></mat-divider>
-
-              <div class="card-body list">
-                <div class="empty-state" *ngIf="!staged.length">
-                  No staged objects
-                </div>
-                <div *ngFor="let item of staged">
-                  <ng-container
-                    *ngTemplateOutlet="
-                      memberTpl;
-                      context: {
-                        $implicit: item,
-                        type: 'staged',
-                      }
-                    "></ng-container>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div class="release-column">
-          <!-- members -->
-          <div class="labelled-box track-panel members-panel">
-            <div class="content no-label">
-              <div class="card-header member-list">
-                <h3>Members ({{ members.length }})</h3>
-              </div>
-
-              <mat-divider></mat-divider>
-
-              <div class="card-body list">
-                <div class="empty-state" *ngIf="!members.length">
-                  No published objects
-                </div>
-                <div *ngFor="let item of members">
-                  <ng-container
-                    *ngTemplateOutlet="
-                      memberTpl;
-                      context: {
-                        $implicit: item,
-                        type: 'member',
-                      }
-                    "></ng-container>
-                </div>
-              </div>
-            </div>
+            </ng-template>
           </div>
         </div>
       </div>
     </div>
   </ng-template>
 
-  <ng-template #memberTpl let-item let-type="type">
+  <ng-template #memberTpl let-item let-lane="lane">
     <app-release-track-object-card
       [item]="item"
-      [cardType]="type"
-      [laneStatus]="item.object_status"
-      [showDescription]="false"
-      [showDiff]="type !== 'member'"
-      [showModifiedMeta]="false"
+      [cardType]="lane.type"
+      [laneStatus]="getLaneStatus(item, lane)"
+      [showDescription]="shouldShowLaneDescription(lane)"
+      [showDiff]="!canReviewAndApprove(item, lane)"
+      [showModifiedMeta]="true"
       (viewObject)="onView($event.object_ref)"
-      (diffObject)="onDiff($event.object_ref)">
+      (diffObject)="onDiff($event)">
       <app-status-chip
-        *ngIf="item.object_status"
         card-header-action
-        [status]="item.object_status"></app-status-chip>
+        [status]="getLaneStatus(item, lane)"></app-status-chip>
 
       <div
-        *ngIf="type === 'candidate' || type === 'staged'"
+        *ngIf="
+          canReviewAndApprove(item, lane) ||
+          canManuallyPromote(lane) ||
+          canManuallyDemote(lane)
+        "
         card-footer-action
         class="small-buttons">
         <button
-          *ngIf="type === 'candidate'"
+          *ngIf="canReviewAndApprove(item, lane)"
+          class="review-color"
+          mat-stroked-button
+          type="button"
+          (click)="onReviewAndApprove(item)">
+          <mat-icon>fact_check</mat-icon>
+          Review
+        </button>
+        <button
+          *ngIf="canManuallyPromote(lane)"
           class="promote-color"
           mat-stroked-button
+          type="button"
           (click)="onPromote(item.object_ref)">
           <mat-icon>arrow_forward</mat-icon>
           Promote
         </button>
         <button
-          *ngIf="type === 'staged'"
+          *ngIf="canManuallyDemote(lane)"
           class="demote-color"
           mat-stroked-button
+          type="button"
           (click)="onDemote(item)">
           <mat-icon>arrow_back</mat-icon>
           Demote
         </button>
       </div>
     </app-release-track-object-card>
-  </ng-template>
-
-  <ng-template #reviewTpl>
-    <div class="review-tpl-wrapper">
-      <app-release-track-review-board
-        [items]="reviewItems"
-        (viewObject)="onView($event.object_ref)"
-        (diffObject)="onDiff($event)"
-        (bulkReview)="onBulkReviewAll($event)">
-      </app-release-track-review-board>
-    </div>
   </ng-template>
 
   <ng-template #historyTpl>
