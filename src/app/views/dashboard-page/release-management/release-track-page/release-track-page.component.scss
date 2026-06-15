@@ -44,6 +44,350 @@ $released-members-disabled-dark: colors.on-color-deemphasis(dark);
     gap: 8px;
   }
 
+  .review-tpl-wrapper {
+    margin-top: 20px;
+  }
+
+  .history-tpl {
+    margin-top: 20px;
+  }
+
+  .config-tpl {
+    max-width: 768px;
+    margin: 24px auto 0;
+  }
+
+  .config-actions {
+    display: flex;
+    justify-content: flex-end;
+    margin-bottom: 16px;
+  }
+
+  .config-card-list {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .config-card > .content {
+    display: block;
+    padding: 22px 24px;
+
+    h3 {
+      margin: 0 0 20px;
+      font-size: 20px;
+      font-weight: 700;
+      line-height: 26px;
+
+      .dark & {
+        color: colors.color(mitre-light-blue);
+      }
+
+      .light & {
+        color: colors.color(mitre-blue);
+      }
+    }
+
+    .mat-divider {
+      margin: 18px 0;
+
+      .dark & {
+        border-top-color: colors.border-color(dark);
+      }
+
+      .light & {
+        border-top-color: colors.border-color(light);
+      }
+    }
+  }
+
+  .config-row {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 20px;
+
+    > .config-field {
+      flex: 0 0 320px;
+      margin-top: -8px;
+    }
+
+    > .config-state,
+    > .config-value,
+    > .mat-mdc-slide-toggle {
+      flex: 0 0 auto;
+      margin-left: auto;
+    }
+  }
+
+  .config-copy {
+    flex: 1 1 auto;
+    min-width: 0;
+
+    p {
+      margin: 4px 0 0;
+      font-size: 14px;
+      line-height: 20px;
+
+      .dark & {
+        color: colors.on-color-deemphasis(dark);
+      }
+
+      .light & {
+        color: colors.on-color-deemphasis(light);
+      }
+    }
+  }
+
+  .config-label {
+    font-size: 14px;
+    font-weight: 700;
+    line-height: 20px;
+
+    .dark & {
+      color: colors.on-color(dark);
+    }
+
+    .light & {
+      color: colors.on-color(light);
+    }
+  }
+
+  .config-state,
+  .config-value {
+    display: inline-flex;
+    align-items: center;
+    width: fit-content;
+    border-radius: 4px;
+    padding: 3px 6px;
+    font-family: monospace;
+    font-size: 14px;
+    font-weight: 700;
+    line-height: 18px;
+
+    .dark & {
+      color: color.mix(colors.color(secondary), colors.on-color(dark), 42%);
+      background: rgba(colors.color(secondary), 0.34);
+    }
+
+    .light & {
+      color: colors.color(secondary);
+      background: rgba(colors.color(secondary), 0.08);
+    }
+  }
+
+  .config-state {
+    font-family: inherit;
+    font-size: 13px;
+    text-transform: uppercase;
+
+    .dark & {
+      color: color.mix(colors.color(secondary), colors.on-color(dark), 42%);
+      background: rgba(colors.color(secondary), 0.34);
+    }
+
+    .light & {
+      color: colors.color(secondary);
+      background: rgba(colors.color(secondary), 0.08);
+    }
+  }
+
+  .config-state-on {
+    .dark & {
+      color: color.mix(colors.color(secondary), colors.on-color(dark), 42%);
+      background: rgba(colors.color(secondary), 0.34);
+    }
+
+    .light & {
+      color: colors.color(secondary);
+      background: rgba(colors.color(secondary), 0.08);
+    }
+  }
+
+  .config-field {
+    width: min(100%, 320px);
+  }
+
+  .snapshot-history-list {
+    display: flex;
+    flex-direction: column;
+    gap: 32px;
+    max-width: 896px;
+    margin: 32px auto 0;
+    padding-left: 72px;
+  }
+
+  .snapshot-history-entry {
+    position: relative;
+
+    &:not(:last-child)::before {
+      content: '';
+      position: absolute;
+      top: 48px;
+      bottom: -32px;
+      left: -38px;
+      width: 2px;
+
+      .dark & {
+        background: rgba(colors.on-color(dark), 0.36);
+      }
+
+      .light & {
+        background: rgba(colors.on-color(light), 0.24);
+      }
+    }
+  }
+
+  .snapshot-history-marker {
+    position: absolute;
+    top: 0;
+    left: -58px;
+    display: grid;
+    place-items: center;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+
+    .dark & {
+      color: colors.on-color-deemphasis(dark);
+      background: color.mix(
+        colors.color(mitre-navy),
+        colors.color(mitre-silver),
+        62%
+      );
+    }
+
+    .light & {
+      color: colors.on-color-deemphasis(light);
+      background: color.mix(
+        colors.color(mitre-silver),
+        colors.color(mitre-navy),
+        84%
+      );
+    }
+
+    &.snapshot-history-marker-tagged {
+      color: colors.color(success);
+    }
+
+    .mat-icon {
+      width: 18px;
+      height: 18px;
+      font-size: 18px;
+      line-height: 18px;
+    }
+  }
+
+  .snapshot-history-card {
+    overflow: hidden;
+    border: 1px solid;
+    border-radius: 6px;
+
+    .dark & {
+      border-color: colors.border-color(dark);
+      background: color.mix(colors.color(dark), colors.color(mitre-navy), 72%);
+    }
+
+    .light & {
+      border-color: colors.border-color(light);
+      background: colors.color(mitre-silver);
+    }
+  }
+
+  .snapshot-history-card-header {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 20px 16px 22px;
+    border-bottom: 1px solid;
+
+    .dark & {
+      border-color: colors.border-color(dark);
+      background: color.mix(colors.color(dark), colors.color(mitre-navy), 68%);
+    }
+
+    .light & {
+      border-color: colors.border-color(light);
+      background: colors.color(light);
+    }
+  }
+
+  .snapshot-history-title {
+    min-width: 0;
+
+    h3 {
+      margin: 0;
+      font-size: 20px;
+      line-height: 26px;
+
+      .dark & {
+        color: colors.on-color-deemphasis(dark);
+      }
+
+      .light & {
+        color: colors.on-color-deemphasis(light);
+      }
+    }
+
+    p {
+      margin: 4px 0 0;
+      font-size: 13px;
+      line-height: 18px;
+
+      .dark & {
+        color: colors.on-color-deemphasis(dark);
+      }
+
+      .light & {
+        color: colors.on-color-deemphasis(light);
+      }
+    }
+  }
+
+  .snapshot-history-actions {
+    flex: 0 0 auto;
+    justify-content: flex-end;
+    padding-top: 6px;
+  }
+
+  .snapshot-history-stats {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 16px;
+    padding: 14px 16px 12px;
+  }
+
+  .snapshot-history-stat {
+    min-width: 0;
+    text-align: center;
+  }
+
+  .snapshot-history-stat-value {
+    font-size: 26px;
+    font-weight: 800;
+    line-height: 32px;
+  }
+
+  .snapshot-history-stat-label {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    line-height: 16px;
+    text-transform: uppercase;
+
+    .dark & {
+      color: colors.on-color-deemphasis(dark);
+    }
+
+    .light & {
+      color: colors.on-color-deemphasis(light);
+    }
+  }
+
+  .modified-color {
+    color: color.mix(colors.color(spark-yellow), colors.color(warn), 72%);
+  }
+
   .release-track-board {
     display: flex;
     flex-direction: column;
@@ -514,6 +858,54 @@ $released-members-disabled-dark: colors.on-color-deemphasis(dark);
         .dark & {
           border-top-color: colors.border-color(dark);
         }
+      }
+    }
+
+    .snapshot-history-list {
+      margin-top: 20px;
+      padding-left: 50px;
+    }
+
+    .snapshot-history-card-header,
+    .snapshot-history-actions {
+      align-items: flex-start;
+    }
+
+    .snapshot-history-card-header {
+      flex-direction: column;
+    }
+
+    .snapshot-history-actions {
+      justify-content: flex-start;
+      padding-top: 0;
+    }
+
+    .snapshot-history-stats {
+      grid-template-columns: 1fr;
+      text-align: left;
+    }
+
+    .config-tpl {
+      margin-top: 20px;
+    }
+
+    .config-card > .content {
+      padding: 18px;
+    }
+
+    .config-row {
+      flex-direction: column;
+      gap: 12px;
+
+      > .config-field {
+        flex: 0 1 auto;
+        margin-top: 0;
+      }
+
+      > .config-state,
+      > .config-value,
+      > .mat-mdc-slide-toggle {
+        margin-left: 0;
       }
     }
   }
