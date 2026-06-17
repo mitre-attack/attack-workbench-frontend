@@ -25,19 +25,19 @@
           <div class="stat">
             <div class="stat-label">CANDIDATES</div>
             <div class="stat-value candidates-stat-value">
-              {{ track.candidates?.length || 'TODO' }}
+              {{ track.stats?.candidates ?? 0 }}
             </div>
           </div>
           <div class="stat">
             <div class="stat-label">STAGED</div>
             <div class="stat-value staged-stat-value">
-              {{ track.staged?.length || 'TODO' }}
+              {{ track.stats?.staged ?? 0 }}
             </div>
           </div>
           <div class="stat">
             <div class="stat-label">MEMBERS</div>
             <div class="stat-value">
-              {{ track.members?.length || 'TODO' }}
+              {{ track.stats?.members ?? 0 }}
             </div>
           </div>
         </ng-container>
