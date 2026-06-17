@@ -422,7 +422,11 @@
 
             <mat-divider></mat-divider>
 
-            <div class="config-row">
+            <div
+              class="config-row"
+              [class.config-row-disabled]="
+                !configForm.get('autoPromote')?.value
+              ">
               <div class="config-copy">
                 <div class="config-label">Candidacy Threshold</div>
                 <p>
@@ -443,7 +447,11 @@
                 </mat-form-field>
               </ng-container>
               <ng-template #thresholdValue>
-                <span class="config-value">
+                <span
+                  class="config-value"
+                  [class.config-value-disabled]="
+                    !configForm.get('autoPromote')?.value
+                  ">
                   {{
                     formatConfigOption(
                       configForm.get('candidacyThreshold')?.value
@@ -664,7 +672,11 @@
 
             <mat-divider></mat-divider>
 
-            <div class="config-row">
+            <div
+              class="config-row"
+              [class.config-row-disabled]="
+                !configForm.get('includeSecondaryObjects')?.value
+              ">
               <div class="config-copy">
                 <div class="config-label">Secondary Object Threshold</div>
                 <p>
@@ -686,7 +698,11 @@
                 </mat-form-field>
               </ng-container>
               <ng-template #secondaryThresholdValue>
-                <span class="config-value">
+                <span
+                  class="config-value"
+                  [class.config-value-disabled]="
+                    !configForm.get('includeSecondaryObjects')?.value
+                  ">
                   {{
                     formatConfigOption(
                       configForm.get('secondaryObjectThreshold')?.value

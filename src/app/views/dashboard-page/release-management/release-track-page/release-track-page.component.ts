@@ -65,7 +65,7 @@ interface SnapshotHistoryViewModel {
 
 interface ReleaseTrackConfigFormValue {
   autoPromote: boolean;
-  candidacyThreshold: WorkflowStatusType;
+  candidacyThreshold: WorkflowStatusType | null;
   memberSyncStrategy: MemberSyncStrategyType;
   memberSyncSupplantBehavior: MemberSyncBehaviorType;
   memberSyncSupplantStatusPolicy: MemberSyncPolicyType;
@@ -127,6 +127,15 @@ export class ReleaseTrackPageComponent implements OnInit {
       includeSecondaryObjects: [false],
       secondaryObjectThreshold: [WorkflowStatus.Reviewed],
     });
+    this.configForm.get('autoPromote')?.valueChanges.subscribe(autoPromote => {
+      this.syncCandidacyThresholdControl(!!autoPromote);
+    });
+    this.configForm
+      .get('includeSecondaryObjects')
+      ?.valueChanges.subscribe(includeSecondaryObjects => {
+        this.syncSecondaryObjectThresholdControl(!!includeSecondaryObjects);
+      });
+    this.syncSecondaryObjectThresholdControl(false);
   }
 
   ngOnInit(): void {
@@ -829,6 +838,48 @@ export class ReleaseTrackPageComponent implements OnInit {
     this.configForm.reset(this.getConfigFormValue(normalizedConfig), {
       emitEvent: false,
     });
+    this.syncCandidacyThresholdControl(!!normalizedConfig.auto_promote);
+    this.syncSecondaryObjectThresholdControl(
+      !!normalizedConfig.include_secondary_objects?.enabled
+    );
+  }
+
+  private syncCandidacyThresholdControl(autoPromote: boolean): void {
+    this.syncWorkflowStatusControl('candidacyThreshold', autoPromote);
+  }
+
+  private syncSecondaryObjectThresholdControl(
+    includeSecondaryObjects: boolean
+  ): void {
+    this.syncWorkflowStatusControl(
+      'secondaryObjectThreshold',
+      includeSecondaryObjects
+    );
+  }
+
+  private syncWorkflowStatusControl(
+    controlName: string,
+    isEnabled: boolean
+  ): void {
+    const thresholdControl = this.configForm.get(controlName);
+    if (!thresholdControl) return;
+
+    if (isEnabled) {
+      thresholdControl.enable({ emitEvent: false });
+      if (!thresholdControl.value) {
+        thresholdControl.setValue(WorkflowStatus.Reviewed, {
+          emitEvent: false,
+        });
+      }
+      return;
+    }
+
+    if (!thresholdControl.value) {
+      thresholdControl.setValue(WorkflowStatus.Reviewed, {
+        emitEvent: false,
+      });
+    }
+    thresholdControl.disable({ emitEvent: false });
   }
 
   private getConfigFromResponse(
@@ -892,8 +943,9 @@ export class ReleaseTrackPageComponent implements OnInit {
   private getConfigFormValue(
     config: ReleaseTrackConfig
   ): ReleaseTrackConfigFormValue {
+    const autoPromote = config.auto_promote ?? true;
     return {
-      autoPromote: config.auto_promote ?? true,
+      autoPromote,
       candidacyThreshold: config.candidacy_threshold ?? WorkflowStatus.Reviewed,
       memberSyncStrategy:
         config.member_sync?.strategy ?? MemberSyncStrategy.Manual,
@@ -917,9 +969,8 @@ export class ReleaseTrackPageComponent implements OnInit {
 
   private getConfigPayload(): ReleaseTrackConfig {
     const value = this.configForm.getRawValue() as ReleaseTrackConfigFormValue;
-    return {
+    const payload: ReleaseTrackConfig = {
       auto_promote: value.autoPromote,
-      candidacy_threshold: value.candidacyThreshold,
       include_secondary_objects: {
         enabled: value.includeSecondaryObjects,
         status_threshold: value.secondaryObjectThreshold,
@@ -936,6 +987,12 @@ export class ReleaseTrackPageComponent implements OnInit {
         },
       },
     };
+
+    if (value.autoPromote && value.candidacyThreshold) {
+      payload.candidacy_threshold = value.candidacyThreshold;
+    }
+
+    return payload;
   }
 
   private openReleasePreviewDialog(preview: any): void {

@@ -388,6 +388,39 @@ describe('ReleaseTrackPageComponent', () => {
       includeSecondaryObjects: true,
       secondaryObjectThreshold: 'work-in-progress',
     });
+    expect(component.configForm.get('candidacyThreshold')?.disabled).toBe(true);
+  });
+
+  it('should disable the secondary object threshold when secondary objects are not included', () => {
+    mockReleaseTrackApiConnector.getConfig.mockReturnValue(
+      of({
+        include_secondary_objects: {
+          enabled: false,
+          status_threshold: 'awaiting-review',
+        },
+      })
+    );
+    component.id = 'release-track--123';
+
+    component.getConfig();
+
+    expect(component.configForm.getRawValue()).toEqual(
+      expect.objectContaining({
+        includeSecondaryObjects: false,
+        secondaryObjectThreshold: 'awaiting-review',
+      })
+    );
+    expect(component.configForm.get('secondaryObjectThreshold')?.disabled).toBe(
+      true
+    );
+
+    component.configForm.patchValue({
+      includeSecondaryObjects: true,
+    });
+
+    expect(component.configForm.get('secondaryObjectThreshold')?.enabled).toBe(
+      true
+    );
   });
 
   it('should save release track config and refresh state', () => {
@@ -440,6 +473,37 @@ describe('ReleaseTrackPageComponent', () => {
     expect(component.isEditingConfig).toBe(false);
     expect(refreshSpy).toHaveBeenCalled();
     expect(historySpy).toHaveBeenCalled();
+  });
+
+  it('should save release track config without a candidacy threshold when auto-promotion is off', () => {
+    mockReleaseTrackApiConnector.updateConfig.mockReturnValue(of({}));
+    component.id = 'release-track--123';
+    component.releaseTrack = { config: {} } as any;
+    component.configForm.patchValue({
+      autoPromote: false,
+      candidacyThreshold: 'reviewed',
+      memberSyncStrategy: MemberSyncStrategy.Manual,
+      memberSyncSupplantBehavior: MemberSyncBehavior.Replace,
+      memberSyncSupplantStatusPolicy: MemberSyncPolicy.Preserve,
+      candidatesToStagedConflict: ConflictPolicy.PreferLatest,
+      stagedToMembersConflict: ConflictPolicy.Abort,
+      includeSecondaryObjects: false,
+      secondaryObjectThreshold: 'reviewed',
+    });
+    component.isEditingConfig = true;
+
+    component.onSaveConfig();
+
+    expect(mockReleaseTrackApiConnector.updateConfig).toHaveBeenCalledWith(
+      'release-track--123',
+      expect.not.objectContaining({
+        candidacy_threshold: expect.anything(),
+      })
+    );
+    expect(
+      mockReleaseTrackApiConnector.updateConfig.mock.calls[0][1]
+        .candidacy_threshold
+    ).toBeUndefined();
   });
 
   it('should split auto-promotion release tracks into workflow lanes', () => {

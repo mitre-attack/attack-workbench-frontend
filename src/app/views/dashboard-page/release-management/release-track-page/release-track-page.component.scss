@@ -120,6 +120,42 @@ $released-members-disabled-dark: colors.on-color-deemphasis(dark);
     }
   }
 
+  .config-row-disabled {
+    .config-label,
+    .config-copy p,
+    .config-value {
+      color: #7d8792;
+    }
+
+    .config-value {
+      background: rgba(29, 39, 51, 0.06);
+    }
+
+    .dark & {
+      .config-label,
+      .config-copy p,
+      .config-value {
+        color: colors.on-color-deemphasis(dark);
+      }
+
+      .config-value {
+        background: rgba(colors.on-color(dark), 0.08);
+      }
+    }
+
+    .light & {
+      .config-label,
+      .config-copy p,
+      .config-value {
+        color: colors.on-color-deemphasis(light);
+      }
+
+      .config-value {
+        background: rgba(colors.on-color(light), 0.06);
+      }
+    }
+  }
+
   .config-copy {
     flex: 1 1 auto;
     min-width: 0;
@@ -201,6 +237,21 @@ $released-members-disabled-dark: colors.on-color-deemphasis(dark);
     .light & {
       color: colors.color(secondary);
       background: rgba(colors.color(secondary), 0.08);
+    }
+  }
+
+  .config-value-disabled {
+    color: #7d8792;
+    background: rgba(29, 39, 51, 0.06);
+
+    .dark & {
+      color: colors.on-color-deemphasis(dark);
+      background: rgba(colors.on-color(dark), 0.08);
+    }
+
+    .light & {
+      color: colors.on-color-deemphasis(light);
+      background: rgba(colors.on-color(light), 0.06);
     }
   }
 
