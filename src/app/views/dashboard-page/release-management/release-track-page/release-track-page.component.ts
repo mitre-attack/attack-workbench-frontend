@@ -13,13 +13,11 @@ import {
   MemberSyncStrategyType,
   ReleaseTrackConfig,
   ReleaseTrackSnapshot,
-  ReleaseTrackType,
-} from 'src/app/classes/release-tracks';
-import {
-  ReleaseTracksConnectorService,
   ReleaseTrackSnapshotHistoryItem,
+  ReleaseTrackType,
   StixObjectRef,
-} from 'src/app/services/connectors/rest-api/release-tracks.service';
+} from 'src/app/classes/release-tracks';
+import { ReleaseTracksConnectorService } from 'src/app/services/connectors/rest-api/release-tracks.service';
 import { BreadcrumbService } from 'src/app/services/helpers/breadcrumb.service';
 import { MatDialog } from '@angular/material/dialog';
 import { SelectionModel } from '@angular/cdk/collections';

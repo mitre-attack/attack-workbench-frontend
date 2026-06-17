@@ -7,158 +7,37 @@ import { environment } from '../../../../environments/environment';
 import { logger } from '../../../utils/logger';
 import { ApiConnector } from '../api-connector';
 import {
+  ExportFormat,
+  ReleaseTrackSnapshot,
+} from 'src/app/classes/release-tracks';
+import type {
+  BumpPayload,
+  ClonePayload,
+  CreateReleaseTrackPayload,
   ExportFormatType,
   ReleaseTrackConfig,
-  ReleaseTrackSnapshot,
-  ReleaseTrackType,
+  ReleaseTrackSnapshotHistoryItem,
+  ReleaseTrackSnapshotOptions,
+  ReviewPayload,
+  StixBundlePayload,
+  StixObjectRef,
+  UpdateContentsPayload,
+  UpdateMetadataPayload,
 } from 'src/app/classes/release-tracks';
 import { Paginated } from './rest-api-connector.service';
 
-// -----------------------------------------------------------------------------
-// Request Payload Definitions for Release Tracks API Requests
-// -----------------------------------------------------------------------------
-export type StixObjectRef = string | { id: string; modified?: string };
-
-export interface CreateReleaseTrackPayload {
-  name: string;
-  description?: string;
-  external_references?: any[];
-  object_marking_refs?: any[];
-  type?: ReleaseTrackType;
-  composition?: any;
-  snapshot_schedule?: any;
-}
-
-// Backwards-compatible payload shape for virtual track composition. The UI
-// sometimes submits a slightly different structure; keep the service tolerant.
-export interface VirtualCompositionPayload {
-  component_tracks?: any[];
-  deduplication?: {
-    strategy?: string;
-    tier_resolution?: string;
-    status_resolution?: string;
-  };
-}
-
-export interface StixBundlePayload {
-  type: 'bundle';
-  id?: string;
-  objects: any[];
-}
-
-export interface UpdateMetadataPayload {
-  name?: string;
-  description?: string;
-  external_references?: any[];
-  object_marking_refs?: any[];
-}
-
-export interface UpdateContentsPayload {
-  x_mitre_contents: string[];
-}
-
-export interface BumpPayload {
-  type?: 'major' | 'minor';
-  version?: string;
-  dry_run?: boolean;
-}
-
-export interface ClonePayload {
-  name?: string;
-}
-
-export interface ReviewPayload {
-  from: string;
-  to: string;
-  object_refs?: StixObjectRef[];
-}
-
-export interface UpdateVersionPayload {
-  old_modified?: string;
-  new_modified?: string;
-}
-
-export type ConfigPayload = Partial<ReleaseTrackConfig>;
-
-export interface ReleaseTrackSnapshotOptions {
-  format?: ExportFormatType;
-  include?: string;
-  [key: string]: any;
-}
-
-export interface CreateVirtualSnapshotPayload {
-  description?: string;
-}
-
-export interface CreateVirtualSnapshotResponse {
-  stix?: {
-    id?: string;
-    modified?: string;
-    x_mitre_version?: string | null;
-    type?: ReleaseTrackType | string;
-    [key: string]: any;
-  };
-  composition_resolution?: {
-    resolved_at?: string;
-    component_snapshots?: any[];
-    total_objects?: number;
-    duplicates_resolved?: number;
-    [key: string]: any;
-  };
-  [key: string]: any;
-}
-
-export interface PreviewVirtualSnapshotResponse {
-  preview?: {
-    would_resolve_to?: {
-      component_snapshots?: any[];
-      total_objects?: number;
-      [key: string]: any;
-    };
-    comparison_to_latest_tagged?: {
-      current_version?: string | null;
-      new_objects?: number;
-      updated_objects?: number;
-      removed_objects?: number;
-      [key: string]: any;
-    };
-    [key: string]: any;
-  };
-  [key: string]: any;
-}
-
-export interface ReleaseTrackSnapshotHistoryItem {
-  id?: string;
-  modified?: string | Date;
-  version?: string | null;
-  created?: string | Date;
-  tagged_at?: string | Date;
-  snapshot_id?: string | Date;
-  members?: any[];
-  staged?: any[];
-  candidates?: any[];
-  contents?: {
-    members?: any[];
-    staged?: any[];
-    candidates?: any[];
-    [key: string]: any;
-  };
-  summary?: {
-    members_count?: number;
-    added_count?: number;
-    modified_count?: number;
-    promoted_count?: number;
-    [key: string]: any;
-  };
-  stix?: {
-    id?: string;
-    modified?: string | Date;
-    x_mitre_version?: string | null;
-    x_mitre_contents?: any[];
-    [key: string]: any;
-  };
-  [key: string]: any;
-}
+export type {
+  BumpPayload,
+  ClonePayload,
+  CreateReleaseTrackPayload,
+  ReleaseTrackSnapshotHistoryItem,
+  ReleaseTrackSnapshotOptions,
+  ReviewPayload,
+  StixBundlePayload,
+  StixObjectRef,
+  UpdateContentsPayload,
+  UpdateMetadataPayload,
+} from 'src/app/classes/release-tracks';
 
 // -----------------------------------------------------------------------------
 // Release Tracks API Connector Service
@@ -262,13 +141,7 @@ export class ReleaseTracksConnectorService extends ApiConnector {
     offset?: number;
     search?: string;
   }): Observable<Paginated<any>> {
-    let params = new HttpParams();
-    if (options?.type) params = params.set('type', options.type);
-    if (options?.releases) params = params.set('releases', options.releases);
-    if (options?.limit) params = params.set('limit', options.limit.toString());
-    if (options?.offset)
-      params = params.set('offset', options.offset.toString());
-    if (options?.search) params = params.set('search', options.search);
+    const params = this.buildHttpParams(options);
     const url = `${this.apiUrl}/release-tracks`;
     return this.http.get(url, { params }).pipe(
       tap(() => logger.log('retrieved release tracks list')),
@@ -474,9 +347,11 @@ export class ReleaseTracksConnectorService extends ApiConnector {
    * @param format Optional output format
    * @returns Observable<any> preview payload
    */
-  public previewBump(id: string, format = 'workbench'): Observable<any> {
-    let params = new HttpParams();
-    if (format) params = params.set('format', format);
+  public previewBump(
+    id: string,
+    format: ExportFormatType = ExportFormat.Workbench
+  ): Observable<any> {
+    const params = this.buildHttpParams({ format });
     const url = `${this.apiUrl}/release-tracks/${id}/bump/preview`;
     return this.http.get(url, { params }).pipe(
       tap(result =>
@@ -553,8 +428,8 @@ export class ReleaseTracksConnectorService extends ApiConnector {
   public retrieveSnapshotByModified(
     id: string,
     modified: string,
-    options?: Record<string, any>
-  ): Observable<any> {
+    options?: ReleaseTrackSnapshotOptions
+  ): Observable<ReleaseTrackSnapshot | null> {
     const params = this.buildHttpParams(options);
     const url = `${this.apiUrl}/release-tracks/${id}/snapshots/${modified}`;
     return this.http.get(url, { params }).pipe(
@@ -687,18 +562,18 @@ export class ReleaseTracksConnectorService extends ApiConnector {
    * Resolve component tracks and create a new draft snapshot for a virtual track.
    * @param id Release track id
    * @param body Optional snapshot creation options
-   * @returns Observable<CreateVirtualSnapshotResponse>
+   * @returns Observable<any>
    */
   public createVirtualSnapshot(
     id: string,
-    body?: CreateVirtualSnapshotPayload
-  ): Observable<CreateVirtualSnapshotResponse> {
+    body?: { description?: string }
+  ): Observable<any> {
     const url = `${this.apiUrl}/release-tracks/${id}/snapshots/create`;
-    return this.http.post<CreateVirtualSnapshotResponse>(url, body || {}).pipe(
+    return this.http.post(url, body || {}).pipe(
       tap(result =>
         logger.log(`created virtual snapshot for track ${id}`, result)
       ),
-      catchError(this.handleError_raise<CreateVirtualSnapshotResponse>()),
+      catchError(this.handleError_raise()),
       share()
     );
   }
@@ -707,19 +582,15 @@ export class ReleaseTracksConnectorService extends ApiConnector {
    * GET /api/release-tracks/:id/snapshots/preview
    * Preview the resolved contents of a virtual snapshot without creating it.
    * @param id Release track id
-   * @returns Observable<PreviewVirtualSnapshotResponse | null>
+   * @returns Observable<any>
    */
-  public previewVirtualSnapshot(
-    id: string
-  ): Observable<PreviewVirtualSnapshotResponse | null> {
+  public previewVirtualSnapshot(id: string): Observable<any> {
     const url = `${this.apiUrl}/release-tracks/${id}/snapshots/preview`;
-    return this.http.get<PreviewVirtualSnapshotResponse>(url).pipe(
+    return this.http.get(url).pipe(
       tap(result =>
         logger.log(`previewed virtual snapshot for track ${id}`, result)
       ),
-      catchError(
-        this.handleError_continue<PreviewVirtualSnapshotResponse | null>(null)
-      ),
+      catchError(this.handleError_continue<any>(null)),
       share()
     );
   }
@@ -763,11 +634,7 @@ export class ReleaseTracksConnectorService extends ApiConnector {
     id: string,
     options?: { status?: string; limit?: number; offset?: number }
   ): Observable<any> {
-    let params = new HttpParams();
-    if (options?.status) params = params.set('status', options.status);
-    if (options?.limit) params = params.set('limit', options.limit.toString());
-    if (options?.offset)
-      params = params.set('offset', options.offset.toString());
+    const params = this.buildHttpParams(options);
     const url = `${this.apiUrl}/release-tracks/${id}/candidates`;
     return this.http.get(url, { params }).pipe(
       tap(() => logger.log(`listed candidates for track ${id}`)),
@@ -849,7 +716,7 @@ export class ReleaseTracksConnectorService extends ApiConnector {
   public updateCandidateVersion(
     id: string,
     objectRef: string,
-    body: UpdateVersionPayload
+    body: { old_modified?: string; new_modified?: string }
   ): Observable<any> {
     const url = `${this.apiUrl}/release-tracks/${id}/candidates/${objectRef}/update-version`;
     return this.http.post(url, body).pipe(
@@ -935,7 +802,7 @@ export class ReleaseTracksConnectorService extends ApiConnector {
    */
   public updateConfig(
     id: string,
-    body: ConfigPayload,
+    body: Partial<ReleaseTrackConfig>,
     userAccountId?: string
   ): Observable<any> {
     const url = `${this.apiUrl}/release-tracks/${id}/config`;
