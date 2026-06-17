@@ -4,6 +4,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
 import { MatIconModule } from '@angular/material/icon';
 import { MatTooltipModule } from '@angular/material/tooltip';
+import moment from 'moment';
 import { StixTypeToAttackType } from 'src/app/utils/type-mappings';
 import { StixType, WorkflowStatusType } from 'src/app/utils/types';
 import { UserAvatarComponent } from '../user-avatar/user-avatar.component';
@@ -61,8 +62,30 @@ export class ReleaseTrackObjectCardComponent {
     return this.item?.object_modified || null;
   }
 
+  public get modifiedHumanized(): string {
+    if (!this.modified) return 'Unknown';
+    const now = moment();
+    const then = moment(this.modified);
+    const difference = moment.duration(then.diff(now));
+    return difference.asWeeks() > -1
+      ? difference.humanize(true)
+      : then.format('D MMMM YYYY');
+  }
+
+  public get modifiedTimestamp(): string {
+    if (!this.modified) return '';
+    return moment(this.modified).format('D MMMM YYYY, h:mm A');
+  }
+
   public get modifiedByName(): string {
-    return this.item?.modified_by_user || 'Unknown User';
+    return (
+      this.item?.modified_by_user ||
+      this.item?.object_modified_by ||
+      this.item?.object_added_by ||
+      this.item?.object_staged_by ||
+      this.item?.modified_by_ref ||
+      'Unknown User'
+    );
   }
 
   public get cardClasses(): Record<string, boolean> {

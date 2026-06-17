@@ -234,7 +234,6 @@ import { StixPageTabsComponent } from './components/stix/stix-page-tabs/stix-pag
 import { ReleaseManagementComponent } from './views/dashboard-page/release-management/release-management.component';
 import { ReleaseTrackCardComponent } from './components/release-track-card/release-track-card.component';
 import { ReleaseTrackObjectCardComponent } from './components/release-track-object-card/release-track-object-card.component';
-import { ReleaseTrackReviewBoardComponent } from './components/release-track-review-board/release-track-review-board.component';
 import { NewTrackDialogComponent } from './components/new-track-dialog/new-track-dialog.component';
 import { ReleaseTrackPageComponent } from './views/dashboard-page/release-management/release-track-page/release-track-page.component';
 import { StatusChipComponent } from './components/status-chip/status-chip.component';
@@ -476,7 +475,6 @@ export function initConfig(appConfigService: AppConfigService) {
     UserAvatarComponent,
     ReleaseTrackCardComponent,
     ReleaseTrackObjectCardComponent,
-    ReleaseTrackReviewBoardComponent,
   ],
   providers: [
     AppConfigService,

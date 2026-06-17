@@ -1,3 +1,4 @@
+export * from './api';
 export * from './component-track';
 export * from './composition';
 export * from './config';

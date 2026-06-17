@@ -7,87 +7,37 @@ import { environment } from '../../../../environments/environment';
 import { logger } from '../../../utils/logger';
 import { ApiConnector } from '../api-connector';
 import {
-  ExportFormatType,
+  ExportFormat,
   ReleaseTrackSnapshot,
-  ReleaseTrackType,
+} from 'src/app/classes/release-tracks';
+import type {
+  BumpPayload,
+  ClonePayload,
+  CreateReleaseTrackPayload,
+  ExportFormatType,
+  ReleaseTrackConfig,
+  ReleaseTrackSnapshotHistoryItem,
+  ReleaseTrackSnapshotOptions,
+  ReviewPayload,
+  StixBundlePayload,
+  StixObjectRef,
+  UpdateContentsPayload,
+  UpdateMetadataPayload,
 } from 'src/app/classes/release-tracks';
 import { Paginated } from './rest-api-connector.service';
-import { WorkflowStatusType } from 'src/app/utils/types';
 
-// -----------------------------------------------------------------------------
-// Request Payload Definitions for Release Tracks API Requests
-// -----------------------------------------------------------------------------
-export type StixObjectRef = string | { id: string; modified?: string };
-
-export interface CreateReleaseTrackPayload {
-  name: string;
-  description?: string;
-  external_references?: any[];
-  object_marking_refs?: any[];
-  type?: ReleaseTrackType;
-  composition?: any;
-  snapshot_schedule?: any;
-}
-
-// Backwards-compatible payload shape for virtual track composition. The UI
-// sometimes submits a slightly different structure; keep the service tolerant.
-export interface VirtualCompositionPayload {
-  component_tracks?: any[];
-  deduplication?: {
-    strategy?: string;
-    tier_resolution?: string;
-    status_resolution?: string;
-  };
-}
-
-export interface StixBundlePayload {
-  type: 'bundle';
-  id?: string;
-  objects: any[];
-}
-
-export interface UpdateMetadataPayload {
-  name?: string;
-  description?: string;
-  external_references?: any[];
-  object_marking_refs?: any[];
-}
-
-export interface UpdateContentsPayload {
-  x_mitre_contents: string[];
-}
-
-export interface BumpPayload {
-  type?: 'major' | 'minor';
-  version?: string;
-  dry_run?: boolean;
-}
-
-export interface ClonePayload {
-  name?: string;
-}
-
-export interface ReviewPayload {
-  from: string;
-  to: string;
-  object_refs?: StixObjectRef[];
-}
-
-export interface UpdateVersionPayload {
-  old_modified?: string;
-  new_modified?: string;
-}
-
-export interface ConfigPayload {
-  candidacy_threshold?: WorkflowStatusType;
-  auto_promote?: boolean;
-}
-
-export interface ReleaseTrackSnapshotOptions {
-  format?: ExportFormatType;
-  include?: string;
-  [key: string]: any;
-}
+export type {
+  BumpPayload,
+  ClonePayload,
+  CreateReleaseTrackPayload,
+  ReleaseTrackSnapshotHistoryItem,
+  ReleaseTrackSnapshotOptions,
+  ReviewPayload,
+  StixBundlePayload,
+  StixObjectRef,
+  UpdateContentsPayload,
+  UpdateMetadataPayload,
+} from 'src/app/classes/release-tracks';
 
 // -----------------------------------------------------------------------------
 // Release Tracks API Connector Service
@@ -117,6 +67,36 @@ export class ReleaseTracksConnectorService extends ApiConnector {
       });
     }
     return params;
+  }
+
+  private normalizeSnapshotHistory(
+    result: any
+  ): ReleaseTrackSnapshotHistoryItem[] {
+    if (!result) return [];
+    if (Array.isArray(result)) return result;
+
+    const snapshots =
+      result.snapshots ||
+      result.data ||
+      result.versions ||
+      result.release_track_snapshots ||
+      result.history ||
+      [];
+
+    if (Array.isArray(snapshots) && snapshots.length) return snapshots;
+
+    const historyItems = Array.isArray(result.version_history)
+      ? result.version_history.map((entry: any) => ({
+          ...entry,
+          modified: entry.snapshot_id,
+        }))
+      : [];
+
+    if (!result.version) {
+      return [result, ...historyItems];
+    }
+
+    return historyItems.length ? historyItems : [result];
   }
 
   // -----------------------------------------------------------------------------
@@ -161,13 +141,7 @@ export class ReleaseTracksConnectorService extends ApiConnector {
     offset?: number;
     search?: string;
   }): Observable<Paginated<any>> {
-    let params = new HttpParams();
-    if (options?.type) params = params.set('type', options.type);
-    if (options?.releases) params = params.set('releases', options.releases);
-    if (options?.limit) params = params.set('limit', options.limit.toString());
-    if (options?.offset)
-      params = params.set('offset', options.offset.toString());
-    if (options?.search) params = params.set('search', options.search);
+    const params = this.buildHttpParams(options);
     const url = `${this.apiUrl}/release-tracks`;
     return this.http.get(url, { params }).pipe(
       tap(() => logger.log('retrieved release tracks list')),
@@ -247,6 +221,26 @@ export class ReleaseTracksConnectorService extends ApiConnector {
   }
 
   /**
+   * GET /api/release-tracks/:id
+   * Build snapshot history from the latest snapshot and its version_history.
+   * @param id Release track id
+   * @returns Observable<ReleaseTrackSnapshotHistoryItem[]>
+   */
+  public listSnapshots(
+    id: string
+  ): Observable<ReleaseTrackSnapshotHistoryItem[]> {
+    const url = `${this.apiUrl}/release-tracks/${id}`;
+    return this.http.get(url).pipe(
+      tap(result => logger.log(`retrieved snapshots for track ${id}`, result)),
+      map(result => this.normalizeSnapshotHistory(result)),
+      catchError(
+        this.handleError_continue<ReleaseTrackSnapshotHistoryItem[]>([])
+      ),
+      share()
+    );
+  }
+
+  /**
    * GET /api/release-tracks/:id?format=:format
    * Retrieve the latest snapshot in an export format without deserializing it.
    * @param id Release track id
@@ -265,6 +259,35 @@ export class ReleaseTracksConnectorService extends ApiConnector {
       tap(result =>
         logger.log(
           `retrieved latest snapshot export for track ${id} in ${format} format`,
+          result
+        )
+      ),
+      catchError(this.handleError_raise()),
+      share()
+    );
+  }
+
+  /**
+   * GET /api/release-tracks/:id/snapshots/:modified?format=:format
+   * Retrieve a specific snapshot in an export format without deserializing it.
+   * @param id Release track id
+   * @param modified ISO timestamp identifying the snapshot
+   * @param format Export format
+   * @param options Additional query options
+   * @returns Observable<any> formatted export payload
+   */
+  public exportSnapshotByModified(
+    id: string,
+    modified: string,
+    format: ExportFormatType,
+    options?: Omit<ReleaseTrackSnapshotOptions, 'format'>
+  ): Observable<any> {
+    const params = this.buildHttpParams({ ...options, format });
+    const url = `${this.apiUrl}/release-tracks/${id}/snapshots/${modified}`;
+    return this.http.get(url, { params }).pipe(
+      tap(result =>
+        logger.log(
+          `retrieved snapshot ${modified} export for track ${id} in ${format} format`,
           result
         )
       ),
@@ -324,9 +347,11 @@ export class ReleaseTracksConnectorService extends ApiConnector {
    * @param format Optional output format
    * @returns Observable<any> preview payload
    */
-  public previewBump(id: string, format = 'workbench'): Observable<any> {
-    let params = new HttpParams();
-    if (format) params = params.set('format', format);
+  public previewBump(
+    id: string,
+    format: ExportFormatType = ExportFormat.Workbench
+  ): Observable<any> {
+    const params = this.buildHttpParams({ format });
     const url = `${this.apiUrl}/release-tracks/${id}/bump/preview`;
     return this.http.get(url, { params }).pipe(
       tap(result =>
@@ -375,9 +400,13 @@ export class ReleaseTracksConnectorService extends ApiConnector {
    * @param id Release track id
    * @returns Observable<unknown>
    */
-  public deleteReleaseTrack(id: string): Observable<unknown> {
+  public deleteReleaseTrack(
+    id: string,
+    options?: { versions?: 'latest' }
+  ): Observable<unknown> {
+    const params = this.buildHttpParams(options);
     const url = `${this.apiUrl}/release-tracks/${id}`;
-    return this.http.delete(url).pipe(
+    return this.http.delete(url, { params }).pipe(
       tap(() => logger.log(`deleted track ${id}`)),
       catchError(this.handleError_raise()),
       share()
@@ -399,15 +428,9 @@ export class ReleaseTracksConnectorService extends ApiConnector {
   public retrieveSnapshotByModified(
     id: string,
     modified: string,
-    options?: Record<string, any>
-  ): Observable<any> {
-    let params = new HttpParams();
-    if (options) {
-      Object.keys(options).forEach(k => {
-        const v = options[k];
-        if (v !== undefined && v !== null) params = params.set(k, String(v));
-      });
-    }
+    options?: ReleaseTrackSnapshotOptions
+  ): Observable<ReleaseTrackSnapshot | null> {
+    const params = this.buildHttpParams(options);
     const url = `${this.apiUrl}/release-tracks/${id}/snapshots/${modified}`;
     return this.http.get(url, { params }).pipe(
       tap(result =>
@@ -534,6 +557,44 @@ export class ReleaseTracksConnectorService extends ApiConnector {
     );
   }
 
+  /**
+   * POST /api/release-tracks/:id/snapshots/create
+   * Resolve component tracks and create a new draft snapshot for a virtual track.
+   * @param id Release track id
+   * @param body Optional snapshot creation options
+   * @returns Observable<any>
+   */
+  public createVirtualSnapshot(
+    id: string,
+    body?: { description?: string }
+  ): Observable<any> {
+    const url = `${this.apiUrl}/release-tracks/${id}/snapshots/create`;
+    return this.http.post(url, body || {}).pipe(
+      tap(result =>
+        logger.log(`created virtual snapshot for track ${id}`, result)
+      ),
+      catchError(this.handleError_raise()),
+      share()
+    );
+  }
+
+  /**
+   * GET /api/release-tracks/:id/snapshots/preview
+   * Preview the resolved contents of a virtual snapshot without creating it.
+   * @param id Release track id
+   * @returns Observable<any>
+   */
+  public previewVirtualSnapshot(id: string): Observable<any> {
+    const url = `${this.apiUrl}/release-tracks/${id}/snapshots/preview`;
+    return this.http.get(url).pipe(
+      tap(result =>
+        logger.log(`previewed virtual snapshot for track ${id}`, result)
+      ),
+      catchError(this.handleError_continue<any>(null)),
+      share()
+    );
+  }
+
   // -----------------------------------------------------------------------------
   // Candidate Management
   // -----------------------------------------------------------------------------
@@ -573,11 +634,7 @@ export class ReleaseTracksConnectorService extends ApiConnector {
     id: string,
     options?: { status?: string; limit?: number; offset?: number }
   ): Observable<any> {
-    let params = new HttpParams();
-    if (options?.status) params = params.set('status', options.status);
-    if (options?.limit) params = params.set('limit', options.limit.toString());
-    if (options?.offset)
-      params = params.set('offset', options.offset.toString());
+    const params = this.buildHttpParams(options);
     const url = `${this.apiUrl}/release-tracks/${id}/candidates`;
     return this.http.get(url, { params }).pipe(
       tap(() => logger.log(`listed candidates for track ${id}`)),
@@ -659,7 +716,7 @@ export class ReleaseTracksConnectorService extends ApiConnector {
   public updateCandidateVersion(
     id: string,
     objectRef: string,
-    body: UpdateVersionPayload
+    body: { old_modified?: string; new_modified?: string }
   ): Observable<any> {
     const url = `${this.apiUrl}/release-tracks/${id}/candidates/${objectRef}/update-version`;
     return this.http.post(url, body).pipe(
@@ -745,7 +802,7 @@ export class ReleaseTracksConnectorService extends ApiConnector {
    */
   public updateConfig(
     id: string,
-    body: ConfigPayload,
+    body: Partial<ReleaseTrackConfig>,
     userAccountId?: string
   ): Observable<any> {
     const url = `${this.apiUrl}/release-tracks/${id}/config`;

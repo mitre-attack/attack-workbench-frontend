@@ -1,5 +1,7 @@
 import { WorkflowStatus, WorkflowStatusType } from 'src/app/utils/types';
 
+type EnumValue<T extends Record<string, string>> = T[keyof T];
+
 // -----------------------------------------------------------------------------
 // Release Track Type
 // -----------------------------------------------------------------------------
@@ -24,11 +26,7 @@ export enum ConflictPolicy {
   Abort = 'abort', // throw error on any conflict
 }
 
-export type ConflictPolicyType =
-  | ConflictPolicy.AlwaysOverwrite
-  | ConflictPolicy.AlwaysReject
-  | ConflictPolicy.PreferLatest
-  | ConflictPolicy.Abort;
+export type ConflictPolicyType = EnumValue<typeof ConflictPolicy>;
 
 export const CONFLICT_POLICY_OPTIONS: ConflictPolicyType[] = Object.values(
   ConflictPolicy
@@ -41,15 +39,11 @@ export const CONFLICT_POLICY_OPTIONS: ConflictPolicyType[] = Object.values(
 export enum DeduplicationStrategy {
   PrioritizeLatestObject = 'prioritize_latest_object', // keep version with newest object_modified
   PrioritizeLatestSnapshot = 'prioritize_latest_snapshot', // keep version from most recently modified snapshot
-  PrioritizeHigherPriority = 'prioritize_higher_priority', // keep version from the higher-priority conmponent (lower number)
+  PrioritizeHigherPriority = 'prioritize_higher_priority', // keep version from the higher-priority component (lower number)
   Quarantine = 'quarantine', // send all conflicting versions to quarantine for manual review
 }
 
-export type DeduplicationStrategyType =
-  | DeduplicationStrategy.PrioritizeLatestObject
-  | DeduplicationStrategy.PrioritizeLatestSnapshot
-  | DeduplicationStrategy.PrioritizeHigherPriority
-  | DeduplicationStrategy.Quarantine;
+export type DeduplicationStrategyType = EnumValue<typeof DeduplicationStrategy>;
 
 export const DEDUPLICATION_STRATEGY_OPTIONS: DeduplicationStrategyType[] =
   Object.values(DeduplicationStrategy) as DeduplicationStrategyType[];
@@ -65,11 +59,7 @@ export enum ExportFormat {
   FileSystemStore = 'filesystemstore',
 }
 
-export type ExportFormatType =
-  | ExportFormat.Snapshot
-  | ExportFormat.Bundle
-  | ExportFormat.Workbench
-  | ExportFormat.FileSystemStore;
+export type ExportFormatType = EnumValue<typeof ExportFormat>;
 
 export const EXPORT_FORMAT_OPTIONS: ExportFormatType[] = Object.values(
   ExportFormat
@@ -86,11 +76,7 @@ export enum SnapshotTier {
   All = 'all',
 }
 
-export type SnapshotTierType =
-  | SnapshotTier.Member
-  | SnapshotTier.Staged
-  | SnapshotTier.Candidate
-  | SnapshotTier.All;
+export type SnapshotTierType = EnumValue<typeof SnapshotTier>;
 
 export const SNAPSHOT_TIER_OPTIONS: SnapshotTierType[] = Object.values(
   SnapshotTier
@@ -114,10 +100,7 @@ export enum ResolutionStrategy {
   SpecificSnapshot = 'specific_snapshot',
 }
 
-export type ResolutionStrategyType =
-  | ResolutionStrategy.LatestTagged
-  | ResolutionStrategy.SpecificVersion
-  | ResolutionStrategy.SpecificSnapshot;
+export type ResolutionStrategyType = EnumValue<typeof ResolutionStrategy>;
 
 export const RESOLUTION_STRATEGY_OPTIONS: ResolutionStrategyType[] =
   Object.values(ResolutionStrategy) as ResolutionStrategyType[];
@@ -132,10 +115,7 @@ export enum SnapshotScheduleMode {
   Dates = 'dates',
 }
 
-export type SnapshotScheduleModeType =
-  | SnapshotScheduleMode.Manual
-  | SnapshotScheduleMode.Cron
-  | SnapshotScheduleMode.Dates;
+export type SnapshotScheduleModeType = EnumValue<typeof SnapshotScheduleMode>;
 
 export const SNAPSHOT_MODE_OPTIONS: SnapshotScheduleModeType[] = Object.values(
   SnapshotScheduleMode
@@ -150,9 +130,7 @@ export enum MemberSyncStrategy {
   Manual = 'manual',
 }
 
-export type MemberSyncStrategyType =
-  | MemberSyncStrategy.TrackLatest
-  | MemberSyncStrategy.Manual;
+export type MemberSyncStrategyType = EnumValue<typeof MemberSyncStrategy>;
 
 export const MEMBER_SYNC_STRATEGY_OPTIONS: MemberSyncStrategyType[] =
   Object.values(MemberSyncStrategy) as MemberSyncStrategyType[];
@@ -163,10 +141,7 @@ export enum MemberSyncBehavior {
   Ignore = 'ignore',
 }
 
-export type MemberSyncBehaviorType =
-  | MemberSyncBehavior.Replace
-  | MemberSyncBehavior.Queue
-  | MemberSyncBehavior.Ignore;
+export type MemberSyncBehaviorType = EnumValue<typeof MemberSyncBehavior>;
 
 export const MEMBER_SYNC_BEHAVIOR_OPTIONS: MemberSyncBehaviorType[] =
   Object.values(MemberSyncBehavior) as MemberSyncBehaviorType[];
@@ -176,9 +151,7 @@ export enum MemberSyncPolicy {
   Preserve = 'preserve',
 }
 
-export type MemberSyncPolicyType =
-  | MemberSyncPolicy.Reset
-  | MemberSyncPolicy.Preserve;
+export type MemberSyncPolicyType = EnumValue<typeof MemberSyncPolicy>;
 
 export const MEMBER_SYNC_STATUS_POLICY_OPTIONS: MemberSyncPolicyType[] =
   Object.values(MemberSyncPolicy) as MemberSyncPolicyType[];
