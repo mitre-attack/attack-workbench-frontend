@@ -1,5 +1,6 @@
 .all-objects-page {
-  h1 {
-    margin-top: 0;
+  .list-page-header {
+    max-width: 48rem;
+    margin: 0 auto 16px;
   }
 }

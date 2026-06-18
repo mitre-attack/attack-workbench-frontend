@@ -199,7 +199,7 @@ export class StixListComponent implements OnInit, AfterViewInit, OnDestroy {
 
   ngAfterViewInit() {
     // set up listener to search input
-    if (this.config.type && this.config.type != 'relationship') {
+    if (this.config.type != 'relationship') {
       this.searchSubscription = fromEvent(this.search.nativeElement, 'keyup')
         .pipe(
           filter(Boolean),
@@ -881,7 +881,7 @@ export class StixListComponent implements OnInit, AfterViewInit, OnDestroy {
       return;
     }
     // filter on STIX objects specified in the config
-    let filtered = this.config.stixObjects;
+    let filtered = this.filterExcludedAttackTypes(this.config.stixObjects);
     filtered = this.filterLocalObjects(filtered, filterStates);
     filtered = this.sortObjects(filtered);
 
@@ -934,7 +934,7 @@ export class StixListComponent implements OnInit, AfterViewInit, OnDestroy {
       this.data$ = this.restAPIConnectorService.getAllTactics(options);
     else if (this.config.type == 'technique')
       this.data$ = this.restAPIConnectorService.getAllTechniques(options);
-    else if (this.config.type.includes('collection'))
+    else if (this.config.type?.includes('collection'))
       this.data$ = this.restAPIConnectorService.getAllCollections({
         search: this.searchQuery,
         versions: 'all',
@@ -971,8 +971,21 @@ export class StixListComponent implements OnInit, AfterViewInit, OnDestroy {
         this.restAPIConnectorService.getAllMarkingDefinitions(options);
     else if (this.config.type == 'note')
       this.data$ = this.restAPIConnectorService.getAllNotes(options);
-    const subscription = this.data$.subscribe({
+    else
+      this.data$ = this.restAPIConnectorService.getAllObjects({
+        limit,
+        offset,
+        state: filterStates.state,
+        revoked: filterStates.revoked,
+        deprecated: filterStates.deprecated,
+        deserialize: true,
+        lastUpdatedBy: this.userIdsUsedInSearch,
+        search: this.searchQuery,
+      });
+    let subscription: Subscription | undefined;
+    subscription = this.data$.subscribe({
       next: data => {
+        data.data = this.filterExcludedAttackTypes(data.data);
         this.totalObjectCount = data.pagination.total;
         this.emitDetectsHasData(data.data.length > 0);
       },
@@ -1083,6 +1096,15 @@ export class StixListComponent implements OnInit, AfterViewInit, OnDestroy {
     ) {
       this.detectsHasData.emit(hasData);
     }
+  }
+
+  private filterExcludedAttackTypes(objects: StixObject[]): StixObject[] {
+    if (!this.config.excludeAttackTypes?.length) return objects;
+
+    return objects.filter(
+      object =>
+        !this.config.excludeAttackTypes.includes(object.attackType as AttackType)
+    );
   }
 
   public showDeprecated(event) {
@@ -1211,6 +1233,8 @@ export interface StixListConfig {
 
   /** force the list to show only this type */
   type?: AttackType | 'collection-created' | 'collection-imported';
+  /** exclude rows matching these ATT&CK object types */
+  excludeAttackTypes?: AttackType[];
 
   /** can the user select in this list? allowed options:
    *     "one": user can select a single element at a time

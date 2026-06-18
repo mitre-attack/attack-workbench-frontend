@@ -1,6 +1,8 @@
-<div class="all-objects-page">
-  <h1>All Objects</h1>
-  <p class="text-deemphasis">
-    A consolidated table of all objects will live here someday.
-  </p>
+<div class="list-page all-objects-page">
+  <div class="list-page-header">
+    <h1>{{ title }}</h1>
+    <p class="text-deemphasis">{{ description }}</p>
+  </div>
+
+  <app-stix-list [config]="stixListConfig"></app-stix-list>
 </div>
