@@ -1103,7 +1103,9 @@ export class StixListComponent implements OnInit, AfterViewInit, OnDestroy {
 
     return objects.filter(
       object =>
-        !this.config.excludeAttackTypes.includes(object.attackType as AttackType)
+        !this.config.excludeAttackTypes.includes(
+          object.attackType as AttackType
+        )
     );
   }
 
