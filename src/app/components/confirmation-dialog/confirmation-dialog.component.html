@@ -6,6 +6,13 @@
       ><span *ngIf="config.no_suffix">, {{ config.no_suffix }}</span>
     </button>
     <button
+      *ngIf="config.alternate_label"
+      mat-button
+      [mat-dialog-close]="config.alternate_value || 'alternate'"
+      class="text-label">
+      <span>{{ config.alternate_label }}</span>
+    </button>
+    <button
       mat-stroked-button
       color="warn"
       [mat-dialog-close]="true"

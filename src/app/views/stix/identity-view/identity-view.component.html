@@ -1,0 +1,98 @@
+<div class="identity-view view-page grid spacing-16">
+  <div class="row">
+    <div class="col">
+      <app-name-property
+        [config]="{
+          mode: config.mode,
+          object: config.object,
+        }"></app-name-property>
+      <app-subheading
+        [config]="config"
+        (onOpenHistory)="openHistory()"
+        (onOpenNotes)="openNotes()"></app-subheading>
+    </div>
+  </div>
+  <div class="row">
+    <div class="col">
+      <app-string-property
+        class="grow-to-row"
+        [config]="{
+          mode: config.mode,
+          object: config.object,
+          field: 'identity_class',
+          label: 'identity class',
+          required: true,
+          editType: 'select',
+        }"></app-string-property>
+    </div>
+  </div>
+  <div class="row">
+    <div class="col">
+      <app-list-property
+        class="grow-to-row"
+        [config]="{
+          mode: config.mode,
+          object: config.object,
+          field: 'roles',
+          editType: 'any',
+        }"></app-list-property>
+    </div>
+    <div class="col">
+      <app-list-property
+        class="grow-to-row"
+        [config]="{
+          mode: config.mode,
+          object: config.object,
+          field: 'sectors',
+          editType: 'select',
+        }"></app-list-property>
+    </div>
+  </div>
+  <div class="row">
+    <div class="col">
+      <app-string-property
+        class="grow-to-row"
+        [config]="{
+          mode: config.mode,
+          object: config.object,
+          field: 'contact',
+          label: 'contact information',
+        }"></app-string-property>
+    </div>
+  </div>
+  <div class="row">
+    <div class="col">
+      <app-descriptive-property
+        [config]="{
+          mode: config.mode,
+          object: config.object,
+          field: 'description',
+          firstParagraphOnly: false,
+          referencesField: 'external_references',
+          label: 'Description',
+        }"></app-descriptive-property>
+    </div>
+  </div>
+  <div
+    *ngIf="
+      identity.external_references.list().length > 0 ||
+      previous?.external_references.list().length > 0 ||
+      editing
+    ">
+    <div class="row">
+      <div class="col">
+        <h2 class="section-header">References</h2>
+      </div>
+    </div>
+    <div class="row">
+      <div class="col">
+        <app-external-references-property
+          [config]="{
+            mode: config.mode,
+            object: config.object,
+            referencesField: 'external_references',
+          }"></app-external-references-property>
+      </div>
+    </div>
+  </div>
+</div>

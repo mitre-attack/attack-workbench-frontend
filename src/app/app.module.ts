@@ -45,6 +45,7 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatRadioModule } from '@angular/material/radio';
 import { MatSelectModule } from '@angular/material/select';
 import { MatSidenavModule } from '@angular/material/sidenav';
+import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatSortModule } from '@angular/material/sort';
 import { MatStepperModule } from '@angular/material/stepper';
@@ -185,6 +186,7 @@ import { CampaignViewComponent } from './views/stix/campaign-view/campaign-view.
 import { DataComponentViewComponent } from './views/stix/data-component-view/data-component-view.component';
 import { DataSourceViewComponent } from './views/stix/data-source-view/data-source-view.component';
 import { GroupViewComponent } from './views/stix/group-view/group-view.component';
+import { IdentityViewComponent } from './views/stix/identity-view/identity-view.component';
 import { MarkingDefinitionViewComponent } from './views/stix/marking-definition-view/marking-definition-view.component';
 import { MatrixFlatComponent } from './views/stix/matrix/matrix-flat/matrix-flat.component';
 import { MatrixSideComponent } from './views/stix/matrix/matrix-side/matrix-side.component';
@@ -328,6 +330,7 @@ export function initConfig(appConfigService: AppConfigService) {
     IdentityPropertyComponent,
     DataSourceViewComponent,
     DataComponentViewComponent,
+    IdentityViewComponent,
     MarkingDefinitionViewComponent,
     CampaignViewComponent,
     CitationPropertyComponent,
@@ -394,6 +397,7 @@ export function initConfig(appConfigService: AppConfigService) {
     MatSelectModule,
     MatExpansionModule,
     MatCheckboxModule,
+    MatSlideToggleModule,
     MatRadioModule,
     MatProgressSpinnerModule,
     MatMenuModule,
@@ -441,6 +445,7 @@ export function initConfig(appConfigService: AppConfigService) {
     MatSelectModule,
     MatExpansionModule,
     MatCheckboxModule,
+    MatSlideToggleModule,
     MatRadioModule,
     MatProgressSpinnerModule,
     MatMenuModule,

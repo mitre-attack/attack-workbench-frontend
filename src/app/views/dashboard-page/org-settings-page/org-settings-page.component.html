@@ -28,41 +28,42 @@
       </div>
     </div>
     <div
-      *ngIf="organizationIdentity; else loadingIdentity"
+      *ngIf="organizationIdentity && organizationIdentities; else loadingIdentity"
       class="identity-edit grid">
       <hr />
       <div class="row">
         <div class="col narrow vertical-center identity-icon">
           <app-identity-property
             [config]="{
-              object: { identity: organizationIdentity },
+              object: { identity: selectedOrganizationIdentity },
               field: 'identity',
             }"></app-identity-property>
         </div>
         <div class="col">
           <mat-form-field appearance="outline">
-            <mat-label>organization name</mat-label>
-            <input matInput required [(ngModel)]="organizationIdentity.name" />
-          </mat-form-field>
-        </div>
-      </div>
-      <div class="row">
-        <div class="col">
-          <mat-form-field appearance="outline">
-            <mat-label>organization description</mat-label>
-            <input matInput [(ngModel)]="organizationIdentity.description" />
-            <mat-hint>this field can be left blank if desired</mat-hint>
+            <mat-label>organization identity</mat-label>
+            <mat-select required [(ngModel)]="selectedOrganizationIdentityId">
+              <mat-option
+                *ngFor="let identity of organizationIdentities"
+                [value]="identity.stixID">
+                {{ identity.name || identity.stixID }}
+              </mat-option>
+            </mat-select>
+            <mat-hint>Select an existing identity object</mat-hint>
           </mat-form-field>
         </div>
       </div>
       <div class="row">
         <div class="col center">
           <div>
+            <button mat-button routerLink="/identity" class="text-label">
+              manage identities
+            </button>
             <button
               mat-stroked-button
               (click)="saveIdentity()"
               class="text-label"
-              [disabled]="organizationIdentity.name.length == 0">
+              [disabled]="isIdentityUnchanged">
               save
             </button>
           </div>
@@ -149,6 +150,40 @@
       </div>
     </div>
   </div>
+
+  <div *ngIf="hasMitreIdentity" class="view-page grid spacing-20">
+    <div class="row">
+      <div class="col">
+        <h2>MITRE Identity Writes</h2>
+      </div>
+    </div>
+    <div
+      *ngIf="mitreIdentityWrites; else loadingMitreIdentityWrites"
+      class="identity-edit grid spacing-16">
+      <hr />
+      <div class="mitre-identity-write-setting">
+        <p>
+          Enable this only when this Workbench instance is allowed to create or
+          update the protected MITRE Corporation identity object.
+        </p>
+        <div class="mitre-identity-write-controls">
+          <mat-slide-toggle
+            [(ngModel)]="mitreIdentityWrites.enabled"
+            [class.toggle-enabled]="mitreIdentityWrites.enabled"
+            [class.toggle-disabled]="!mitreIdentityWrites.enabled">
+            {{ mitreIdentityWrites.enabled ? 'enabled' : 'disabled' }}
+          </mat-slide-toggle>
+          <button
+            mat-stroked-button
+            (click)="saveMitreIdentityWrites()"
+            class="text-label"
+            [disabled]="isMitreIdentityWritesUnchanged">
+            save
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
   <ng-template #loadingIdentity>
     <app-loading-overlay
       message="loading organization identity"></app-loading-overlay>
@@ -156,5 +191,9 @@
   <ng-template #loadingNamespace>
     <app-loading-overlay
       message="loading organization namespace"></app-loading-overlay>
+  </ng-template>
+  <ng-template #loadingMitreIdentityWrites>
+    <app-loading-overlay
+      message="loading MITRE identity write setting"></app-loading-overlay>
   </ng-template>
 </div>
