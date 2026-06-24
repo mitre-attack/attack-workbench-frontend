@@ -7,6 +7,7 @@ import { RestApiConnectorService } from 'src/app/services/connectors/rest-api/re
 import {
   createMockRestApiConnector,
   createAsyncObservable,
+  createPaginatedResponse,
 } from 'src/app/testing/mocks/rest-api-connector.mock';
 
 describe('OrgSettingsPageComponent', () => {
@@ -16,6 +17,7 @@ describe('OrgSettingsPageComponent', () => {
   beforeEach(async () => {
     const mockRestApiConnector = createMockRestApiConnector({
       getOrganizationIdentity: () => createAsyncObservable({}),
+      getAllIdentities: () => createAsyncObservable(createPaginatedResponse()),
       getOrganizationNamespace: () =>
         createAsyncObservable({ prefix: '', range_start: undefined }),
     });
