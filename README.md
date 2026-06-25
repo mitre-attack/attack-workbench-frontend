@@ -45,10 +45,10 @@ The ATT\&CK Workbench application is composed of several interconnected services
 
 ### Core Components
 
-* **[ATT\&CK Workbench Frontend](https://github.com/center-for-threat-informed-defense/attack-workbench-frontend)**
+* **[ATT\&CK Workbench Frontend](https://github.com/mitre-attack/attack-workbench-frontend)**
   The web-based user interface for ATT\&CK Workbench, and the primary way users interact with the knowledge base.
 
-* **[ATT\&CK Workbench REST API](https://github.com/center-for-threat-informed-defense/attack-workbench-rest-api)**
+* **[ATT\&CK Workbench REST API](https://github.com/mitre-attack/attack-workbench-rest-api)**
   Provides a CRUD interface for storing, querying, and editing ATT\&CK objects, as well as managing collections, collection indexes, and subscriptions.
 
 * **[ATT\&CK Workbench Database](https://hub.docker.com/_/mongo)**
