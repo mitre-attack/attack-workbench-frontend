@@ -7,8 +7,8 @@ This document outlines how to set up ATT&CK Workbench for local development. For
 Before running the application locally, ensure you have the following set up:
 
 1. Clone the required repositories
-    - [attack-workbench-frontend](https://github.com/center-for-threat-informed-defense/attack-workbench-frontend) repository
-    - [attack-workbench-rest-api](https://github.com/center-for-threat-informed-defense/attack-workbench-rest-api) repository alongside the frontend
+    - [attack-workbench-frontend](https://github.com/mitre-attack/attack-workbench-frontend) repository
+    - [attack-workbench-rest-api](https://github.com/mitre-attack/attack-workbench-rest-api) repository alongside the frontend
 
 2. Install the [recommended version](../README.md#requirements) of [Node.js](https://nodejs.org/)
 
@@ -29,7 +29,7 @@ npm install
 
 #### 2. Configure the system
 
-Configure the application using environment variables, a configuration file, or a combination. Please refer to the documentation on how to [Configure the System](https://github.com/center-for-threat-informed-defense/attack-workbench-rest-api?tab=readme-ov-file#step-3-configure-the-system) for more details.
+Configure the application using environment variables, a configuration file, or a combination. Please refer to the documentation on how to [Configure the System](https://github.com/mitre-attack/attack-workbench-rest-api?tab=readme-ov-file#step-3-configure-the-system) for more details.
 
 For example, you can use a custom configuration to adapt to your specific environment:
 

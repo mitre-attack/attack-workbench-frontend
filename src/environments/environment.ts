@@ -16,7 +16,7 @@ export const environment = {
   integrations: {
     rest_api: {
       // configuration for the ATT&CK Workbench REST API
-      // https://github.com/center-for-threat-informed-defense/attack-workbench-rest-api
+      // https://github.com/mitre-attack/attack-workbench-rest-api
       enabled: true, // MUST be true for application operation
       url: 'http://localhost:3000/api',
     },
