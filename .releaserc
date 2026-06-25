@@ -21,7 +21,7 @@
       "@codedependant/semantic-release-docker",
       {
         "dockerRegistry": "ghcr.io",
-        "dockerProject": "center-for-threat-informed-defense",
+        "dockerProject": "mitre-attack",
         "dockerImage": "attack-workbench-frontend",
         "dockerFile": "Dockerfile",
         "dockerContext": ".",
