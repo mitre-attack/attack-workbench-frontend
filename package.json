@@ -4,7 +4,7 @@
   "description": "An application allowing users to explore, create, annotate, and share extensions of the MITRE ATT&CK® knowledge base. This repository contains an Angular-based web application providing the user interface for the ATT&CK Workbench application.",
   "repository": {
     "type": "git",
-    "url": "https://github.com/center-for-threat-informed-defense/attack-workbench-frontend.git"
+    "url": "https://github.com/mitre-attack/attack-workbench-frontend.git"
   },
   "keywords": [
     "cti",
@@ -13,7 +13,7 @@
     "mitre-attack",
     "mitre-corporation",
     "ctid",
-    "center-for-threat-informed-defense",
+    "mitre-attack",
     "cybersecurity",
     "stix"
   ],

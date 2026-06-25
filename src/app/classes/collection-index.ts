@@ -1,10 +1,10 @@
 import { Observable, of } from 'rxjs';
 import { RestApiConnectorService } from '../services/connectors/rest-api/rest-api-connector.service';
+import { logger } from '../utils/logger';
 import { Serializable, ValidationData } from './serializable';
 import { VersionNumber } from './version-number';
-import { logger } from '../utils/logger';
 
-// https://github.com/center-for-threat-informed-defense/attack-workbench-frontend/blob/develop/docs/collections.md#collection-version-properties
+// https://github.com/mitre-attack/attack-workbench-frontend/blob/develop/docs/collections.md#collection-version-properties
 export class CollectionVersion extends Serializable {
   public version: VersionNumber;
   public modified: Date;
@@ -114,7 +114,7 @@ export class CollectionVersion extends Serializable {
     return of(new ValidationData());
   }
 }
-// https://github.com/center-for-threat-informed-defense/attack-workbench-frontend/blob/develop/docs/collections.md#collection-reference-properties
+// https://github.com/mitre-attack/attack-workbench-frontend/blob/develop/docs/collections.md#collection-reference-properties
 export class CollectionReference extends Serializable {
   public id: string;
   public name: string;
@@ -224,7 +224,7 @@ export class CollectionReference extends Serializable {
     return of(new ValidationData());
   }
 }
-// https://github.com/center-for-threat-informed-defense/attack-workbench-frontend/blob/develop/docs/collections.md#collection-index-properties
+// https://github.com/mitre-attack/attack-workbench-frontend/blob/develop/docs/collections.md#collection-index-properties
 export class CollectionIndex extends Serializable {
   public collection_index: {
     id: string;
