@@ -112,6 +112,7 @@ export class ReleaseTrackSnapshot {
 
     if ('staged' in raw && Array.isArray(raw.staged)) {
       this.staged = raw.staged.map((s: any) => ({
+        ...s,
         object_ref: s.object_ref,
         object_modified: new Date(s.object_modified),
         object_status: s.object_status,
@@ -124,6 +125,7 @@ export class ReleaseTrackSnapshot {
 
     if ('candidates' in raw && Array.isArray(raw.candidates)) {
       this.candidates = raw.candidates.map((c: any) => ({
+        ...c,
         object_ref: c.object_ref,
         object_modified: new Date(c.object_modified),
         object_status: c.object_status,

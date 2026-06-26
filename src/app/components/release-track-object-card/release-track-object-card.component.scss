@@ -115,14 +115,29 @@
 }
 
 .object-description {
-  display: -webkit-box;
+  display: block;
   min-height: 30px;
   margin: 0;
   font-size: 14px;
   font-weight: 500;
   line-height: 22px;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 3;
+
+  ::ng-deep p {
+    display: -webkit-box;
+    overflow: hidden;
+    margin: 0;
+    text-overflow: ellipsis;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 3;
+  }
+
+  ::ng-deep :last-child {
+    margin-bottom: 0;
+  }
+
+  ::ng-deep a {
+    font-weight: 700;
+  }
 
   .light & {
     color: colors.on-color(light);
