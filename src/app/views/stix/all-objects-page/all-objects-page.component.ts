@@ -4,6 +4,7 @@ import { StixListConfig } from 'src/app/components/stix/stix-list/stix-list.comp
 export const ALL_OBJECTS_STIX_LIST_CONFIG: StixListConfig = {
   showUserSearch: true,
   excludeAttackTypes: ['relationship', 'note', 'collection'],
+  columnsPreset: 'all-objects',
 };
 
 @Component({

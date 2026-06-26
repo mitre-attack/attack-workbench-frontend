@@ -23,4 +23,8 @@ describe('AllObjectsPageComponent', () => {
   it('should create', () => {
     expect(component).toBeTruthy();
   });
+
+  it('should use the all objects column preset', () => {
+    expect(component.stixListConfig.columnsPreset).toBe('all-objects');
+  });
 });
