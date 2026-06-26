@@ -1,13 +1,7 @@
 <div class="add-dialog">
   <h1 *ngIf="config.title" mat-dialog-title>{{ config.title }}</h1>
   <mat-dialog-content>
-    <div
-      *ngIf="
-        config.type === 'user' ||
-          config.type === 'analytic' ||
-          config.selectableObjects?.length > 0;
-        else nothing
-      ">
+    <div *ngIf="hasSelectableContent; else nothing">
       <mat-checkbox
         *ngIf="config.showPreserveRelationshipsOption"
         color="primary"
@@ -18,20 +12,22 @@
       </mat-checkbox>
       <app-stix-list
         *ngIf="config.type !== 'user'"
-        [config]="{
-          select: config.selectionType
-            ? config.selectionType
-            : config.select
-              ? 'many'
-              : 'disabled',
-          selectionModel: config.select,
-          type: config.type,
-          clickBehavior: 'expand',
-          stixObjects: config.selectableObjects
-            ? config.selectableObjects
-            : undefined,
-          showFilters: false,
-        }"></app-stix-list>
+        [config]="
+          config.stixListConfig || {
+            select: config.selectionType
+              ? config.selectionType
+              : config.select
+                ? 'many'
+                : 'disabled',
+            selectionModel: config.select,
+            type: config.type,
+            clickBehavior: 'expand',
+            stixObjects: config.selectableObjects
+              ? config.selectableObjects
+              : undefined,
+            showFilters: false,
+          }
+        "></app-stix-list>
       <app-users-list
         *ngIf="config.type === 'user'"
         [config]="{
@@ -47,13 +43,7 @@
     </ng-template>
   </mat-dialog-content>
   <mat-dialog-actions align="center">
-    <ng-container
-      *ngIf="
-        config.type === 'user' ||
-          config.type === 'analytic' ||
-          config.selectableObjects?.length > 0;
-        else closeDialog
-      ">
+    <ng-container *ngIf="hasSelectableContent; else closeDialog">
       <button
         mat-raised-button
         class="extended-button left-button"
