@@ -33,6 +33,7 @@ import { MultipleChoiceDialogComponent } from 'src/app/components/multiple-choic
 import { finalize, take } from 'rxjs/operators';
 import { FormBuilder, FormGroup } from '@angular/forms';
 import { ReleaseTrackObjectItem } from 'src/app/components/release-track-object-card/release-track-object-card.component';
+import { ALL_OBJECTS_STIX_LIST_CONFIG } from 'src/app/views/stix/all-objects-page/all-objects-page.component';
 
 type ReleaseTrackLaneType = 'candidate' | 'staged' | 'member';
 
@@ -354,67 +355,40 @@ export class ReleaseTrackPageComponent implements OnInit {
     if (!this.releaseTrack) return;
 
     const selection = new SelectionModel<string>(true);
-
-    const sub = this.restApiConnectorService
-      .getAllObjects({ deserialize: true })
-      .subscribe({
-        next: results => {
-          const objects = (results as any).data || [];
-
-          const dialogRef = this.dialog.open(AddDialogComponent, {
-            data: {
-              selectableObjects: objects,
-              select: selection,
-              type: 'all',
-              selectionType: 'many',
-              buttonLabel: 'Add',
-              title: 'Add candidates',
-              clearSelection: true,
-            },
-            maxWidth: '70em',
-            minWidth: '40vw',
-            maxHeight: '75vh',
-          });
-
-          const closeSub = dialogRef.afterClosed().subscribe({
-            next: result => {
-              if (!result) return; // user cancelled
-
-              const objectRefs: any[] = selection.selected.map(stixId => {
-                const obj = objects.find(
-                  (o: any) =>
-                    o.stixID === stixId || (o.stix && o.stix.id === stixId)
-                );
-                const id = obj ? obj.stixID || obj.stix?.id : stixId;
-                let modified: string | undefined;
-                if (obj) {
-                  if (obj.modified instanceof Date)
-                    modified = obj.modified.toISOString();
-                  else if (obj.modified) modified = obj.modified;
-                  else if (obj.stix && obj.stix.modified)
-                    modified = obj.stix.modified;
-                }
-                return modified ? { id, modified } : id;
-              });
-
-              const apiSub = this.connector
-                .addCandidates(this.id, objectRefs)
-                .subscribe({
-                  next: () => {
-                    // refresh snapshot from server so local state reflects saved candidates
-                    this.refreshReleaseTrackState();
-                  },
-                  error: err => {
-                    console.error('Failed to add candidates', err);
-                  },
-                  complete: () => apiSub.unsubscribe(),
-                });
-            },
-            complete: () => closeSub.unsubscribe(),
-          });
+    const dialogRef = this.dialog.open(AddDialogComponent, {
+      data: {
+        select: selection,
+        type: 'all',
+        selectionType: 'many',
+        buttonLabel: 'Add',
+        title: 'Add candidates',
+        clearSelection: true,
+        stixListConfig: {
+          ...ALL_OBJECTS_STIX_LIST_CONFIG,
+          select: 'many',
+          selectionModel: selection,
+          clickBehavior: 'expand',
         },
-        complete: () => sub.unsubscribe(),
-      });
+      },
+      maxWidth: '90vw',
+      width: '80vw',
+      maxHeight: '85vh',
+    });
+
+    dialogRef.afterClosed().subscribe({
+      next: result => {
+        if (!result || !selection.selected.length) return;
+
+        this.connector.addCandidates(this.id, selection.selected).subscribe({
+          next: () => {
+            this.refreshReleaseTrackState();
+          },
+          error: err => {
+            console.error('Failed to add candidates', err);
+          },
+        });
+      },
+    });
   }
 
   public getViewUrl(stixId: string): string {

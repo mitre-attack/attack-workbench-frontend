@@ -14,6 +14,7 @@ import { MatDialog } from '@angular/material/dialog';
 import { BreadcrumbService } from 'src/app/services/helpers/breadcrumb.service';
 import { RestApiConnectorService } from 'src/app/services/connectors/rest-api/rest-api-connector.service';
 import { MultipleChoiceDialogComponent } from 'src/app/components/multiple-choice-dialog/multiple-choice-dialog.component';
+import { AddDialogComponent } from 'src/app/components/add-dialog/add-dialog.component';
 import { FormsModule, ReactiveFormsModule } from '@angular/forms';
 import {
   ConflictPolicy,
@@ -44,6 +45,7 @@ describe('ReleaseTrackPageComponent', () => {
       updateConfig: vi.fn(() => createAsyncObservable({})),
       reviewCandidates: vi.fn(() => createAsyncObservable({})),
       updateMetadataByLatest: vi.fn(() => createAsyncObservable({})),
+      addCandidates: vi.fn(() => createAsyncObservable({})),
     });
     mockDialog = {
       open: vi.fn(),
@@ -271,6 +273,39 @@ describe('ReleaseTrackPageComponent', () => {
     expect(
       mockReleaseTrackApiConnector.createVirtualSnapshot
     ).not.toHaveBeenCalled();
+  });
+
+  it('should open the all objects table to add candidates', () => {
+    mockDialog.open.mockImplementation((_component: any, config: any) => {
+      config.data.select.select('attack-pattern--1234');
+      return {
+        afterClosed: () => of(true),
+      };
+    });
+    mockReleaseTrackApiConnector.addCandidates.mockReturnValue(of({}));
+    component.id = 'release-track--123';
+    component.releaseTrack = { id: 'release-track--123' } as any;
+
+    component.onAddCandidate();
+
+    expect(mockRestApiConnector.getAllObjects).not.toHaveBeenCalled();
+    expect(mockDialog.open).toHaveBeenCalledWith(
+      AddDialogComponent,
+      expect.objectContaining({
+        data: expect.objectContaining({
+          title: 'Add candidates',
+          stixListConfig: expect.objectContaining({
+            showUserSearch: true,
+            excludeAttackTypes: ['relationship', 'note', 'collection'],
+            select: 'many',
+          }),
+        }),
+      })
+    );
+    expect(mockReleaseTrackApiConnector.addCandidates).toHaveBeenCalledWith(
+      'release-track--123',
+      ['attack-pattern--1234']
+    );
   });
 
   it('should preview and tag the latest draft release', () => {

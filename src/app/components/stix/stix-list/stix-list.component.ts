@@ -233,6 +233,14 @@ export class StixListComponent implements OnInit, AfterViewInit, OnDestroy {
       this.tableDetail = [];
       return;
     }
+    if (this.config.columnsPreset === 'all-objects') {
+      this.addIdAndNameColumns(sticky_allowed);
+      this.addColumn('type', 'attackType', 'plain');
+      this.addDomainColumn();
+      this.addColumn('modified', 'modified', 'timestamp');
+      this.tableDetail = [];
+      return;
+    }
     if ('type' in this.config) {
       // set columns according to type
       switch (this.config.type.replace(/_/g, '-')) {
@@ -1256,7 +1264,7 @@ export interface StixListConfig {
   /** default true, if false hides all search/filter/control options */
   showControls?: boolean;
   /** Optional preset to override default columns */
-  columnsPreset?: 'id-name';
+  columnsPreset?: 'id-name' | 'all-objects';
   /** display the 'show deprecated' filter, default false
    *  this may be relevant when displaying a list of embedded relationships, where
    *  the list of STIX objects is provided in the 'stixObjects' configuration
