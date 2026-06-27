@@ -189,6 +189,7 @@
       [laneStatus]="item.object_status"
       [showDescription]="false"
       [showDiff]="type !== 'member'"
+      [diffOptions]="getDiffOptions(item)"
       [showModifiedMeta]="false"
       (viewObject)="onView($event.object_ref)"
       (diffObject)="onDiff($event)">

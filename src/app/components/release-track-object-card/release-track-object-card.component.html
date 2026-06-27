@@ -34,12 +34,19 @@
         View
       </button>
       <button
-        *ngIf="showDiff"
+        *ngIf="canShowDiffButton && !hasMultipleDiffOptions"
         mat-stroked-button
         type="button"
-        (click)="onDiff()">
-        <mat-icon>difference</mat-icon>
+        (click)="onDiffButtonClick()">
         Diff
+      </button>
+      <button
+        *ngIf="hasMultipleDiffOptions"
+        mat-stroked-button
+        type="button"
+        [matMenuTriggerFor]="diffMenu">
+        Diff
+        <span aria-hidden="true">▼</span>
       </button>
     </div>
 
@@ -66,3 +73,13 @@
     </div>
   </mat-card-actions>
 </mat-card>
+
+<mat-menu #diffMenu="matMenu">
+  <button
+    *ngFor="let option of diffOptions"
+    mat-menu-item
+    type="button"
+    (click)="onSelectDiffOption(option)">
+    {{ option.label }}
+  </button>
+</mat-menu>

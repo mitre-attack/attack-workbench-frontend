@@ -26,6 +26,10 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 import { forkJoin, Observable, of } from 'rxjs';
 import { StixObject } from 'src/app/classes/stix';
 import { ReleaseTrackObjectItem } from 'src/app/components/release-track-object-card/release-track-object-card.component';
+import {
+  ReleaseTrackDiffOption,
+  ReleaseTrackDiffTarget,
+} from 'src/app/components/release-track-object-card/release-track-object-card.component';
 import { StixDialogComponent } from 'src/app/views/stix/stix-dialog/stix-dialog.component';
 
 @Component({
@@ -72,10 +76,18 @@ export class ReleaseTrackPageComponent implements OnInit {
       ...this.candidates.map(item => ({
         ...item,
         release_track_tier: 'candidate',
+        diff_options: this.getDiffOptions({
+          ...item,
+          release_track_tier: 'candidate',
+        }),
       })),
       ...this.staged.map(item => ({
         ...item,
         release_track_tier: 'staged',
+        diff_options: this.getDiffOptions({
+          ...item,
+          release_track_tier: 'staged',
+        }),
       })),
     ];
   }
@@ -189,7 +201,7 @@ export class ReleaseTrackPageComponent implements OnInit {
   }
 
   public getViewUrl(stixId: string): string {
-    const stixType = stixId.split('-')[0] as StixType;
+    const stixType = stixId.split('--')[0] as StixType;
     return `/${StixTypeToAttackType[stixType]}/${stixId}`;
   }
 
@@ -282,10 +294,15 @@ export class ReleaseTrackPageComponent implements OnInit {
       return;
     }
 
-    const diff =
-      tier === 'candidate'
-        ? this.resolveCandidateDiffObjects(item)
-        : this.resolveStagedDiffObjects(item);
+    const target = item.diff_target ?? this.getDefaultDiffTarget(item);
+    if (!target) {
+      this.snackbar.open('No comparison version is available.', undefined, {
+        duration: 3000,
+      });
+      return;
+    }
+
+    const diff = this.resolveDiffObjects(item, tier, target);
 
     diff.pipe(take(1)).subscribe(({ current, prior, expectedBaseline }) => {
       if (!current) {
@@ -426,6 +443,42 @@ export class ReleaseTrackPageComponent implements OnInit {
     console.log('onPreviewRelease');
   }
 
+  // Build the list of valid diff baselines for an item based on its current release-track tier.
+  public getDiffOptions(
+    item: ReleaseTrackObjectItem
+  ): ReleaseTrackDiffOption[] {
+    if (!item?.object_ref) return [];
+
+    const tier = this.getDiffTier(item);
+    if (tier === 'candidate') {
+      const options: ReleaseTrackDiffOption[] = [];
+      if (this.findStagedEntry(item.object_ref)) {
+        options.push({
+          value: 'staged',
+          label: 'Compare with staged',
+        });
+      }
+      if (this.findMemberEntry(item.object_ref)) {
+        options.push({
+          value: 'members',
+          label: 'Compare with members',
+        });
+      }
+      return options;
+    }
+
+    if (tier === 'staged' && this.findMemberEntry(item.object_ref)) {
+      return [
+        {
+          value: 'members',
+          label: 'Compare with members',
+        },
+      ];
+    }
+
+    return [];
+  }
+
   private reviewCandidateStatus(
     from: WorkflowStatusType,
     to: WorkflowStatusType,
@@ -466,6 +519,13 @@ export class ReleaseTrackPageComponent implements OnInit {
     return this.getReleaseTrackTier(item);
   }
 
+  // Fall back to the first valid baseline so single-option cards can open Diff directly.
+  private getDefaultDiffTarget(
+    item: ReleaseTrackObjectItem
+  ): ReleaseTrackDiffTarget | null {
+    return this.getDiffOptions(item)[0]?.value ?? null;
+  }
+
   private findStagedEntry(objectRef: string): ReleaseTrackObjectItem | null {
     return (
       this.releaseTrack?.staged?.find(item => item.object_ref === objectRef) ??
@@ -480,14 +540,36 @@ export class ReleaseTrackPageComponent implements OnInit {
     );
   }
 
-  private resolveCandidateDiffObjects(item: ReleaseTrackObjectItem): Observable<{
+  // Route diff resolution to the tier-specific loader that understands the selected baseline.
+  private resolveDiffObjects(
+    item: ReleaseTrackObjectItem,
+    tier: 'candidate' | 'staged',
+    target: ReleaseTrackDiffTarget
+  ): Observable<{
     current: StixObject | null;
     prior: StixObject | null;
     expectedBaseline: boolean;
   }> {
-    const stagedEntry = this.findStagedEntry(item.object_ref);
-    const memberEntry = stagedEntry ? null : this.findMemberEntry(item.object_ref);
-    const baselineEntry = stagedEntry ?? memberEntry;
+    if (tier === 'candidate') {
+      return this.resolveCandidateDiffObjects(item, target);
+    }
+
+    return this.resolveStagedDiffObjects(item, target);
+  }
+
+  // Compare a candidate against either staged or members depending on the user's selection.
+  private resolveCandidateDiffObjects(
+    item: ReleaseTrackObjectItem,
+    target: ReleaseTrackDiffTarget
+  ): Observable<{
+    current: StixObject | null;
+    prior: StixObject | null;
+    expectedBaseline: boolean;
+  }> {
+    const baselineEntry =
+      target === 'staged'
+        ? this.findStagedEntry(item.object_ref)
+        : this.findMemberEntry(item.object_ref);
 
     return forkJoin({
       current: this.fetchObjectVersion(item.object_ref),
@@ -506,12 +588,17 @@ export class ReleaseTrackPageComponent implements OnInit {
     );
   }
 
-  private resolveStagedDiffObjects(item: ReleaseTrackObjectItem): Observable<{
+  // Compare a staged object against members, while keeping the staged version as the current side.
+  private resolveStagedDiffObjects(
+    item: ReleaseTrackObjectItem,
+    target: ReleaseTrackDiffTarget
+  ): Observable<{
     current: StixObject | null;
     prior: StixObject | null;
     expectedBaseline: boolean;
   }> {
-    const memberEntry = this.findMemberEntry(item.object_ref);
+    const memberEntry =
+      target === 'members' ? this.findMemberEntry(item.object_ref) : null;
 
     return forkJoin({
       current: this.fetchObjectVersion(item.object_ref, item.object_modified),
@@ -540,22 +627,40 @@ export class ReleaseTrackPageComponent implements OnInit {
     let requestObject: Observable<StixObject[]>;
     switch (attackType) {
       case 'technique':
-        requestObject = this.restApiConnectorService.getTechnique(objectRef, modified);
+        requestObject = this.restApiConnectorService.getTechnique(
+          objectRef,
+          modified
+        );
         break;
       case 'tactic':
-        requestObject = this.restApiConnectorService.getTactic(objectRef, modified);
+        requestObject = this.restApiConnectorService.getTactic(
+          objectRef,
+          modified
+        );
         break;
       case 'group':
-        requestObject = this.restApiConnectorService.getGroup(objectRef, modified);
+        requestObject = this.restApiConnectorService.getGroup(
+          objectRef,
+          modified
+        );
         break;
       case 'campaign':
-        requestObject = this.restApiConnectorService.getCampaign(objectRef, modified);
+        requestObject = this.restApiConnectorService.getCampaign(
+          objectRef,
+          modified
+        );
         break;
       case 'asset':
-        requestObject = this.restApiConnectorService.getAsset(objectRef, modified);
+        requestObject = this.restApiConnectorService.getAsset(
+          objectRef,
+          modified
+        );
         break;
       case 'software':
-        requestObject = this.restApiConnectorService.getSoftware(objectRef, modified);
+        requestObject = this.restApiConnectorService.getSoftware(
+          objectRef,
+          modified
+        );
         break;
       case 'mitigation':
         requestObject = this.restApiConnectorService.getMitigation(
@@ -564,7 +669,10 @@ export class ReleaseTrackPageComponent implements OnInit {
         );
         break;
       case 'matrix':
-        requestObject = this.restApiConnectorService.getMatrix(objectRef, modified);
+        requestObject = this.restApiConnectorService.getMatrix(
+          objectRef,
+          modified
+        );
         break;
       case 'data-source':
         requestObject = this.restApiConnectorService.getDataSource(
@@ -585,7 +693,10 @@ export class ReleaseTrackPageComponent implements OnInit {
         );
         break;
       case 'analytic':
-        requestObject = this.restApiConnectorService.getAnalytic(objectRef, modified);
+        requestObject = this.restApiConnectorService.getAnalytic(
+          objectRef,
+          modified
+        );
         break;
       default:
         return of(null);

@@ -3,10 +3,18 @@ import { Component, EventEmitter, Input, Output } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
 import { MatIconModule } from '@angular/material/icon';
+import { MatMenuModule } from '@angular/material/menu';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { StixTypeToAttackType } from 'src/app/utils/type-mappings';
 import { StixType, WorkflowStatusType } from 'src/app/utils/types';
 import { UserAvatarComponent } from '../user-avatar/user-avatar.component';
+
+export type ReleaseTrackDiffTarget = 'staged' | 'members';
+
+export interface ReleaseTrackDiffOption {
+  value: ReleaseTrackDiffTarget;
+  label: string;
+}
 
 export interface ReleaseTrackObjectItem {
   object_ref: string;
@@ -16,6 +24,8 @@ export interface ReleaseTrackObjectItem {
   object_added_by?: string;
   object_staged_at?: Date | string;
   object_staged_by?: string;
+  diff_options?: ReleaseTrackDiffOption[];
+  diff_target?: ReleaseTrackDiffTarget;
   [key: string]: any;
 }
 
@@ -27,6 +37,7 @@ export interface ReleaseTrackObjectItem {
     MatButtonModule,
     MatCardModule,
     MatIconModule,
+    MatMenuModule,
     MatTooltipModule,
     UserAvatarComponent,
   ],
@@ -40,6 +51,7 @@ export class ReleaseTrackObjectCardComponent {
   @Input() showDescription = true;
   @Input() showDiff = true;
   @Input() showModifiedMeta = true;
+  @Input() diffOptions: ReleaseTrackDiffOption[] | null = null;
 
   @Output() viewObject = new EventEmitter<ReleaseTrackObjectItem>();
   @Output() diffObject = new EventEmitter<ReleaseTrackObjectItem>();
@@ -77,8 +89,32 @@ export class ReleaseTrackObjectCardComponent {
     this.viewObject.emit(this.item);
   }
 
-  public onDiff(): void {
-    this.diffObject.emit(this.item);
+  // Hide Diff entirely when the parent says it is unavailable for this item.
+  public get canShowDiffButton(): boolean {
+    return this.showDiff && (!this.diffOptions || this.diffOptions.length > 0);
+  }
+
+  // Switch from a direct button to a dropdown trigger when more than one baseline exists.
+  public get hasMultipleDiffOptions(): boolean {
+    return (this.diffOptions?.length ?? 0) > 1;
+  }
+
+  // Emit the only valid baseline immediately so one-option diffing stays one click.
+  public onDiffButtonClick(): void {
+    if (!this.canShowDiffButton || this.hasMultipleDiffOptions) return;
+
+    this.diffObject.emit({
+      ...this.item,
+      diff_target: this.diffOptions?.[0]?.value,
+    });
+  }
+
+  // Preserve the user's menu choice by attaching the selected baseline to the emitted item.
+  public onSelectDiffOption(option: ReleaseTrackDiffOption): void {
+    this.diffObject.emit({
+      ...this.item,
+      diff_target: option.value,
+    });
   }
 
   private get fallbackObjectLabel(): string {

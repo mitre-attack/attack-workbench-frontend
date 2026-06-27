@@ -38,6 +38,7 @@
           [laneStatus]="lane.status"
           [showDescription]="true"
           [showModifiedMeta]="true"
+          [diffOptions]="item.diff_options ?? []"
           (viewObject)="viewObject.emit($event)"
           (diffObject)="diffObject.emit($event)">
         </app-release-track-object-card>
