@@ -78,6 +78,12 @@ const stixRouteData = [
     headerSection: 'defenses',
     deprecated: true,
   },
+  // more
+  {
+    attackType: 'identity',
+    editable: true,
+    headerSection: 'more',
+  },
 ];
 
 const stixRoutes: Routes = [];

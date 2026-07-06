@@ -22,4 +22,6 @@ export interface ConfirmationDialogConfig {
   message: string; //prompt text
   yes_suffix?: string; //optional suffix to add to the yes button
   no_suffix?: string; //optional suffix to add to the no button
+  alternate_label?: string; //optional label for a third button
+  alternate_value?: string; //optional value returned by the third button
 }

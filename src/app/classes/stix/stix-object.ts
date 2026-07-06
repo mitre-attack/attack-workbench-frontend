@@ -17,6 +17,7 @@ import { v4 as uuid } from 'uuid';
 import { logger } from '../../utils/logger';
 import { ExternalReferences } from '../external-references';
 import { Serializable, ValidationData } from '../serializable';
+import { UserAccount } from '../authn/user-account';
 import { VersionNumber } from '../version-number';
 
 export type workflowStates =
@@ -35,6 +36,7 @@ export abstract class StixObject extends Serializable {
   public created_by?: any;
   public modified_by_ref: string; //embedded relationship
   public modified_by?: any;
+  public created_by_user_account?: UserAccount;
   public firstInitialized: boolean; // boolean to track if it is a newly created object
 
   public object_marking_refs: string[] = []; //list of embedded relationships to marking_defs
@@ -356,6 +358,11 @@ export abstract class StixObject extends Serializable {
         logger.error(
           "ObjectError: 'stix' field does not exist in modified_by_identity object"
         );
+    }
+    if ('created_by_user_account' in raw && raw.created_by_user_account) {
+      this.created_by_user_account = new UserAccount(
+        raw.created_by_user_account
+      );
     }
 
     if ('workspace' in raw) {

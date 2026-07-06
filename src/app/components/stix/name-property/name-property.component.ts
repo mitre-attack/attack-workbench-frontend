@@ -40,7 +40,7 @@ export class NamePropertyComponent implements OnInit {
     return (
       this.config.mode === 'view' &&
       this.object instanceof StixObject &&
-      this.object.attackType !== 'collection'
+      !['collection', 'identity'].includes(this.object.attackType)
     );
   }
 
@@ -100,6 +100,8 @@ export class NamePropertyComponent implements OnInit {
   }
 
   public workflowChange(event): void {
+    if (!this.showWorkflowControl) return;
+
     const previousWorkflowState =
       this.object?.workflow?.state || 'work-in-progress';
     if (event.isUserInput) {
@@ -110,6 +112,7 @@ export class NamePropertyComponent implements OnInit {
           object: this.object,
           versionAlreadyIncremented: false,
           initialWorkflowState: event.source.value,
+          showWorkflow: true,
         },
         autoFocus: false,
       });

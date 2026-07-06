@@ -15,7 +15,10 @@
     </div>
     <div class="column narrow version-buttons">
       <mat-action-list>
-        <mat-form-field class="workflow-status" appearance="outline">
+        <mat-form-field
+          *ngIf="workflowEnabled"
+          class="workflow-status"
+          appearance="outline">
           <mat-label>mark as...</mat-label>
           <mat-select
             [(ngModel)]="newState"
