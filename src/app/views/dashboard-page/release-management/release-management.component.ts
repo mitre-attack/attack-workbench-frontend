@@ -57,11 +57,7 @@ export class ReleaseManagementComponent implements OnInit, OnDestroy {
 
   private loadTracks(): void {
     this.subscription = this.connector.listReleaseTracks().subscribe(result => {
-      if (!result || !result.data) {
-        this.allTracks = [];
-        return;
-      }
-      this.allTracks = this.tracksWithComputedData(result.data);
+      this.allTracks = this.tracksWithComputedData(result?.data ?? []);
     });
   }
 
@@ -74,80 +70,19 @@ export class ReleaseManagementComponent implements OnInit, OnDestroy {
   }
 
   private tracksWithComputedData(data: any[]): any[] {
-    return data?.map((track: any) => {
-      // If snapshots are available, compute stats from them. Otherwise use
-      // server-provided summary fields like latest_snapshot_modified.
-      const snapshots: any[] = Array.isArray(track.snapshots)
-        ? track.snapshots
-        : [];
-
-      let latestVersion: any = 'No tagged releases';
-      let latestModified: any =
-        track.latest_snapshot_modified ||
-        track.created_at ||
-        track.updated_at ||
-        null;
-      let stats: any = {
-        candidates: 0,
-        staged: 0,
-        members: 0,
-        quarantined: 0,
-      };
-
-      if (snapshots.length) {
-        const sortedByModified = [...snapshots].sort((a, b) => {
-          const ma = a?.modified || '';
-          const mb = b?.modified || '';
-          return String(mb).localeCompare(String(ma));
-        });
-
-        const latestSnapshot = sortedByModified[0] || null;
-        const taggedSnapshots = sortedByModified.filter(
-          (s: any) => s && s.version
-        );
-        const latestTaggedSnapshot =
-          taggedSnapshots.length > 0 ? taggedSnapshots[0] : null;
-
-        latestVersion = latestTaggedSnapshot
-          ? latestTaggedSnapshot.version
-          : 'No tagged releases';
-        latestModified =
-          latestSnapshot?.modified || latestSnapshot?.created || latestModified;
-
-        stats = {
-          candidates:
-            latestSnapshot?.candidates?.length ||
-            latestSnapshot?.contents?.candidates?.length ||
-            0,
-          staged:
-            latestSnapshot?.staged?.length ||
-            latestSnapshot?.contents?.staged?.length ||
-            0,
-          members:
-            latestTaggedSnapshot?.members?.length ||
-            latestTaggedSnapshot?.contents?.members?.length ||
-            0,
-          quarantined:
-            latestSnapshot?.quarantine?.length ||
-            latestSnapshot?.contents?.quarantine?.length ||
-            0,
-        };
-      } else {
-        latestVersion = track.latest_tagged_version || 'No tagged releases';
-        latestModified = track.latest_snapshot_modified || latestModified;
-        stats = {
-          candidates: track.snapshot_count || 0,
-          staged: 0,
-          members: track.tagged_release_count || 0,
-          quarantined: 0,
-        };
-      }
+    return data.map((track: any) => {
+      const summary = track.summary ?? {};
 
       return {
         ...track,
-        latestVersion,
-        latestModified,
-        stats,
+        latestVersion: track.latest_tagged_version ?? 'No tagged releases',
+        latestModified: track.latest_snapshot_modified,
+        stats: {
+          candidates: summary.candidates_count ?? 0,
+          staged: summary.staged_count ?? 0,
+          members: summary.members_count ?? 0,
+          quarantined: 0,
+        },
       };
     });
   }

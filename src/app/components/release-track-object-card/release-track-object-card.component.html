@@ -18,9 +18,7 @@
   </mat-card-header>
 
   <mat-card-content *ngIf="showDescription">
-    <p class="object-description">
-      {{ description }}
-    </p>
+    <markdown class="object-description" [data]="description"></markdown>
   </mat-card-content>
 
   <mat-card-actions>
