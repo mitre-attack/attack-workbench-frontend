@@ -73,7 +73,7 @@
     "@types/node": "^20.19.43",
     "angular-eslint": "^19.4.0",
     "codelyzer": "^6.0.0",
-    "commitlint": "^20.5.0",
+    "commitlint": "^21.2.1",
     "esbuild-visualizer": "^0.7.0",
     "eslint": "^9.23.0",
     "eslint-config-prettier": "^10.1.1",
