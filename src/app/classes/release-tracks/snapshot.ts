@@ -2,6 +2,7 @@ import { Composition, CompositionResolution } from './composition';
 import { ReleaseTrackConfig } from './config';
 import { ReleaseTrackType } from './enums';
 import { VersionHistoryEntry } from './history';
+import { SnapshotSchedule } from './release-track';
 import {
   CandidateEntry,
   MemberEntry,
@@ -34,6 +35,7 @@ export class ReleaseTrackSnapshot {
   // virtual track composition
   public composition?: Composition;
   public composition_resolution?: CompositionResolution;
+  public snapshot_schedule?: SnapshotSchedule;
 
   constructor(raw?: any) {
     if (raw) this.deserialize(raw);
@@ -105,8 +107,11 @@ export class ReleaseTrackSnapshot {
 
     if ('members' in raw && Array.isArray(raw.members)) {
       this.members = raw.members.map((m: any) => ({
+        ...m,
         object_ref: m.object_ref,
-        object_modified: new Date(m.object_modified),
+        object_modified: m.object_modified
+          ? new Date(m.object_modified)
+          : undefined,
       }));
     }
 
@@ -114,7 +119,9 @@ export class ReleaseTrackSnapshot {
       this.staged = raw.staged.map((s: any) => ({
         ...s,
         object_ref: s.object_ref,
-        object_modified: new Date(s.object_modified),
+        object_modified: s.object_modified
+          ? new Date(s.object_modified)
+          : undefined,
         object_status: s.object_status,
         object_staged_at: s.object_staged_at
           ? new Date(s.object_staged_at)
@@ -127,7 +134,9 @@ export class ReleaseTrackSnapshot {
       this.candidates = raw.candidates.map((c: any) => ({
         ...c,
         object_ref: c.object_ref,
-        object_modified: new Date(c.object_modified),
+        object_modified: c.object_modified
+          ? new Date(c.object_modified)
+          : undefined,
         object_status: c.object_status,
         object_added_at: c.object_added_at
           ? new Date(c.object_added_at)
@@ -138,8 +147,11 @@ export class ReleaseTrackSnapshot {
 
     if ('quarantine' in raw && Array.isArray(raw.quarantine)) {
       this.quarantine = raw.quarantine.map((q: any) => ({
+        ...q,
         object_ref: q.object_ref,
-        object_modified: new Date(q.object_modified),
+        object_modified: q.object_modified
+          ? new Date(q.object_modified)
+          : undefined,
         source_track_id: q.source_track_id,
         source_track_name: q.source_track_name,
         source_snapshot_version: q.source_snapshot_version,
@@ -148,6 +160,9 @@ export class ReleaseTrackSnapshot {
     }
 
     if ('composition' in raw) this.composition = raw.composition;
+
+    if ('snapshot_schedule' in raw)
+      this.snapshot_schedule = raw.snapshot_schedule;
 
     if ('composition_resolution' in raw && raw.composition_resolution) {
       const cr = raw.composition_resolution;
@@ -221,6 +236,7 @@ export class ReleaseTrackSnapshot {
       })),
       composition: this.composition,
       composition_resolution: this.composition_resolution,
+      snapshot_schedule: this.snapshot_schedule,
     };
   }
 

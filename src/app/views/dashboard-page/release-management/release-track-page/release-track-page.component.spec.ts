@@ -18,10 +18,13 @@ import { AddDialogComponent } from 'src/app/components/add-dialog/add-dialog.com
 import { FormsModule, ReactiveFormsModule } from '@angular/forms';
 import {
   ConflictPolicy,
+  DeduplicationStrategy,
   MemberSyncBehavior,
   MemberSyncPolicy,
   MemberSyncStrategy,
   ReleaseTrackType,
+  SnapshotScheduleMode,
+  SnapshotTier,
 } from 'src/app/classes/release-tracks';
 
 describe('ReleaseTrackPageComponent', () => {
@@ -30,19 +33,23 @@ describe('ReleaseTrackPageComponent', () => {
   let mockReleaseTrackApiConnector: any;
   let mockDialog: any;
   let mockRestApiConnector: any;
+  let mockRouter: any;
 
   beforeEach(async () => {
     mockReleaseTrackApiConnector = createMockReleaseTrackApiConnector({
       getLatestSnapshot: vi.fn(() => createAsyncObservable(null)),
+      listReleaseTracks: vi.fn(() => createAsyncObservable({ data: [] })),
       listSnapshots: vi.fn(() => createAsyncObservable([])),
       exportLatestSnapshot: vi.fn(() => createAsyncObservable({})),
       exportSnapshotByModified: vi.fn(() => createAsyncObservable({})),
       retrieveSnapshotByModified: vi.fn(() => createAsyncObservable(null)),
+      previewVirtualSnapshot: vi.fn(() => createAsyncObservable({})),
       createVirtualSnapshot: vi.fn(() => createAsyncObservable({})),
       previewBump: vi.fn(() => createAsyncObservable({})),
       bumpByLatest: vi.fn(() => createAsyncObservable({})),
       getConfig: vi.fn(() => createAsyncObservable(null)),
       updateConfig: vi.fn(() => createAsyncObservable({})),
+      updateComposition: vi.fn(() => createAsyncObservable({})),
       reviewCandidates: vi.fn(() => createAsyncObservable({})),
       updateMetadataByLatest: vi.fn(() => createAsyncObservable({})),
       addCandidates: vi.fn(() => createAsyncObservable({})),
@@ -59,7 +66,7 @@ describe('ReleaseTrackPageComponent', () => {
     const mockBreadcrumbService = {
       changeBreadcrumb: vi.fn(),
     };
-    const mockRouter = {
+    mockRouter = {
       navigate: vi.fn(),
     };
 
@@ -179,6 +186,176 @@ describe('ReleaseTrackPageComponent', () => {
     expect(component.releaseTrack?.name).toBe('Enterprise Release');
   });
 
+  it('should expose virtual release track composition and resolution details', () => {
+    component.releaseTrack = {
+      type: ReleaseTrackType.Virtual,
+      composition: {
+        component_tracks: [
+          {
+            track_id: 'release-track--component-one',
+            resolution_strategy: 'latest_tagged',
+            priority: 0,
+            filters: {
+              object_types: ['attack-pattern'],
+            },
+          },
+          {
+            track_id: 'release-track--component-two',
+            resolution_strategy: 'latest_tagged',
+            priority: 1,
+          },
+        ],
+      },
+      composition_resolution: {
+        component_snapshots: [
+          {
+            track_id: 'release-track--component-one',
+            track_name: 'Resolved Component One',
+            resolved_version: '1.0',
+            objects_contributed: 8,
+            objects_after_filter: 8,
+          },
+          {
+            track_id: 'release-track--component-two',
+            track_name: 'Component Two',
+            resolved_version: '2.0',
+            objects_contributed: 12,
+            objects_after_filter: 12,
+          },
+        ],
+        summary: {
+          total_objects: 20,
+        },
+        deduplication: {
+          duplicates_found: 2,
+          conflicts_resolved: [{ object_ref: 'attack-pattern--one' }],
+        },
+      },
+      members: [
+        {
+          object_ref: 'x-mitre-collection--enterprise',
+          object_modified: '2026-01-01T00:00:00.000Z',
+          attack_id: 'NX0001',
+          name: 'Enterprise ATT&CK',
+        },
+      ],
+      quarantine: [{ object_ref: 'attack-pattern--quarantined' }],
+    } as any;
+    (component as any).virtualComponentTrackSummaries = new Map([
+      [
+        'release-track--component-one',
+        {
+          trackId: 'release-track--component-one',
+          name: 'Component One',
+          candidatesCount: 9,
+          stagedCount: 3,
+          membersCount: 72,
+        },
+      ],
+      [
+        'release-track--component-two',
+        {
+          trackId: 'release-track--component-two',
+          name: 'Component Two',
+          candidatesCount: 2,
+          stagedCount: 1,
+          membersCount: 20,
+        },
+      ],
+    ]);
+
+    expect(component.isVirtualReleaseTrack).toBe(true);
+    expect(component.virtualComponentTracks).toHaveLength(2);
+    expect(component.resolvedComponentSnapshots).toHaveLength(2);
+    expect(component.virtualResolvedObjectCount).toBe(20);
+    expect(component.virtualDuplicateCount).toBe(2);
+    expect(component.virtualConflictCount).toBe(1);
+    expect(component.quarantineObjects).toHaveLength(1);
+    expect(
+      component.getComponentTrackLabel(component.virtualComponentTracks[0])
+    ).toBe('Component One');
+    expect(
+      component.getComponentTrackFilters(component.virtualComponentTracks[0])
+    ).toEqual(['attack pattern']);
+    expect(component.virtualResolutionRows[0]).toEqual(
+      expect.objectContaining({
+        trackId: 'release-track--component-one',
+        trackName: 'Component One',
+        strategy: 'latest_tagged',
+        resolvedVersion: '1.0',
+        candidatesCount: 9,
+        stagedCount: 3,
+        membersCount: 72,
+      })
+    );
+    expect(
+      component.getVirtualResolvedVersion(component.virtualResolutionRows[0])
+    ).toBe('v1.0');
+    expect(component.getVirtualTierCount(9)).toBe('9');
+    expect(component.getVirtualObjectTitle(component.members[0])).toBe(
+      'Enterprise ATT&CK'
+    );
+    expect(component.getVirtualObjectSubtitle(component.members[0])).toBe(
+      'NX0001'
+    );
+  });
+
+  it('should load component track summaries alongside a virtual track', () => {
+    mockReleaseTrackApiConnector.getLatestSnapshot.mockReturnValue(
+      of({
+        type: ReleaseTrackType.Virtual,
+        name: 'Virtual Release',
+        composition: {
+          component_tracks: [
+            {
+              track_id: 'release-track--component-one',
+              resolution_strategy: 'latest_tagged',
+            },
+          ],
+        },
+      })
+    );
+    mockReleaseTrackApiConnector.listReleaseTracks.mockReturnValue(
+      of({
+        data: [
+          {
+            track_id: 'release-track--component-one',
+            name: 'Component One',
+            summary: {
+              candidates_count: 9,
+              staged_count: 3,
+              members_count: 72,
+            },
+          },
+        ],
+      })
+    );
+    component.id = 'release-track--virtual';
+
+    component.getReleaseTrack();
+
+    expect(mockReleaseTrackApiConnector.listReleaseTracks).toHaveBeenCalled();
+    expect(component.virtualResolutionRows[0]).toEqual(
+      expect.objectContaining({
+        trackName: 'Component One',
+        candidatesCount: 9,
+        stagedCount: 3,
+        membersCount: 72,
+      })
+    );
+  });
+
+  it('should navigate to a component release track page', () => {
+    component.onOpenComponentTrack({
+      trackId: 'release-track--component-one',
+    });
+
+    expect(mockRouter.navigate).toHaveBeenCalledWith([
+      '/dashboard/release-management',
+      'release-track--component-one',
+    ]);
+  });
+
   it('should load snapshot history and compute timeline counts', () => {
     mockReleaseTrackApiConnector.listSnapshots.mockReturnValue(
       of([
@@ -239,6 +416,24 @@ describe('ReleaseTrackPageComponent', () => {
     const historySpy = vi
       .spyOn(component, 'getSnapshotHistory')
       .mockImplementation(() => undefined);
+    mockReleaseTrackApiConnector.previewVirtualSnapshot.mockReturnValue(
+      of({
+        preview: {
+          would_resolve_to: {
+            total_objects: 20,
+            component_snapshots: [
+              {
+                track_name: 'Component Track',
+                resolved_version: '1.0',
+              },
+            ],
+          },
+        },
+      })
+    );
+    mockDialog.open.mockReturnValue({
+      afterClosed: () => of('create'),
+    });
     mockReleaseTrackApiConnector.createVirtualSnapshot.mockReturnValue(of({}));
     component.id = 'release-track--123';
     component.releaseTrack = { type: ReleaseTrackType.Virtual } as any;
@@ -246,8 +441,22 @@ describe('ReleaseTrackPageComponent', () => {
     component.onDraft();
 
     expect(
-      mockReleaseTrackApiConnector.createVirtualSnapshot
+      mockReleaseTrackApiConnector.previewVirtualSnapshot
     ).toHaveBeenCalledWith('release-track--123');
+    expect(mockDialog.open).toHaveBeenCalledWith(
+      MultipleChoiceDialogComponent,
+      expect.objectContaining({
+        data: expect.objectContaining({
+          title: 'Create draft snapshot?',
+          description: expect.stringContaining('20 objects'),
+        }),
+      })
+    );
+    expect(
+      mockReleaseTrackApiConnector.createVirtualSnapshot
+    ).toHaveBeenCalledWith('release-track--123', {
+      description: 'Initial virtual snapshot',
+    });
     expect(refreshSpy).toHaveBeenCalled();
     expect(historySpy).toHaveBeenCalled();
     expect(component.isCreatingDraft).toBe(false);
@@ -260,7 +469,7 @@ describe('ReleaseTrackPageComponent', () => {
     component.onDraft();
 
     expect(
-      mockReleaseTrackApiConnector.createVirtualSnapshot
+      mockReleaseTrackApiConnector.previewVirtualSnapshot
     ).not.toHaveBeenCalled();
   });
 
@@ -271,7 +480,7 @@ describe('ReleaseTrackPageComponent', () => {
     component.onDraft();
 
     expect(
-      mockReleaseTrackApiConnector.createVirtualSnapshot
+      mockReleaseTrackApiConnector.previewVirtualSnapshot
     ).not.toHaveBeenCalled();
   });
 
@@ -412,17 +621,19 @@ describe('ReleaseTrackPageComponent', () => {
     expect(mockReleaseTrackApiConnector.getConfig).toHaveBeenCalledWith(
       'release-track--123'
     );
-    expect(component.configForm.getRawValue()).toEqual({
-      autoPromote: false,
-      candidacyThreshold: 'awaiting-review',
-      memberSyncStrategy: 'track_latest',
-      memberSyncSupplantBehavior: 'queue',
-      memberSyncSupplantStatusPolicy: 'reset',
-      candidatesToStagedConflict: 'always_reject',
-      stagedToMembersConflict: 'abort',
-      includeSecondaryObjects: true,
-      secondaryObjectThreshold: 'work-in-progress',
-    });
+    expect(component.configForm.getRawValue()).toEqual(
+      expect.objectContaining({
+        autoPromote: false,
+        candidacyThreshold: 'awaiting-review',
+        memberSyncStrategy: 'track_latest',
+        memberSyncSupplantBehavior: 'queue',
+        memberSyncSupplantStatusPolicy: 'reset',
+        candidatesToStagedConflict: 'always_reject',
+        stagedToMembersConflict: 'abort',
+        includeSecondaryObjects: true,
+        secondaryObjectThreshold: 'work-in-progress',
+      })
+    );
     expect(component.configForm.get('candidacyThreshold')?.disabled).toBe(true);
   });
 
@@ -539,6 +750,178 @@ describe('ReleaseTrackPageComponent', () => {
       mockReleaseTrackApiConnector.updateConfig.mock.calls[0][1]
         .candidacy_threshold
     ).toBeUndefined();
+  });
+
+  it('should load virtual release track config from composition fields', () => {
+    mockReleaseTrackApiConnector.getLatestSnapshot.mockReturnValue(
+      of({
+        type: ReleaseTrackType.Virtual,
+        name: 'Virtual Release',
+        composition: {
+          component_tracks: [
+            {
+              track_id: 'release-track--component-one',
+              resolution_strategy: 'latest_tagged',
+              priority: 0,
+            },
+          ],
+          deduplication: {
+            strategy: DeduplicationStrategy.Quarantine,
+            tier_resolution: SnapshotTier.Staged,
+            status_resolution: 'awaiting-review',
+          },
+        },
+        snapshot_schedule: {
+          mode: SnapshotScheduleMode.Cron,
+          cron: '0 0 1 1,7 *',
+        },
+        config: {},
+      })
+    );
+    component.id = 'release-track--virtual';
+
+    component.getReleaseTrack();
+
+    expect(component.configForm.getRawValue()).toEqual(
+      expect.objectContaining({
+        virtualDeduplicationStrategy: DeduplicationStrategy.Quarantine,
+        virtualDeduplicationTier: SnapshotTier.Staged,
+        virtualDeduplicationStatus: 'awaiting-review',
+        virtualSnapshotScheduleMode: SnapshotScheduleMode.Cron,
+        virtualSnapshotScheduleCron: '0 0 1 1,7 *',
+      })
+    );
+  });
+
+  it('should save virtual release track composition config', () => {
+    const refreshSpy = vi
+      .spyOn(component, 'getReleaseTrack')
+      .mockImplementation(() => undefined);
+    const historySpy = vi
+      .spyOn(component, 'getSnapshotHistory')
+      .mockImplementation(() => undefined);
+    mockReleaseTrackApiConnector.updateComposition.mockReturnValue(of({}));
+    component.id = 'release-track--virtual';
+    component.releaseTrack = {
+      type: ReleaseTrackType.Virtual,
+      composition: {
+        component_tracks: [
+          {
+            track_id: 'release-track--component-one',
+            resolution_strategy: 'latest_tagged',
+          },
+        ],
+        deduplication: {
+          strategy: DeduplicationStrategy.PrioritizeLatestObject,
+        },
+      },
+    } as any;
+    component.configForm.patchValue({
+      virtualDeduplicationStrategy: DeduplicationStrategy.Quarantine,
+      virtualDeduplicationTier: SnapshotTier.Staged,
+      virtualDeduplicationStatus: 'reviewed',
+    });
+    component.onEditConfig();
+    component.configForm.patchValue({
+      virtualDeduplicationStrategy: DeduplicationStrategy.Quarantine,
+      virtualDeduplicationTier: SnapshotTier.Staged,
+      virtualDeduplicationStatus: 'reviewed',
+    });
+
+    component.onSaveConfig();
+
+    expect(mockReleaseTrackApiConnector.updateComposition).toHaveBeenCalledWith(
+      'release-track--virtual',
+      {
+        component_tracks: [
+          {
+            track_id: 'release-track--component-one',
+            resolution_strategy: 'latest_tagged',
+            priority: 0,
+          },
+        ],
+        deduplication: {
+          strategy: DeduplicationStrategy.Quarantine,
+          tier_resolution: SnapshotTier.Staged,
+          status_resolution: 'reviewed',
+        },
+      }
+    );
+    expect(mockReleaseTrackApiConnector.updateConfig).not.toHaveBeenCalled();
+    expect(component.isEditingConfig).toBe(false);
+    expect(refreshSpy).toHaveBeenCalled();
+    expect(historySpy).toHaveBeenCalled();
+  });
+
+  it('should edit virtual release track component tracks', () => {
+    mockReleaseTrackApiConnector.updateComposition.mockReturnValue(of({}));
+    component.id = 'release-track--virtual';
+    component.releaseTrack = {
+      type: ReleaseTrackType.Virtual,
+      composition: {
+        component_tracks: [
+          {
+            track_id: 'release-track--component-one',
+            resolution_strategy: 'latest_tagged',
+            priority: 0,
+          },
+        ],
+      },
+    } as any;
+    component.virtualComponentTrackOptions = [
+      {
+        trackId: 'release-track--component-one',
+        name: 'Component One',
+        description: '',
+        latestTaggedVersion: '1.0',
+        taggedReleaseCount: 1,
+      },
+      {
+        trackId: 'release-track--component-two',
+        name: 'Component Two',
+        description: '',
+        latestTaggedVersion: null,
+        taggedReleaseCount: 0,
+      },
+    ];
+    component.onEditConfig();
+
+    expect(component.filteredVirtualComponentTrackOptions).toEqual([
+      expect.objectContaining({
+        trackId: 'release-track--component-two',
+      }),
+    ]);
+
+    component.selectVirtualComponentTrack({
+      option: {
+        value: component.virtualComponentTrackOptions[1],
+      },
+    });
+    component.setVirtualComponentTrackObjectTypes(
+      component.virtualConfigComponentTracks[1],
+      ['attack-pattern']
+    );
+    component.removeVirtualComponentTrack(
+      component.virtualConfigComponentTracks[0]
+    );
+
+    component.onSaveConfig();
+
+    expect(mockReleaseTrackApiConnector.updateComposition).toHaveBeenCalledWith(
+      'release-track--virtual',
+      expect.objectContaining({
+        component_tracks: [
+          {
+            track_id: 'release-track--component-two',
+            resolution_strategy: 'latest_tagged',
+            priority: 0,
+            filters: {
+              object_types: ['attack-pattern'],
+            },
+          },
+        ],
+      })
+    );
   });
 
   it('should split auto-promotion release tracks into workflow lanes', () => {

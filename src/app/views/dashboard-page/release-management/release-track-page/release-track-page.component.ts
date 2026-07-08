@@ -1,8 +1,14 @@
+import { SelectionModel } from '@angular/cdk/collections';
 import { Component, OnInit } from '@angular/core';
+import { FormBuilder, FormGroup } from '@angular/forms';
+import { MatDialog } from '@angular/material/dialog';
 import { ActivatedRoute, Router } from '@angular/router';
+import { finalize, take } from 'rxjs/operators';
 import {
   ConflictPolicy,
   ConflictPolicyType,
+  DeduplicationStrategy,
+  DeduplicationStrategyType,
   ExportFormat,
   ExportFormatType,
   MemberSyncBehavior,
@@ -15,24 +21,28 @@ import {
   ReleaseTrackSnapshot,
   ReleaseTrackSnapshotHistoryItem,
   ReleaseTrackType,
+  ResolutionStrategy,
+  SnapshotScheduleMode,
+  SnapshotScheduleModeType,
+  SnapshotTier,
+  SnapshotTierType,
   StixObjectRef,
 } from 'src/app/classes/release-tracks';
-import { ReleaseTracksConnectorService } from 'src/app/services/connectors/rest-api/release-tracks.service';
-import { BreadcrumbService } from 'src/app/services/helpers/breadcrumb.service';
-import { MatDialog } from '@angular/material/dialog';
-import { SelectionModel } from '@angular/cdk/collections';
-import { RestApiConnectorService } from 'src/app/services/connectors/rest-api/rest-api-connector.service';
 import { AddDialogComponent } from 'src/app/components/add-dialog/add-dialog.component';
-import { StixTypeToAttackType } from 'src/app/utils/type-mappings';
+import { MultipleChoiceDialogComponent } from 'src/app/components/multiple-choice-dialog/multiple-choice-dialog.component';
+import { ReleaseTrackObjectItem } from 'src/app/components/release-track-object-card/release-track-object-card.component';
+import { ReleaseTracksConnectorService } from 'src/app/services/connectors/rest-api/release-tracks.service';
+import { RestApiConnectorService } from 'src/app/services/connectors/rest-api/rest-api-connector.service';
+import { BreadcrumbService } from 'src/app/services/helpers/breadcrumb.service';
+import {
+  AttackTypeToPlural,
+  StixTypeToAttackType,
+} from 'src/app/utils/type-mappings';
 import {
   StixType,
   WorkflowStatus,
   WorkflowStatusType,
 } from 'src/app/utils/types';
-import { MultipleChoiceDialogComponent } from 'src/app/components/multiple-choice-dialog/multiple-choice-dialog.component';
-import { finalize, take } from 'rxjs/operators';
-import { FormBuilder, FormGroup } from '@angular/forms';
-import { ReleaseTrackObjectItem } from 'src/app/components/release-track-object-card/release-track-object-card.component';
 import { ALL_OBJECTS_STIX_LIST_CONFIG } from 'src/app/views/stix/all-objects-page/all-objects-page.component';
 
 type ReleaseTrackLaneType = 'candidate' | 'staged' | 'member';
@@ -76,6 +86,60 @@ interface ReleaseTrackConfigFormValue {
   secondaryObjectThreshold: WorkflowStatusType;
 }
 
+interface VirtualReleaseTrackConfigFormValue {
+  virtualDeduplicationStrategy: DeduplicationStrategyType;
+  virtualDeduplicationTier: SnapshotTierType;
+  virtualDeduplicationStatus: WorkflowStatusType;
+  virtualSnapshotScheduleMode: SnapshotScheduleModeType;
+  virtualSnapshotScheduleCron: string;
+}
+
+interface VirtualResolutionRow {
+  trackId: string;
+  trackName: string;
+  strategy: string;
+  resolvedVersion?: string | null;
+  candidatesCount?: number | null;
+  stagedCount?: number | null;
+  membersCount?: number | null;
+}
+
+interface VirtualComponentTrackSummary {
+  trackId: string;
+  name: string;
+  description: string;
+  type: string;
+  latestTaggedVersion: string | null;
+  taggedReleaseCount: number;
+  candidatesCount: number;
+  stagedCount: number;
+  membersCount: number;
+}
+
+interface VirtualComponentTrackOption {
+  trackId: string;
+  name: string;
+  description: string;
+  latestTaggedVersion: string | null;
+  taggedReleaseCount: number;
+}
+
+const VIRTUAL_OBJECT_TYPE_OPTIONS: StixType[] = [
+  'attack-pattern',
+  'campaign',
+  'course-of-action',
+  'intrusion-set',
+  'malware',
+  'tool',
+  'x-mitre-asset',
+  'x-mitre-data-source',
+  'x-mitre-data-component',
+  'x-mitre-detection-strategy',
+  'x-mitre-analytic',
+  'x-mitre-matrix',
+  'x-mitre-tactic',
+];
+
 @Component({
   selector: 'app-release-track-page',
   standalone: false,
@@ -98,6 +162,12 @@ export class ReleaseTrackPageComponent implements OnInit {
   public releaseTrackConfig: ReleaseTrackConfig = {};
   public snapshotHistory: SnapshotHistoryViewModel[] = [];
   public configForm: FormGroup;
+  private virtualComponentTrackSummaries = new Map<
+    string,
+    VirtualComponentTrackSummary
+  >();
+  public virtualComponentTrackOptions: VirtualComponentTrackOption[] = [];
+  public virtualConfigComponentTracks: any[] = [];
 
   public candidacyOptions = Object.values(WorkflowStatus);
   public memberSyncStrategyOptions = Object.values(MemberSyncStrategy);
@@ -107,6 +177,15 @@ export class ReleaseTrackPageComponent implements OnInit {
     ConflictPolicy
   ).filter(policy => policy !== ConflictPolicy.Abort);
   public stagedToMembersConflictOptions = Object.values(ConflictPolicy);
+  public virtualDeduplicationOptions = Object.values(DeduplicationStrategy);
+  public virtualDeduplicationTierOptions = Object.values(SnapshotTier);
+  public virtualDeduplicationStatusOptions = Object.values(WorkflowStatus);
+  public virtualSnapshotScheduleModeOptions =
+    Object.values(SnapshotScheduleMode);
+  public virtualObjectTypeOptions = VIRTUAL_OBJECT_TYPE_OPTIONS.map(type => ({
+    label: this.formatStixType(type),
+    value: type,
+  }));
 
   constructor(
     private connector: ReleaseTracksConnectorService,
@@ -127,6 +206,14 @@ export class ReleaseTrackPageComponent implements OnInit {
       stagedToMembersConflict: [ConflictPolicy.Abort],
       includeSecondaryObjects: [false],
       secondaryObjectThreshold: [WorkflowStatus.Reviewed],
+      virtualDeduplicationStrategy: [
+        DeduplicationStrategy.PrioritizeLatestObject,
+      ],
+      virtualDeduplicationTier: [SnapshotTier.Member],
+      virtualDeduplicationStatus: [WorkflowStatus.Reviewed],
+      virtualSnapshotScheduleMode: [SnapshotScheduleMode.Manual],
+      virtualSnapshotScheduleCron: [''],
+      virtualComponentTrackSearch: [''],
     });
     this.configForm.get('autoPromote')?.valueChanges.subscribe(autoPromote => {
       this.syncCandidacyThresholdControl(!!autoPromote);
@@ -169,6 +256,120 @@ export class ReleaseTrackPageComponent implements OnInit {
 
   public get members(): any[] {
     return this.releaseTrack?.members ?? [];
+  }
+
+  public get virtualComponentTracks(): any[] {
+    return this.releaseTrack?.composition?.component_tracks ?? [];
+  }
+
+  public get displayedVirtualConfigComponentTracks(): any[] {
+    return this.isEditingConfig
+      ? this.virtualConfigComponentTracks
+      : this.virtualComponentTracks;
+  }
+
+  public get filteredVirtualComponentTrackOptions(): VirtualComponentTrackOption[] {
+    const search = this.getVirtualComponentTrackSearchText();
+    const selectedIds = new Set(
+      this.virtualConfigComponentTracks
+        .map(track => track.track_id)
+        .filter((trackId): trackId is string => !!trackId)
+    );
+
+    return this.virtualComponentTrackOptions
+      .filter(track => !selectedIds.has(track.trackId))
+      .filter(track => this.matchesVirtualComponentTrackSearch(track, search));
+  }
+
+  public get virtualSnapshotSchedule(): any {
+    return (this.releaseTrack as any)?.snapshot_schedule || {};
+  }
+
+  public get resolvedComponentSnapshots(): any[] {
+    return this.releaseTrack?.composition_resolution?.component_snapshots ?? [];
+  }
+
+  public get quarantineObjects(): any[] {
+    return this.releaseTrack?.quarantine ?? [];
+  }
+
+  public get virtualResolvedAt(): Date | null {
+    return this.releaseTrack?.composition_resolution?.resolved_at ?? null;
+  }
+
+  public get virtualResolutionRows(): VirtualResolutionRow[] {
+    if (this.resolvedComponentSnapshots.length) {
+      return this.resolvedComponentSnapshots.map(component => {
+        const configuredTrack = this.virtualComponentTracks.find(
+          track => track.track_id === component.track_id
+        );
+        return {
+          trackId: component.track_id,
+          trackName:
+            this.getComponentTrackSummary(component.track_id)?.name ||
+            component.track_name ||
+            component.track_id,
+          strategy:
+            component.strategy_used ||
+            configuredTrack?.resolution_strategy ||
+            '',
+          resolvedVersion:
+            component.resolved_version ||
+            component.version ||
+            component.version_label ||
+            null,
+          ...this.getVirtualComponentCounts(component.track_id),
+        };
+      });
+    }
+
+    return this.virtualComponentTracks.map(track => ({
+      trackId: track.track_id,
+      trackName: this.getComponentTrackLabel(track),
+      strategy: track.resolution_strategy,
+      resolvedVersion: null,
+      ...this.getVirtualComponentCounts(track.track_id),
+    }));
+  }
+
+  public get virtualResolvedObjectCount(): number {
+    const resolved = this.releaseTrack?.composition_resolution as any;
+    return (
+      this.getResolutionNumber(
+        resolved,
+        'total_objects',
+        'totalObjects',
+        'objects_contributed',
+        'total_objects_after'
+      ) ||
+      this.resolvedComponentSnapshots.reduce(
+        (total, component) =>
+          total + Number(component.objects_contributed || 0),
+        0
+      )
+    );
+  }
+
+  public get virtualDuplicateCount(): number {
+    return this.getResolutionNumber(
+      this.releaseTrack?.composition_resolution as any,
+      'duplicates_found',
+      'duplicates',
+      'duplicate_count'
+    );
+  }
+
+  public get virtualConflictCount(): number {
+    const resolved = this.releaseTrack?.composition_resolution as any;
+    const conflictCount = this.getResolutionNumber(
+      resolved,
+      'conflicts_found',
+      'conflicts',
+      'conflict_count'
+    );
+    if (conflictCount) return conflictCount;
+    const resolvedConflicts = resolved?.deduplication?.conflicts_resolved;
+    return Array.isArray(resolvedConflicts) ? resolvedConflicts.length : 0;
   }
 
   public get autoPromotionEnabled(): boolean {
@@ -271,8 +472,18 @@ export class ReleaseTrackPageComponent implements OnInit {
             this.releaseTrack.name
           );
 
-          if (!this.isEditingConfig && this.releaseTrack.config) {
-            this.setConfig(this.releaseTrack.config);
+          if (this.isVirtualReleaseTrack) {
+            this.loadVirtualComponentTrackSummaries();
+          } else {
+            this.virtualComponentTrackSummaries.clear();
+          }
+
+          if (!this.isEditingConfig) {
+            if (this.isVirtualReleaseTrack) {
+              this.setVirtualConfig();
+            } else if (this.releaseTrack.config) {
+              this.setConfig(this.releaseTrack.config);
+            }
           }
 
           // this.loadCandidates();
@@ -322,9 +533,13 @@ export class ReleaseTrackPageComponent implements OnInit {
       .subscribe({
         next: config => {
           if (!this.isEditingConfig) {
-            this.setConfig(
-              this.getConfigFromResponse(config, this.releaseTrack?.config)
-            );
+            if (this.isVirtualReleaseTrack) {
+              this.setVirtualConfig();
+            } else {
+              this.setConfig(
+                this.getConfigFromResponse(config, this.releaseTrack?.config)
+              );
+            }
           }
         },
         error: err => {
@@ -565,6 +780,337 @@ export class ReleaseTrackPageComponent implements OnInit {
     return `${item.object_ref}-${item.object_modified || ''}`;
   }
 
+  public trackByComponentTrack(_index: number, track: any): string {
+    return track?.track_id || `${_index}`;
+  }
+
+  public trackByResolvedComponent(_index: number, component: any): string {
+    return component?.track_id || component?.track_name || `${_index}`;
+  }
+
+  public trackByVirtualResolutionRow(
+    _index: number,
+    row: VirtualResolutionRow
+  ): string {
+    return row.trackId || `${_index}`;
+  }
+
+  public onOpenComponentTrack(track: any): void {
+    const trackId = track?.track_id || track?.trackId;
+    if (!trackId) return;
+    this.router.navigate(['/dashboard/release-management', trackId]);
+  }
+
+  public getComponentTrackLabel(track: any): string {
+    const resolvedComponent = this.resolvedComponentSnapshots.find(
+      component => component.track_id === track.track_id
+    );
+    return (
+      this.getComponentTrackSummary(track.track_id)?.name ||
+      resolvedComponent?.track_name ||
+      track.track_name ||
+      track.track_id
+    );
+  }
+
+  public getComponentTrackFilters(track: any): string[] {
+    const objectTypes = track?.filters?.object_types;
+    if (!Array.isArray(objectTypes)) return [];
+    return objectTypes.map(type => this.formatConfigOption(type));
+  }
+
+  public getResolvedComponentLabel(component: any): string {
+    const version =
+      component.resolved_version ||
+      component.version ||
+      component.version_label;
+    if (version) return `Resolved version ${version}`;
+
+    const snapshot =
+      component.resolved_snapshot_id || component.resolved_snapshot;
+    if (snapshot) return `Resolved snapshot ${this.toDisplayDate(snapshot)}`;
+
+    return 'Resolved snapshot';
+  }
+
+  public getVirtualResolvedVersion(row: VirtualResolutionRow): string {
+    if (!row.resolvedVersion) return '-';
+    return row.resolvedVersion.startsWith('v')
+      ? row.resolvedVersion
+      : `v${row.resolvedVersion}`;
+  }
+
+  public getVirtualTierCount(value: number | null | undefined): string {
+    if (value === null || value === undefined) return '-';
+    return String(value);
+  }
+
+  public displayVirtualComponentTrackOption(
+    track: VirtualComponentTrackOption
+  ): string {
+    return track?.name || '';
+  }
+
+  public getVirtualComponentTrackSnapshotLabel(
+    track: VirtualComponentTrackOption | any
+  ): string {
+    const version =
+      track?.latestTaggedVersion ||
+      track?.latest_tagged_version ||
+      track?.latest_version;
+    return version ? `v${version}` : 'no tagged snapshots';
+  }
+
+  public selectVirtualComponentTrack(event: any): void {
+    const option = event?.option?.value as VirtualComponentTrackOption;
+    if (!option) return;
+
+    this.virtualConfigComponentTracks = [
+      ...this.virtualConfigComponentTracks,
+      {
+        track_id: option.trackId,
+        resolution_strategy: ResolutionStrategy.LatestTagged,
+        priority: this.virtualConfigComponentTracks.length,
+      },
+    ];
+    this.configForm
+      .get('virtualComponentTrackSearch')
+      ?.setValue('', { emitEvent: false });
+  }
+
+  public removeVirtualComponentTrack(track: any): void {
+    this.virtualConfigComponentTracks =
+      this.virtualConfigComponentTracks.filter(item => item !== track);
+  }
+
+  public getVirtualComponentTrackObjectTypes(track: any): string[] {
+    const objectTypes = track?.filters?.object_types;
+    return Array.isArray(objectTypes) ? objectTypes : [];
+  }
+
+  public setVirtualComponentTrackObjectTypes(
+    track: any,
+    objectTypes: string[]
+  ): void {
+    if (!objectTypes.length) {
+      const filters = { ...(track.filters || {}) };
+      delete filters.object_types;
+      track.filters = Object.keys(filters).length ? filters : undefined;
+      return;
+    }
+
+    track.filters = {
+      ...(track.filters || {}),
+      object_types: objectTypes,
+    };
+  }
+
+  public getVirtualComponentTrackDescription(track: any): string {
+    return this.getComponentTrackSummary(track?.track_id)?.description || '';
+  }
+
+  public getVirtualObjectTitle(item: any): string {
+    return item?.name || this.getFallbackObjectLabel(item?.object_ref);
+  }
+
+  public getVirtualObjectSubtitle(item: any): string {
+    return (
+      item?.attack_id ||
+      item?.attackId ||
+      item?.source_snapshot_version ||
+      item?.conflict_reason ||
+      item?.object_ref ||
+      ''
+    );
+  }
+
+  private getResolutionNumber(resolution: any, ...keys: string[]): number {
+    if (!resolution) return 0;
+    const sources = [resolution, resolution.summary, resolution.deduplication];
+    for (const source of sources) {
+      if (!source) continue;
+      for (const key of keys) {
+        if (typeof source[key] === 'number') return source[key];
+      }
+    }
+    return 0;
+  }
+
+  private loadVirtualComponentTrackSummaries(): void {
+    this.connector
+      .listReleaseTracks()
+      .pipe(take(1))
+      .subscribe({
+        next: result => {
+          const summaries = new Map<string, VirtualComponentTrackSummary>();
+          const options: VirtualComponentTrackOption[] = [];
+          for (const track of this.getReleaseTrackList(result)) {
+            const trackId = this.getReleaseTrackId(track);
+            if (!trackId) continue;
+            summaries.set(trackId, this.toVirtualComponentTrackSummary(track));
+            if (this.isStandardReleaseTrack(track)) {
+              options.push(this.toVirtualComponentTrackOption(track));
+            }
+          }
+          this.virtualComponentTrackSummaries = summaries;
+          this.virtualComponentTrackOptions = options;
+        },
+        error: err => {
+          this.virtualComponentTrackSummaries.clear();
+          this.virtualComponentTrackOptions = [];
+          console.error('Failed to load component track summaries', err);
+        },
+      });
+  }
+
+  private getReleaseTrackList(result: any): any[] {
+    if (Array.isArray(result?.data)) return result.data;
+    if (Array.isArray(result?.release_tracks)) return result.release_tracks;
+    if (Array.isArray(result)) return result;
+    return [];
+  }
+
+  private getReleaseTrackId(track: any): string | null {
+    return track?.track_id || track?.id || null;
+  }
+
+  private isStandardReleaseTrack(track: any): boolean {
+    return String(track?.type).toLowerCase() === ReleaseTrackType.Standard;
+  }
+
+  private toVirtualComponentTrackSummary(
+    track: any
+  ): VirtualComponentTrackSummary {
+    const summary = track?.summary || {};
+    return {
+      trackId: this.getReleaseTrackId(track) as string,
+      name: track?.name || 'Untitled release track',
+      description: track?.description || '',
+      type: track?.type || '',
+      latestTaggedVersion: this.getLatestTaggedVersion(track),
+      taggedReleaseCount: this.getTaggedReleaseCount(track),
+      candidatesCount: Number(summary.candidates_count || 0),
+      stagedCount: Number(summary.staged_count || 0),
+      membersCount: Number(summary.members_count || 0),
+    };
+  }
+
+  private toVirtualComponentTrackOption(
+    track: any
+  ): VirtualComponentTrackOption {
+    return {
+      trackId: this.getReleaseTrackId(track) as string,
+      name: track?.name || 'Untitled release track',
+      description: track?.description || '',
+      latestTaggedVersion: this.getLatestTaggedVersion(track),
+      taggedReleaseCount: this.getTaggedReleaseCount(track),
+    };
+  }
+
+  private getLatestTaggedVersion(track: any): string | null {
+    return (
+      track?.latest_tagged_version ||
+      track?.latestTaggedVersion ||
+      track?.latest_version ||
+      track?.latestVersion ||
+      null
+    );
+  }
+
+  private getTaggedReleaseCount(track: any): number {
+    return Number(
+      track?.tagged_release_count ||
+        track?.taggedReleaseCount ||
+        track?.tagged_releases_count ||
+        0
+    );
+  }
+
+  private getComponentTrackSummary(
+    trackId: string
+  ): VirtualComponentTrackSummary | undefined {
+    return this.virtualComponentTrackSummaries.get(trackId);
+  }
+
+  private getVirtualComponentCounts(
+    trackId: string
+  ): Pick<
+    VirtualResolutionRow,
+    'candidatesCount' | 'stagedCount' | 'membersCount'
+  > {
+    const summary = this.getComponentTrackSummary(trackId);
+    return {
+      candidatesCount: summary?.candidatesCount ?? null,
+      stagedCount: summary?.stagedCount ?? null,
+      membersCount: summary?.membersCount ?? null,
+    };
+  }
+
+  private cloneVirtualComponentTracks(tracks: any[]): any[] {
+    return tracks.map(track => ({
+      ...track,
+      filters: track.filters
+        ? {
+            ...track.filters,
+            object_types: Array.isArray(track.filters.object_types)
+              ? [...track.filters.object_types]
+              : undefined,
+            domains: Array.isArray(track.filters.domains)
+              ? [...track.filters.domains]
+              : undefined,
+          }
+        : undefined,
+    }));
+  }
+
+  private getVirtualComponentTrackSearchText(): string {
+    const value = this.configForm.get('virtualComponentTrackSearch')?.value;
+    if (!value) return '';
+    if (typeof value === 'string') return value.trim().toLowerCase();
+    return String(value.name || value.trackId || '')
+      .trim()
+      .toLowerCase();
+  }
+
+  private matchesVirtualComponentTrackSearch(
+    track: VirtualComponentTrackOption,
+    search: string
+  ): boolean {
+    if (!search) return true;
+    return [track.name, track.trackId, track.description]
+      .filter(Boolean)
+      .some(value => value.toLowerCase().includes(search));
+  }
+
+  private toDisplayDate(value: any): string {
+    if (!value) return '';
+    const date = value instanceof Date ? value : new Date(value);
+    if (Number.isNaN(date.getTime())) return String(value);
+    return date.toLocaleString();
+  }
+
+  private toOptionalNumber(value: any): number | null {
+    if (value === null || value === undefined || value === '') return null;
+    const numberValue = Number(value);
+    return Number.isFinite(numberValue) ? numberValue : null;
+  }
+
+  private formatStixType(type: StixType): string {
+    const attackType = StixTypeToAttackType[type];
+    return AttackTypeToPlural[attackType]?.replace(/-/g, ' ') || type;
+  }
+
+  private getFallbackObjectLabel(objectRef: string | undefined): string {
+    if (!objectRef) return 'Unknown object';
+    const [type, id] = objectRef.split('--');
+    if (!type || !id) return objectRef;
+    const attackType = StixTypeToAttackType[type as StixType];
+    const typeLabel = attackType
+      ? attackType.replace(/-/g, ' ')
+      : type.replace(/-/g, ' ');
+    return `${typeLabel.replace(/\b\w/g, char => char.toUpperCase())} ${id.slice(0, 8)}`;
+  }
+
   public onExport(): void {
     if (!this.id) return;
 
@@ -639,12 +1185,98 @@ export class ReleaseTrackPageComponent implements OnInit {
     return `${safeName}-latest-${format}.json`;
   }
 
+  private getVirtualSnapshotPreviewDescription(preview: any): string {
+    const resolved =
+      preview?.preview?.would_resolve_to ||
+      preview?.would_resolve_to ||
+      preview?.composition_resolution ||
+      preview;
+    const components = resolved?.component_snapshots || [];
+    const totalObjects =
+      resolved?.total_objects ||
+      resolved?.summary?.total_objects ||
+      preview?.total_objects ||
+      preview?.summary?.total_objects;
+
+    const componentText = components.length
+      ? `Components: ${components
+          .map((component: any) => {
+            const name =
+              component.track_name || component.track_id || 'component track';
+            const version =
+              component.resolved_version ||
+              component.version ||
+              component.resolved_snapshot;
+            return version ? `${name} (${version})` : name;
+          })
+          .join(', ')}.`
+      : 'No component details were returned.';
+    const objectText =
+      totalObjects === undefined || totalObjects === null
+        ? 'Object count was not returned.'
+        : `${totalObjects} objects will be resolved.`;
+
+    return `${objectText} ${componentText}`;
+  }
+
   public onDraft(): void {
     if (!this.canCreateDraft) return;
 
     this.isCreatingDraft = true;
     this.connector
-      .createVirtualSnapshot(this.id)
+      .previewVirtualSnapshot(this.id)
+      .pipe(take(1))
+      .subscribe({
+        next: preview => {
+          this.isCreatingDraft = false;
+          if (!preview) return;
+          this.openVirtualSnapshotPreview(preview);
+        },
+        error: err => {
+          this.isCreatingDraft = false;
+          console.error('Failed to preview draft snapshot', err);
+        },
+      });
+  }
+
+  private openVirtualSnapshotPreview(preview: any): void {
+    const dialogRef = this.dialog.open(MultipleChoiceDialogComponent, {
+      width: '30em',
+      autoFocus: false,
+      data: {
+        title: 'Create draft snapshot?',
+        description: this.getVirtualSnapshotPreviewDescription(preview),
+        choices: [
+          {
+            label: 'Create Draft',
+            value: 'create',
+            description:
+              'Resolve the virtual track composition into a new draft snapshot.',
+          },
+          {
+            label: 'Cancel',
+            value: 'cancel',
+          },
+        ],
+      },
+    });
+
+    dialogRef.afterClosed().subscribe(choice => {
+      if (choice !== 'create' || !this.id || !this.isVirtualReleaseTrack) {
+        return;
+      }
+      this.createVirtualDraftSnapshot();
+    });
+  }
+
+  private createVirtualDraftSnapshot(): void {
+    this.isCreatingDraft = true;
+    this.connector
+      .createVirtualSnapshot(this.id, {
+        description: this.snapshotHistory.length
+          ? 'Virtual snapshot'
+          : 'Initial virtual snapshot',
+      })
       .pipe(
         take(1),
         finalize(() => {
@@ -662,16 +1294,25 @@ export class ReleaseTrackPageComponent implements OnInit {
   }
 
   public onEditConfig(): void {
+    if (this.isVirtualReleaseTrack) this.setVirtualConfig();
     this.isEditingConfig = true;
   }
 
   public onCancelConfigEdit(): void {
-    this.setConfig(this.releaseTrackConfig);
+    if (this.isVirtualReleaseTrack) {
+      this.setVirtualConfig();
+    } else {
+      this.setConfig(this.releaseTrackConfig);
+    }
     this.isEditingConfig = false;
   }
 
   public onSaveConfig(): void {
     if (!this.id || this.isSavingConfig) return;
+    if (this.isVirtualReleaseTrack) {
+      this.saveVirtualConfig();
+      return;
+    }
 
     const payload = this.getConfigPayload();
     this.isSavingConfig = true;
@@ -731,6 +1372,9 @@ export class ReleaseTrackPageComponent implements OnInit {
         next: snapshot => {
           if (!snapshot) return;
           this.releaseTrack = snapshot;
+          if (this.isVirtualReleaseTrack) {
+            this.loadVirtualComponentTrackSummaries();
+          }
           this.breadcrumbService.changeBreadcrumb(
             this.route.snapshot,
             snapshot.name
@@ -806,16 +1450,85 @@ export class ReleaseTrackPageComponent implements OnInit {
     return String(value).replace(/[_-]+/g, ' ');
   }
 
+  public getVirtualTrackPriority(track: any, index: number): number {
+    return typeof track?.priority === 'number' ? track.priority : index;
+  }
+
+  public getVirtualScheduleValue(key: string): string {
+    const value = this.virtualSnapshotSchedule?.[key];
+    return value === null || value === undefined || value === ''
+      ? 'not set'
+      : String(value);
+  }
+
   private setConfig(config: any): void {
     const normalizedConfig = this.normalizeConfig(config);
     this.releaseTrackConfig = normalizedConfig;
-    this.configForm.reset(this.getConfigFormValue(normalizedConfig), {
+    this.configForm.patchValue(this.getConfigFormValue(normalizedConfig), {
       emitEvent: false,
     });
     this.syncCandidacyThresholdControl(!!normalizedConfig.auto_promote);
     this.syncSecondaryObjectThresholdControl(
       !!normalizedConfig.include_secondary_objects?.enabled
     );
+  }
+
+  private setVirtualConfig(): void {
+    const deduplication = this.releaseTrack?.composition?.deduplication || {};
+    const snapshotSchedule = this.virtualSnapshotSchedule;
+    this.virtualConfigComponentTracks = this.cloneVirtualComponentTracks(
+      this.virtualComponentTracks
+    );
+
+    this.configForm.patchValue(
+      {
+        virtualComponentTrackSearch: '',
+        virtualDeduplicationStrategy:
+          deduplication.strategy ??
+          DeduplicationStrategy.PrioritizeLatestObject,
+        virtualDeduplicationTier:
+          deduplication.tier_resolution ?? SnapshotTier.Member,
+        virtualDeduplicationStatus:
+          deduplication.status_resolution ?? WorkflowStatus.Reviewed,
+        virtualSnapshotScheduleMode:
+          snapshotSchedule.mode ?? SnapshotScheduleMode.Manual,
+        virtualSnapshotScheduleCron: snapshotSchedule.cron ?? '',
+      },
+      { emitEvent: false }
+    );
+  }
+
+  private saveVirtualConfig(): void {
+    const payload = this.getVirtualCompositionPayload();
+    this.isSavingConfig = true;
+    this.connector
+      .updateComposition(this.id, payload)
+      .pipe(
+        take(1),
+        finalize(() => {
+          this.isSavingConfig = false;
+        })
+      )
+      .subscribe({
+        next: result => {
+          this.isEditingConfig = false;
+          if (this.releaseTrack) {
+            this.releaseTrack.composition = this.getCompositionFromResponse(
+              result,
+              payload
+            );
+          }
+          this.refreshReleaseTrackState();
+        },
+        error: err => {
+          console.error('Failed to update virtual release track config', err);
+        },
+      });
+  }
+
+  private getCompositionFromResponse(response: any, fallback: any): any {
+    if (!response) return fallback;
+    return response.composition || response;
   }
 
   private syncCandidacyThresholdControl(autoPromote: boolean): void {
@@ -967,6 +1680,30 @@ export class ReleaseTrackPageComponent implements OnInit {
     }
 
     return payload;
+  }
+
+  private getVirtualCompositionPayload(): any {
+    const value =
+      this.configForm.getRawValue() as VirtualReleaseTrackConfigFormValue;
+    const currentComposition = this.releaseTrack?.composition || {};
+
+    return {
+      ...currentComposition,
+      component_tracks: this.virtualConfigComponentTracks.map(
+        (track, index) => ({
+          ...track,
+          priority: index,
+        })
+      ),
+      deduplication: {
+        strategy:
+          value.virtualDeduplicationStrategy ||
+          DeduplicationStrategy.PrioritizeLatestObject,
+        tier_resolution: value.virtualDeduplicationTier || SnapshotTier.Member,
+        status_resolution:
+          value.virtualDeduplicationStatus || WorkflowStatus.Reviewed,
+      },
+    };
   }
 
   private openReleasePreviewDialog(preview: any): void {
