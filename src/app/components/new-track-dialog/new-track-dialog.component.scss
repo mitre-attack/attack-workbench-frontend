@@ -28,15 +28,36 @@
     &.gap-12 {
       gap: 12px;
     }
+
+    &.stack {
+      align-items: stretch;
+      flex-direction: column;
+      gap: 4px;
+    }
   }
 
   .section-title {
     font-weight: 600;
-    color: rgba(0, 0, 0, 0.85);
+
+    .light & {
+      color: colors.on-color-emphasis(light);
+    }
+
+    .dark & {
+      color: colors.on-color-emphasis(dark);
+    }
   }
+
   .section-sub {
     font-size: 0.9em;
-    color: rgba(0, 0, 0, 0.6);
+
+    .light & {
+      color: colors.on-color-deemphasis(light);
+    }
+
+    .dark & {
+      color: colors.on-color-deemphasis(dark);
+    }
   }
 
   .mat-mdc-form-field {
@@ -48,7 +69,114 @@
   }
 
   mat-hint {
-    color: rgba(0, 0, 0, 0.65);
+    .light & {
+      color: colors.on-color-deemphasis(light);
+    }
+
+    .dark & {
+      color: colors.on-color-deemphasis(dark);
+    }
+  }
+
+  .loading-row,
+  .empty-state {
+    align-items: center;
+    display: flex;
+    gap: 12px;
+    min-height: 56px;
+
+    .light & {
+      color: colors.on-color-deemphasis(light);
+    }
+
+    .dark & {
+      color: colors.on-color-deemphasis(dark);
+    }
+  }
+
+  .component-track-picker {
+    margin-bottom: 12px;
+  }
+
+  .selected-component-track-list {
+    display: grid;
+    gap: 12px;
+  }
+
+  .component-track-option {
+    border-radius: 6px;
+    border: 1px solid;
+    padding: 12px;
+
+    .light & {
+      border-color: colors.border-color(light);
+    }
+
+    .dark & {
+      border-color: colors.border-color(dark);
+    }
+
+    &.selected {
+      .light & {
+        border-color: colors.color(secondary);
+      }
+
+      .dark & {
+        border-color: colors.color(mitre-light-blue);
+      }
+    }
+  }
+
+  .component-track-selected-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+
+    > div {
+      min-width: 0;
+    }
+
+    button {
+      flex: 0 0 auto;
+      width: 32px;
+      height: 32px;
+      padding: 0;
+    }
+  }
+
+  .component-track-name {
+    font-weight: 600;
+    margin-right: 8px;
+  }
+
+  .component-track-meta {
+    font-size: 0.85em;
+
+    .light & {
+      color: colors.on-color-deemphasis(light);
+    }
+
+    .dark & {
+      color: colors.on-color-deemphasis(dark);
+    }
+  }
+
+  .component-track-description {
+    font-size: 0.9em;
+    margin: 8px 0 12px;
+
+    .light & {
+      color: colors.on-color-deemphasis(light);
+    }
+
+    .dark & {
+      color: colors.on-color-deemphasis(dark);
+    }
+  }
+
+  .object-type-filter {
+    margin-top: 8px;
   }
 
   // actions pinned to bottom of dialog
@@ -65,5 +193,31 @@
     .success {
       color: colors.color(success);
     }
+  }
+}
+
+.component-track-option-label {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  min-width: 0;
+}
+
+.component-track-option-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.component-track-option-meta {
+  flex: 0 0 auto;
+  font-size: 0.82em;
+
+  .light & {
+    color: colors.on-color-deemphasis(light);
+  }
+
+  .dark & {
+    color: colors.on-color-deemphasis(dark);
   }
 }

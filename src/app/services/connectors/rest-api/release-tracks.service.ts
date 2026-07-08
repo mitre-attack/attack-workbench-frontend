@@ -13,6 +13,7 @@ import {
 import type {
   BumpPayload,
   ClonePayload,
+  Composition,
   CreateReleaseTrackPayload,
   ExportFormatType,
   ReleaseTrackConfig,
@@ -29,6 +30,7 @@ import { Paginated } from './rest-api-connector.service';
 export type {
   BumpPayload,
   ClonePayload,
+  Composition,
   CreateReleaseTrackPayload,
   ReleaseTrackSnapshotHistoryItem,
   ReleaseTrackSnapshotOptions,
@@ -591,6 +593,29 @@ export class ReleaseTracksConnectorService extends ApiConnector {
         logger.log(`previewed virtual snapshot for track ${id}`, result)
       ),
       catchError(this.handleError_continue<any>(null)),
+      share()
+    );
+  }
+
+  /**
+   * PUT /api/release-tracks/:id/composition
+   * Update the composition rules for a virtual release track.
+   * @param id Release track id
+   * @param body Composition payload
+   * @returns Observable<any>
+   */
+  public updateComposition(
+    id: string,
+    body: Composition,
+    userAccountId?: string
+  ): Observable<any> {
+    const url = `${this.apiUrl}/release-tracks/${id}/composition`;
+    const payload = userAccountId ? { ...body, userAccountId } : body;
+    return this.http.put(url, payload).pipe(
+      tap(result =>
+        logger.log(`updated virtual composition for track ${id}`, result)
+      ),
+      catchError(this.handleError_raise()),
       share()
     );
   }
