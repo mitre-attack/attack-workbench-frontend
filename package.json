@@ -80,7 +80,7 @@
     "@commitlint/config-conventional": "^20.5.3",
     "@types/jasmine": "^6.0.0",
     "@types/jasminewd2": "^2.0.10",
-    "@types/node": "^20.19.37",
+    "@types/node": "^20.19.43",
     "angular-eslint": "^19.4.0",
     "codelyzer": "^6.0.0",
     "commitlint": "^20.5.0",
