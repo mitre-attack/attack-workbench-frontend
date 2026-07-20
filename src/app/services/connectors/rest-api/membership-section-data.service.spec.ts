@@ -10,13 +10,46 @@ describe('MembershipSectionDataService', () => {
   const trackId = 'release-track--c3d8c25d-0dfe-4d8a-8249-1fc4016d0555';
 
   let service: MembershipSectionDataService;
+  let httpClient: { get: ReturnType<typeof vi.fn> };
   let releaseTracksConnector: {
     listReleaseTracks: ReturnType<typeof vi.fn>;
     listReleasesForObject: ReturnType<typeof vi.fn>;
     listObjectVersions: ReturnType<typeof vi.fn>;
+    getLatestSnapshot: ReturnType<typeof vi.fn>;
   };
 
   beforeEach(() => {
+    httpClient = {
+      get: vi.fn().mockReturnValue(
+        of([
+          {
+            stix: { modified: '2026-07-10T10:00:00.000Z' },
+            workspace: {
+              release_tracks: [
+                {
+                  id: trackId,
+                  tier: 'candidates',
+                  status: 'work-in-progress',
+                },
+              ],
+            },
+          },
+          {
+            stix: { modified: '2026-07-12T12:30:00.000Z' },
+            workspace: {
+              release_tracks: [
+                {
+                  id: trackId,
+                  tier: 'candidates',
+                  status: 'awaiting-review',
+                },
+              ],
+            },
+          },
+        ])
+      ),
+    };
+
     releaseTracksConnector = {
       listReleaseTracks: vi.fn().mockReturnValue(
         of({
@@ -58,11 +91,124 @@ describe('MembershipSectionDataService', () => {
           ],
         })
       ),
+      getLatestSnapshot: vi.fn().mockReturnValue(
+        of({
+          modified: '2026-07-20T15:32:46.907Z',
+          candidates: [
+            {
+              object_ref: objectRef,
+              object_status: 'work-in-progress',
+              object_added_at: '2026-07-20T15:32:46.901Z',
+            },
+          ],
+          staged: [],
+        })
+      ),
     };
 
     service = new MembershipSectionDataService(
-      {} as HttpClient,
+      httpClient as unknown as HttpClient,
       releaseTracksConnector as unknown as ReleaseTracksConnectorService
+    );
+  });
+
+  it('uses all object revisions to date the latest status change', async () => {
+    releaseTracksConnector.listReleasesForObject.mockReturnValue(
+      of({ data: [] })
+    );
+    releaseTracksConnector.listObjectVersions.mockReturnValue(
+      of({
+        versions: [
+          {
+            tier: 'candidates',
+            object_ref: objectRef,
+            object_status: 'awaiting-review',
+          },
+        ],
+      })
+    );
+
+    const tracks = await firstValueFrom(
+      service.loadMemberships(
+        objectRef,
+        {
+          type: 'attack-pattern',
+          workspace: {
+            release_tracks: [
+              {
+                id: trackId,
+                tier: 'candidates',
+                status: 'awaiting-review',
+              },
+            ],
+          },
+        },
+        null
+      )
+    );
+
+    expect(tracks[0].current_draft?.updated_at).toBe(
+      '2026-07-12T12:30:00.000Z'
+    );
+    expect(httpClient.get).toHaveBeenCalledWith(
+      expect.stringContaining(`/techniques/${objectRef}`),
+      { params: { versions: 'all' } }
+    );
+  });
+
+  it('falls back to the track snapshot date when revisions show no transition', async () => {
+    httpClient.get.mockReturnValue(
+      of([
+        {
+          stix: { modified: '2025-04-15T19:58:03.170Z' },
+          workspace: {
+            release_tracks: [
+              {
+                id: trackId,
+                tier: 'candidates',
+                status: 'work-in-progress',
+              },
+            ],
+          },
+        },
+      ])
+    );
+    releaseTracksConnector.listReleasesForObject.mockReturnValue(
+      of({ data: [] })
+    );
+    releaseTracksConnector.listObjectVersions.mockReturnValue(
+      of({
+        versions: [
+          {
+            tier: 'candidates',
+            object_ref: objectRef,
+            object_status: 'work-in-progress',
+          },
+        ],
+      })
+    );
+
+    const tracks = await firstValueFrom(
+      service.loadMemberships(
+        objectRef,
+        {
+          type: 'attack-pattern',
+          workspace: {
+            release_tracks: [
+              {
+                id: trackId,
+                tier: 'candidates',
+                status: 'work-in-progress',
+              },
+            ],
+          },
+        },
+        null
+      )
+    );
+
+    expect(tracks[0].current_draft?.updated_at).toBe(
+      '2026-07-20T15:32:46.901Z'
     );
   });
 

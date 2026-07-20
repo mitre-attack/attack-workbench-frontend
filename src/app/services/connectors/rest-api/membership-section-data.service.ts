@@ -112,23 +112,37 @@ export class MembershipSectionDataService {
         objectRef,
         { order: 'desc', limit: 100, offset: 0 }
       ),
+      objectVersionsResponse: this.loadAllObjectVersions(
+        objectRef,
+        objectInput
+      ),
     }).pipe(
-      map(({ rawObject, releaseTracksResponse, releasesResponse }) => {
-        const memberships = suppliedMemberships.length
-          ? suppliedMemberships
-          : this.extractMemberships(rawObject, {
-              object: rawObject,
-            });
+      map(
+        ({
+          rawObject,
+          releaseTracksResponse,
+          releasesResponse,
+          objectVersionsResponse,
+        }) => {
+          const memberships = suppliedMemberships.length
+            ? suppliedMemberships
+            : this.extractMemberships(rawObject, {
+                object: rawObject,
+              });
 
-        const availableTracks = this.normalizeReleaseTrackList(
-          releaseTracksResponse
-        );
+          const availableTracks = this.normalizeReleaseTrackList(
+            releaseTracksResponse
+          );
 
-        return this.applyTaggedReleases(
-          this.buildTracks(availableTracks, memberships, objectRef),
-          releasesResponse
-        );
-      }),
+          return this.applyStatusChangeDates(
+            this.applyTaggedReleases(
+              this.buildTracks(availableTracks, memberships, objectRef),
+              releasesResponse
+            ),
+            objectVersionsResponse
+          );
+        }
+      ),
       switchMap(tracks =>
         this.loadVersionsForMembershipTracks(tracks, objectRef)
       ),
@@ -166,6 +180,31 @@ export class MembershipSectionDataService {
       catchError(error => {
         console.error(`Failed to load raw object ${objectRef}`, error);
         return of(objectInput ?? null);
+      })
+    );
+  }
+
+  private loadAllObjectVersions(
+    objectRef: string,
+    objectInput: any
+  ): Observable<any> {
+    const objectType =
+      objectInput?.type ??
+      objectInput?.stix?.type ??
+      objectInput?.attackType ??
+      this.getTypeFromStixId(objectRef);
+    const resource = this.getResourceName(objectType);
+
+    if (!resource) {
+      return of([]);
+    }
+
+    const url = `${this.apiUrl}/${resource}/${encodeURIComponent(objectRef)}`;
+
+    return this.http.get<any>(url, { params: { versions: 'all' } }).pipe(
+      catchError(error => {
+        console.error(`Failed to load versions for object ${objectRef}`, error);
+        return of([]);
       })
     );
   }
@@ -276,18 +315,28 @@ export class MembershipSectionDataService {
         return of(track);
       }
 
-      return this.releaseTracksConnector
-        .listObjectVersions(track.apiId, objectRef)
-        .pipe(
-          map(response => this.applyVersionResponse(track, response)),
-          catchError(error => {
-            console.error(
-              `Failed to load versions for track ${track.apiId}`,
-              error
-            );
-            return of(track);
-          })
-        );
+      return forkJoin({
+        versionsResponse: this.releaseTracksConnector.listObjectVersions(
+          track.apiId,
+          objectRef
+        ),
+        snapshot: this.releaseTracksConnector.getLatestSnapshot(track.apiId),
+      }).pipe(
+        map(({ versionsResponse, snapshot }) =>
+          this.applySnapshotStatusDate(
+            this.applyVersionResponse(track, versionsResponse),
+            snapshot,
+            objectRef
+          )
+        ),
+        catchError(error => {
+          console.error(
+            `Failed to load versions for track ${track.apiId}`,
+            error
+          );
+          return of(track);
+        })
+      );
     });
 
     return requests.length ? forkJoin(requests) : of(tracks);
@@ -311,10 +360,15 @@ export class MembershipSectionDataService {
       response?.releases ??
       null;
 
+    const detectedDraft = versions.find(version =>
+      this.isDraftVersion(version)
+    );
     const currentDraft = responseDraft
-      ? responseDraft
+      ? { ...(track.current_draft ?? {}), ...responseDraft }
       : versions.length
-        ? (versions.find(version => this.isDraftVersion(version)) ?? null)
+        ? detectedDraft
+          ? { ...(track.current_draft ?? {}), ...detectedDraft }
+          : null
         : (track.current_draft ?? null);
 
     const versionReleases = versions.filter(version =>
@@ -334,6 +388,40 @@ export class MembershipSectionDataService {
       releases: productionReleases,
       versions,
     };
+  }
+
+  private applySnapshotStatusDate(
+    track: MembershipTrack,
+    snapshot: any,
+    objectRef: string
+  ): MembershipTrack {
+    if (!track.current_draft || track.current_draft.updated_at || !snapshot) {
+      return track;
+    }
+
+    const stagedEntry = snapshot.staged?.find(
+      (entry: any) => entry?.object_ref === objectRef
+    );
+    const candidateEntry = snapshot.candidates?.find(
+      (entry: any) => entry?.object_ref === objectRef
+    );
+    const date = stagedEntry
+      ? (stagedEntry.object_staged_at ?? snapshot.modified)
+      : candidateEntry
+        ? ((candidateEntry.object_status === 'work-in-progress'
+            ? candidateEntry.object_added_at
+            : snapshot.modified) ?? candidateEntry.object_added_at)
+        : null;
+
+    return date
+      ? {
+          ...track,
+          current_draft: {
+            ...track.current_draft,
+            updated_at: date,
+          },
+        }
+      : track;
   }
 
   private applyTaggedReleases(
@@ -359,6 +447,86 @@ export class MembershipSectionDataService {
         releases: trackReleases,
       };
     });
+  }
+
+  private applyStatusChangeDates(
+    tracks: MembershipTrack[],
+    response: any
+  ): MembershipTrack[] {
+    const revisions = this.normalizeObjectRevisionList(response).sort(
+      (first, second) =>
+        this.getObjectRevisionTimestamp(first) -
+        this.getObjectRevisionTimestamp(second)
+    );
+
+    return tracks.map(track => {
+      if (!track.current_draft) {
+        return track;
+      }
+
+      const trackId = this.getTrackApiId(track);
+      let previousStatus: string | null = null;
+      let changedAt: unknown = null;
+
+      revisions.forEach(revision => {
+        const membership = this.extractMemberships(revision, {
+          object: revision,
+        }).find(item => item.id === trackId);
+        const status = membership
+          ? this.normalizeStatus(membership.status ?? membership.tier)
+          : '';
+
+        if (!status) {
+          return;
+        }
+
+        if (previousStatus === null) {
+          previousStatus = status;
+          return;
+        }
+
+        if (status !== previousStatus) {
+          previousStatus = status;
+          changedAt = this.getObjectRevisionDate(revision);
+        }
+      });
+
+      return changedAt
+        ? {
+            ...track,
+            current_draft: {
+              ...track.current_draft,
+              updated_at: changedAt,
+            },
+          }
+        : track;
+    });
+  }
+
+  private normalizeObjectRevisionList(response: any): any[] {
+    if (Array.isArray(response)) {
+      return response;
+    }
+
+    const revisions =
+      response?.data ?? response?.items ?? response?.results ?? response ?? [];
+
+    return Array.isArray(revisions) ? revisions : [];
+  }
+
+  private getObjectRevisionTimestamp(revision: any): number {
+    const value = this.getObjectRevisionDate(revision);
+    const timestamp = value ? new Date(value).getTime() : 0;
+
+    return Number.isNaN(timestamp) ? 0 : timestamp;
+  }
+
+  private getObjectRevisionDate(revision: any): string | number | Date | null {
+    return (revision?.stix?.modified ??
+      revision?.modified ??
+      revision?.updated_at ??
+      revision?.updatedAt ??
+      null) as string | number | Date | null;
   }
 
   private normalizeVersionList(response: any): any[] {
