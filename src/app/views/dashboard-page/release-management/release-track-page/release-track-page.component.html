@@ -39,7 +39,9 @@
 
   <ng-template #detailsTpl>
     <!-- stats summary -->
-    <div class="release-track-board">
+    <div
+      class="release-track-board"
+      *ngIf="!isVirtualReleaseTrack; else virtualDetailsTpl">
       <div class="labelled-box summary-frame">
         <div
           class="summary-overview content no-label"
@@ -93,123 +95,453 @@
           </section>
 
           <div class="summary-stats" aria-label="Release track object counts">
-            <div class="summary-metric candidates-summary">
-              <strong class="summary-count view-color">
-                {{ candidates.length || 0 }}
-              </strong>
-              <div class="summary-copy">
-                <strong class="summary-heading">Candidates</strong>
-                <span class="text-deemphasis">in this draft</span>
-              </div>
-            </div>
-
-            <div class="summary-metric staged-summary">
-              <strong class="summary-count promote-color">
-                {{ staged.length || 0 }}
-              </strong>
-              <div class="summary-copy">
-                <strong class="summary-heading">Staged</strong>
-                <span class="text-deemphasis">for next release</span>
-              </div>
-            </div>
-
-            <div class="summary-metric members-summary">
-              <strong class="summary-count">
-                {{ members.length || 0 }}
-              </strong>
-              <div class="summary-copy">
-                <strong class="summary-heading">Released Members</strong>
-                <span class="text-deemphasis">published</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div class="release-columns">
-        <div
-          class="release-column"
-          [ngClass]="{
-            'released-members-column': lane.isReleasedMembers,
-            'released-members-collapsed':
-              lane.isReleasedMembers && !showReleasedMembers,
-          }"
-          *ngFor="let lane of workspaceLanes; trackBy: trackByLaneKey">
-          <div
-            class="labelled-box track-panel"
-            [ngClass]="'track-panel-' + lane.modifier">
-            <button
-              *ngIf="
-                lane.isReleasedMembers && !showReleasedMembers;
-                else expandedLanePanel
-              "
-              class="released-members-rail"
-              type="button"
-              (click)="toggleReleasedMembers()">
-              <span class="released-members-label">
-                Released Members ({{ lane.items.length }})
-              </span>
-            </button>
-
-            <ng-template #expandedLanePanel>
-              <div class="content no-label">
-                <div class="card-header member-list">
-                  <h3
-                    [ngClass]="{
-                      'view-color': lane.modifier === 'candidates',
-                      'review-color': lane.modifier === 'awaiting-review',
-                      'promote-color': lane.modifier === 'staged',
-                    }">
-                    {{ lane.title }} ({{ lane.items.length }})
-                  </h3>
-                  <div class="small-buttons">
-                    <button
-                      *ngIf="canAddCandidates(lane)"
-                      class="view-color"
-                      mat-stroked-button
-                      (click)="onAddCandidate()">
-                      <mat-icon>add</mat-icon>
-                      Add
-                    </button>
-                    <button
-                      *ngIf="lane.isReleasedMembers"
-                      mat-stroked-button
-                      type="button"
-                      (click)="toggleReleasedMembers()">
-                      <mat-icon>
-                        {{
-                          showReleasedMembers ? 'visibility_off' : 'visibility'
-                        }}
-                      </mat-icon>
-                      {{ showReleasedMembers ? 'Hide' : 'Show' }}
-                    </button>
-                  </div>
+            <ng-container *ngIf="isVirtualReleaseTrack; else standardSummary">
+              <div class="summary-metric candidates-summary">
+                <strong class="summary-count view-color">
+                  {{ virtualComponentTracks.length || 0 }}
+                </strong>
+                <div class="summary-copy">
+                  <strong class="summary-heading">Components</strong>
+                  <span class="text-deemphasis">standard tracks</span>
                 </div>
+              </div>
 
-                <mat-divider></mat-divider>
+              <div class="summary-metric staged-summary">
+                <strong class="summary-count promote-color">
+                  {{ virtualResolvedObjectCount || 0 }}
+                </strong>
+                <div class="summary-copy">
+                  <strong class="summary-heading">Resolved Objects</strong>
+                  <span class="text-deemphasis">latest snapshot</span>
+                </div>
+              </div>
 
-                <div class="card-body list">
-                  <div class="empty-state" *ngIf="!lane.items.length">
-                    {{ lane.emptyLabel }}
-                  </div>
-                  <div
-                    *ngFor="let item of lane.items; trackBy: trackByObjectRef">
-                    <ng-container
-                      *ngTemplateOutlet="
-                        memberTpl;
-                        context: {
-                          $implicit: item,
-                          lane: lane,
-                        }
-                      "></ng-container>
-                  </div>
+              <div class="summary-metric members-summary">
+                <strong class="summary-count">
+                  {{ quarantineObjects.length || 0 }}
+                </strong>
+                <div class="summary-copy">
+                  <strong class="summary-heading">Quarantined</strong>
+                  <span class="text-deemphasis">needs review</span>
+                </div>
+              </div>
+            </ng-container>
+
+            <ng-template #standardSummary>
+              <div class="summary-metric candidates-summary">
+                <strong class="summary-count view-color">
+                  {{ candidates.length || 0 }}
+                </strong>
+                <div class="summary-copy">
+                  <strong class="summary-heading">Candidates</strong>
+                  <span class="text-deemphasis">in this draft</span>
+                </div>
+              </div>
+
+              <div class="summary-metric staged-summary">
+                <strong class="summary-count promote-color">
+                  {{ staged.length || 0 }}
+                </strong>
+                <div class="summary-copy">
+                  <strong class="summary-heading">Staged</strong>
+                  <span class="text-deemphasis">for next release</span>
+                </div>
+              </div>
+
+              <div class="summary-metric members-summary">
+                <strong class="summary-count">
+                  {{ members.length || 0 }}
+                </strong>
+                <div class="summary-copy">
+                  <strong class="summary-heading">Released Members</strong>
+                  <span class="text-deemphasis">published</span>
                 </div>
               </div>
             </ng-template>
           </div>
         </div>
       </div>
+
+      <ng-container *ngIf="isVirtualReleaseTrack; else standardWorkspaceTpl">
+        <div class="virtual-track-workspace">
+          <section class="labelled-box virtual-track-card">
+            <div class="content no-label">
+              <div class="card-header member-list">
+                <h3 class="view-color">
+                  Component Tracks ({{ virtualComponentTracks.length }})
+                </h3>
+              </div>
+
+              <mat-divider></mat-divider>
+
+              <div class="virtual-card-body">
+                <div *ngIf="!virtualComponentTracks.length" class="empty-state">
+                  No component tracks configured.
+                </div>
+
+                <article
+                  *ngFor="
+                    let track of virtualComponentTracks;
+                    trackBy: trackByComponentTrack
+                  "
+                  class="virtual-component-row clickable-row"
+                  role="button"
+                  tabindex="0"
+                  (click)="onOpenComponentTrack(track)"
+                  (keydown.enter)="onOpenComponentTrack(track)"
+                  (keydown.space)="
+                    onOpenComponentTrack(track); $event.preventDefault()
+                  ">
+                  <div>
+                    <h4>{{ getComponentTrackLabel(track) }}</h4>
+                    <p class="component-track-id">{{ track.track_id }}</p>
+                  </div>
+                  <div class="virtual-component-meta">
+                    <span class="config-value">
+                      {{ formatConfigOption(track.resolution_strategy) }}
+                    </span>
+                    <span class="config-value">
+                      priority {{ track.priority ?? 0 }}
+                    </span>
+                    <span
+                      *ngIf="getComponentTrackFilters(track).length"
+                      class="config-value">
+                      {{ getComponentTrackFilters(track).join(', ') }}
+                    </span>
+                  </div>
+                </article>
+              </div>
+            </div>
+          </section>
+
+          <section class="labelled-box virtual-track-card">
+            <div class="content no-label">
+              <div class="card-header member-list">
+                <h3 class="promote-color">Latest Resolution</h3>
+              </div>
+
+              <mat-divider></mat-divider>
+
+              <div class="virtual-card-body">
+                <div
+                  *ngIf="!resolvedComponentSnapshots.length"
+                  class="empty-state">
+                  No resolved snapshot yet. Create a draft snapshot to resolve
+                  component contents.
+                </div>
+
+                <article
+                  *ngFor="
+                    let component of resolvedComponentSnapshots;
+                    trackBy: trackByResolvedComponent
+                  "
+                  class="virtual-component-row">
+                  <div>
+                    <h4>
+                      {{
+                        component.track_name ||
+                          component.track_id ||
+                          'Component track'
+                      }}
+                    </h4>
+                    <p>
+                      {{ getResolvedComponentLabel(component) }}
+                    </p>
+                  </div>
+                  <div class="virtual-component-meta">
+                    <span class="config-value">
+                      {{ component.objects_contributed || 0 }} contributed
+                    </span>
+                    <span class="config-value">
+                      {{ component.objects_after_filter || 0 }} after filters
+                    </span>
+                  </div>
+                </article>
+              </div>
+            </div>
+          </section>
+
+          <section class="labelled-box virtual-track-card">
+            <div class="content no-label">
+              <div class="card-header member-list">
+                <h3>Resolution Details</h3>
+              </div>
+
+              <mat-divider></mat-divider>
+
+              <div class="virtual-card-body virtual-resolution-stats">
+                <div class="virtual-stat">
+                  <strong>{{ virtualResolvedObjectCount || 0 }}</strong>
+                  <span>Total Objects</span>
+                </div>
+                <div class="virtual-stat">
+                  <strong>{{ virtualDuplicateCount || 0 }}</strong>
+                  <span>Duplicates</span>
+                </div>
+                <div class="virtual-stat">
+                  <strong>{{ virtualConflictCount || 0 }}</strong>
+                  <span>Conflicts</span>
+                </div>
+                <div class="virtual-stat">
+                  <strong>{{ quarantineObjects.length || 0 }}</strong>
+                  <span>Quarantined</span>
+                </div>
+              </div>
+            </div>
+          </section>
+        </div>
+      </ng-container>
+
+      <ng-template #standardWorkspaceTpl>
+        <div class="release-columns">
+          <div
+            class="release-column"
+            [ngClass]="{
+              'released-members-column': lane.isReleasedMembers,
+              'released-members-collapsed':
+                lane.isReleasedMembers && !showReleasedMembers,
+            }"
+            *ngFor="let lane of workspaceLanes; trackBy: trackByLaneKey">
+            <div
+              class="labelled-box track-panel"
+              [ngClass]="'track-panel-' + lane.modifier">
+              <button
+                *ngIf="
+                  lane.isReleasedMembers && !showReleasedMembers;
+                  else expandedLanePanel
+                "
+                class="released-members-rail"
+                type="button"
+                (click)="toggleReleasedMembers()">
+                <span class="released-members-label">
+                  Released Members ({{ lane.items.length }})
+                </span>
+              </button>
+
+              <ng-template #expandedLanePanel>
+                <div class="content no-label">
+                  <div class="card-header member-list">
+                    <h3
+                      [ngClass]="{
+                        'view-color': lane.modifier === 'candidates',
+                        'review-color': lane.modifier === 'awaiting-review',
+                        'promote-color': lane.modifier === 'staged',
+                      }">
+                      {{ lane.title }} ({{ lane.items.length }})
+                    </h3>
+                    <div class="small-buttons">
+                      <button
+                        *ngIf="canAddCandidates(lane)"
+                        class="view-color"
+                        mat-stroked-button
+                        (click)="onAddCandidate()">
+                        <mat-icon>add</mat-icon>
+                        Add
+                      </button>
+                      <button
+                        *ngIf="lane.isReleasedMembers"
+                        mat-stroked-button
+                        type="button"
+                        (click)="toggleReleasedMembers()">
+                        <mat-icon>
+                          {{
+                            showReleasedMembers
+                              ? 'visibility_off'
+                              : 'visibility'
+                          }}
+                        </mat-icon>
+                        {{ showReleasedMembers ? 'Hide' : 'Show' }}
+                      </button>
+                    </div>
+                  </div>
+
+                  <mat-divider></mat-divider>
+
+                  <div class="card-body list">
+                    <div class="empty-state" *ngIf="!lane.items.length">
+                      {{ lane.emptyLabel }}
+                    </div>
+                    <div
+                      *ngFor="
+                        let item of lane.items;
+                        trackBy: trackByObjectRef
+                      ">
+                      <ng-container
+                        *ngTemplateOutlet="
+                          memberTpl;
+                          context: {
+                            $implicit: item,
+                            lane: lane,
+                          }
+                        "></ng-container>
+                    </div>
+                  </div>
+                </div>
+              </ng-template>
+            </div>
+          </div>
+        </div>
+      </ng-template>
     </div>
+
+    <ng-template #virtualDetailsTpl>
+      <div class="virtual-track-layout">
+        <section class="labelled-box virtual-resolution-panel">
+          <div class="content no-label">
+            <div class="card-header member-list virtual-resolution-header">
+              <h3 class="view-color">Composition Resolution</h3>
+              <span *ngIf="virtualResolvedAt" class="text-deemphasis">
+                Resolved at:
+                {{ virtualResolvedAt | date: 'MMM d, y, h:mm:ss a' }}
+              </span>
+            </div>
+
+            <mat-divider></mat-divider>
+
+            <div class="virtual-resolution-table">
+              <table>
+                <colgroup>
+                  <col class="virtual-resolution-component-col" />
+                  <col class="virtual-resolution-strategy-col" />
+                  <col class="virtual-resolution-version-col" />
+                  <col class="virtual-resolution-count-col" />
+                  <col class="virtual-resolution-count-col" />
+                  <col class="virtual-resolution-count-col" />
+                </colgroup>
+                <thead>
+                  <tr>
+                    <th>Component Track</th>
+                    <th>Strategy</th>
+                    <th>Resolved Version</th>
+                    <th>Candidates</th>
+                    <th>Staged</th>
+                    <th>Members</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr *ngIf="!virtualResolutionRows.length">
+                    <td colspan="6" class="virtual-empty-cell">
+                      No component tracks configured.
+                    </td>
+                  </tr>
+                  <tr
+                    *ngFor="
+                      let row of virtualResolutionRows;
+                      trackBy: trackByVirtualResolutionRow
+                    "
+                    class="virtual-resolution-row clickable-row"
+                    role="button"
+                    tabindex="0"
+                    (click)="onOpenComponentTrack(row)"
+                    (keydown.enter)="onOpenComponentTrack(row)"
+                    (keydown.space)="
+                      onOpenComponentTrack(row); $event.preventDefault()
+                    ">
+                    <td>
+                      <strong>{{ row.trackName }}</strong>
+                      <span class="component-track-id">{{ row.trackId }}</span>
+                    </td>
+                    <td>{{ formatConfigOption(row.strategy) }}</td>
+                    <td>
+                      <strong class="view-color">
+                        {{ getVirtualResolvedVersion(row) }}
+                      </strong>
+                    </td>
+                    <td>
+                      <strong>{{
+                        getVirtualTierCount(row.candidatesCount)
+                      }}</strong>
+                    </td>
+                    <td>
+                      <strong>{{
+                        getVirtualTierCount(row.stagedCount)
+                      }}</strong>
+                    </td>
+                    <td>
+                      <strong>{{
+                        getVirtualTierCount(row.membersCount)
+                      }}</strong>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <div class="virtual-object-panels">
+          <section class="labelled-box virtual-object-panel">
+            <div class="content no-label">
+              <div class="card-header member-list">
+                <h3>Members ({{ members.length || 0 }})</h3>
+              </div>
+
+              <mat-divider></mat-divider>
+
+              <div class="virtual-object-list">
+                <div *ngIf="!members.length" class="empty-state">
+                  No member objects.
+                </div>
+
+                <article
+                  *ngFor="let item of members; trackBy: trackByObjectRef"
+                  class="virtual-object-row">
+                  <div>
+                    <h4>{{ getVirtualObjectTitle(item) }}</h4>
+                    <p>{{ getVirtualObjectSubtitle(item) }}</p>
+                  </div>
+                  <button
+                    mat-stroked-button
+                    type="button"
+                    (click)="onView(item.object_ref)">
+                    View
+                    <mat-icon>open_in_new</mat-icon>
+                  </button>
+                </article>
+              </div>
+            </div>
+          </section>
+
+          <section class="labelled-box virtual-object-panel">
+            <div class="content no-label">
+              <div class="card-header member-list">
+                <h3 class="quarantine-color">
+                  Quarantine ({{ quarantineObjects.length || 0 }})
+                </h3>
+              </div>
+
+              <mat-divider></mat-divider>
+
+              <div class="virtual-object-list">
+                <div *ngIf="!quarantineObjects.length" class="empty-state">
+                  No quarantined objects.
+                </div>
+
+                <article
+                  *ngFor="
+                    let item of quarantineObjects;
+                    trackBy: trackByObjectRef
+                  "
+                  class="virtual-object-row">
+                  <div>
+                    <h4>{{ getVirtualObjectTitle(item) }}</h4>
+                    <p>{{ getVirtualObjectSubtitle(item) }}</p>
+                  </div>
+                  <button
+                    *ngIf="item.object_ref"
+                    mat-stroked-button
+                    type="button"
+                    (click)="onView(item.object_ref)">
+                    View
+                    <mat-icon>open_in_new</mat-icon>
+                  </button>
+                </article>
+              </div>
+            </div>
+          </section>
+        </div>
+      </div>
+    </ng-template>
   </ng-template>
 
   <ng-template #memberTpl let-item let-lane="lane">
@@ -393,327 +725,624 @@
       </div>
 
       <form [formGroup]="configForm" class="config-card-list">
-        <section class="labelled-box config-card">
-          <div class="content no-label">
-            <h3>Promotion Policy</h3>
+        <ng-container *ngIf="isVirtualReleaseTrack; else standardConfigTpl">
+          <section class="labelled-box config-card">
+            <div class="content no-label">
+              <h3>Composition</h3>
 
-            <div class="config-row">
-              <div class="config-copy">
-                <div class="config-label">Auto-promote Candidates</div>
-                <p>
-                  Automatically promote candidates to Staged when they meet the
-                  configured workflow threshold.
-                </p>
+              <div class="config-row">
+                <div class="config-copy">
+                  <div class="config-label">Component Tracks</div>
+                  <p>
+                    Standard release tracks resolved into this virtual track.
+                  </p>
+                </div>
+                <span class="config-value">
+                  {{ displayedVirtualConfigComponentTracks.length }}
+                </span>
               </div>
-              <ng-container *ngIf="isEditingConfig; else autoPromoteStatus">
-                <mat-slide-toggle
-                  aria-label="Auto-promote candidates"
-                  formControlName="autoPromote"></mat-slide-toggle>
-              </ng-container>
-              <ng-template #autoPromoteStatus>
-                <span
-                  class="config-state"
-                  [class.config-state-on]="
-                    configForm.get('autoPromote')?.value
+
+              <mat-divider></mat-divider>
+
+              <div
+                *ngIf="isEditingConfig"
+                class="virtual-component-track-picker">
+                <mat-form-field appearance="outline">
+                  <mat-label>Add component track</mat-label>
+                  <input
+                    matInput
+                    type="text"
+                    formControlName="virtualComponentTrackSearch"
+                    [matAutocomplete]="virtualComponentTrackAutocomplete"
+                    placeholder="Search standard tracks" />
+                  <mat-icon matSuffix>arrow_drop_down</mat-icon>
+                  <mat-autocomplete
+                    #virtualComponentTrackAutocomplete="matAutocomplete"
+                    class="virtual-component-track-autocomplete"
+                    [displayWith]="displayVirtualComponentTrackOption"
+                    (optionSelected)="selectVirtualComponentTrack($event)">
+                    <mat-option
+                      *ngFor="let track of filteredVirtualComponentTrackOptions"
+                      [value]="track">
+                      <span class="component-track-option-label">
+                        <span class="component-track-option-name">
+                          {{ track.name }}
+                        </span>
+                        <span class="component-track-option-meta">
+                          ({{ getVirtualComponentTrackSnapshotLabel(track) }})
+                        </span>
+                      </span>
+                    </mat-option>
+                    <mat-option
+                      *ngIf="!filteredVirtualComponentTrackOptions.length"
+                      disabled>
+                      No matching standard tracks
+                    </mat-option>
+                  </mat-autocomplete>
+                  <mat-hint>
+                    Select one or more standard tracks to include in this
+                    virtual track.
+                  </mat-hint>
+                </mat-form-field>
+              </div>
+
+              <div
+                *ngIf="
+                  displayedVirtualConfigComponentTracks.length;
+                  else noComponentTracks
+                "
+                class="config-component-list">
+                <article
+                  *ngFor="
+                    let track of displayedVirtualConfigComponentTracks;
+                    let componentIndex = index;
+                    trackBy: trackByComponentTrack
+                  "
+                  class="config-component-row"
+                  [class.clickable-row]="!isEditingConfig"
+                  [class.config-component-row-editing]="isEditingConfig"
+                  [attr.role]="!isEditingConfig ? 'button' : null"
+                  [attr.tabindex]="!isEditingConfig ? 0 : null"
+                  (click)="!isEditingConfig && onOpenComponentTrack(track)"
+                  (keydown.enter)="
+                    !isEditingConfig && onOpenComponentTrack(track)
+                  "
+                  (keydown.space)="
+                    !isEditingConfig && onOpenComponentTrack(track);
+                    !isEditingConfig && $event.preventDefault()
                   ">
-                  {{ configForm.get('autoPromote')?.value ? 'ON' : 'OFF' }}
-                </span>
+                  <div class="config-component-main">
+                    <div class="config-copy">
+                      <div class="config-label">
+                        {{ getComponentTrackLabel(track) }}
+                      </div>
+                      <p class="component-track-id">{{ track.track_id }}</p>
+                      <p
+                        *ngIf="getVirtualComponentTrackDescription(track)"
+                        class="config-component-description">
+                        {{ getVirtualComponentTrackDescription(track) }}
+                      </p>
+                    </div>
+                    <button
+                      *ngIf="isEditingConfig"
+                      mat-icon-button
+                      type="button"
+                      aria-label="Remove component track"
+                      (click)="removeVirtualComponentTrack(track)">
+                      <mat-icon>close</mat-icon>
+                    </button>
+                  </div>
+
+                  <div *ngIf="!isEditingConfig" class="config-value-list">
+                    <span class="config-value">
+                      {{ formatConfigOption(track.resolution_strategy) }}
+                    </span>
+                    <span class="config-value">
+                      priority
+                      {{ getVirtualTrackPriority(track, componentIndex) }}
+                    </span>
+                    <span
+                      *ngIf="getComponentTrackFilters(track).length"
+                      class="config-value">
+                      {{ getComponentTrackFilters(track).join(', ') }}
+                    </span>
+                  </div>
+
+                  <mat-form-field
+                    *ngIf="isEditingConfig"
+                    appearance="outline"
+                    class="config-component-filter">
+                    <mat-label>Object type filter</mat-label>
+                    <mat-select
+                      multiple
+                      [value]="getVirtualComponentTrackObjectTypes(track)"
+                      (selectionChange)="
+                        setVirtualComponentTrackObjectTypes(track, $event.value)
+                      ">
+                      <mat-option
+                        *ngFor="let option of virtualObjectTypeOptions"
+                        [value]="option.value">
+                        {{ option.label }}
+                      </mat-option>
+                    </mat-select>
+                    <mat-hint>Leave empty to include all object types</mat-hint>
+                  </mat-form-field>
+                </article>
+              </div>
+
+              <ng-template #noComponentTracks>
+                <div class="empty-state">No component tracks configured.</div>
               </ng-template>
             </div>
+          </section>
 
-            <mat-divider></mat-divider>
+          <section class="labelled-box config-card">
+            <div class="content no-label">
+              <h3>Object Deduplication</h3>
 
-            <div
-              class="config-row"
-              [class.config-row-disabled]="
-                !configForm.get('autoPromote')?.value
-              ">
-              <div class="config-copy">
-                <div class="config-label">Candidacy Threshold</div>
-                <p>
-                  Defines the minimum workflow state required for a candidate to
-                  be promoted to Staged.
-                </p>
+              <div class="config-row">
+                <div class="config-copy">
+                  <div class="config-label">Strategy</div>
+                  <p>Determines which object wins when components overlap.</p>
+                </div>
+                <ng-container
+                  *ngIf="isEditingConfig; else virtualDeduplicationValue">
+                  <mat-form-field appearance="outline" class="config-field">
+                    <mat-label>Strategy</mat-label>
+                    <mat-select formControlName="virtualDeduplicationStrategy">
+                      <mat-option
+                        *ngFor="let option of virtualDeduplicationOptions"
+                        [value]="option">
+                        {{ formatConfigOption(option) }}
+                      </mat-option>
+                    </mat-select>
+                  </mat-form-field>
+                </ng-container>
+                <ng-template #virtualDeduplicationValue>
+                  <span class="config-value">
+                    {{
+                      formatConfigOption(
+                        configForm.get('virtualDeduplicationStrategy')?.value
+                      )
+                    }}
+                  </span>
+                </ng-template>
               </div>
-              <ng-container *ngIf="isEditingConfig; else thresholdValue">
-                <mat-form-field appearance="outline" class="config-field">
-                  <mat-label>Candidacy Threshold</mat-label>
-                  <mat-select formControlName="candidacyThreshold">
-                    <mat-option
-                      *ngFor="let option of candidacyOptions"
-                      [value]="option">
-                      {{ formatConfigOption(option) }}
-                    </mat-option>
-                  </mat-select>
-                </mat-form-field>
-              </ng-container>
-              <ng-template #thresholdValue>
-                <span
-                  class="config-value"
-                  [class.config-value-disabled]="
-                    !configForm.get('autoPromote')?.value
-                  ">
-                  {{
-                    formatConfigOption(
-                      configForm.get('candidacyThreshold')?.value
-                    )
-                  }}
-                </span>
-              </ng-template>
+
+              <mat-divider></mat-divider>
+
+              <div class="config-row">
+                <div class="config-copy">
+                  <div class="config-label">Preferred Tier</div>
+                  <p>
+                    Breaks ties by preferring objects from the selected tier.
+                  </p>
+                </div>
+                <ng-container
+                  *ngIf="isEditingConfig; else virtualTierResolutionValue">
+                  <mat-form-field appearance="outline" class="config-field">
+                    <mat-label>Preferred Tier</mat-label>
+                    <mat-select formControlName="virtualDeduplicationTier">
+                      <mat-option
+                        *ngFor="let option of virtualDeduplicationTierOptions"
+                        [value]="option">
+                        {{ formatConfigOption(option) }}
+                      </mat-option>
+                    </mat-select>
+                  </mat-form-field>
+                </ng-container>
+                <ng-template #virtualTierResolutionValue>
+                  <span class="config-value">
+                    {{
+                      formatConfigOption(
+                        configForm.get('virtualDeduplicationTier')?.value
+                      )
+                    }}
+                  </span>
+                </ng-template>
+              </div>
+
+              <mat-divider></mat-divider>
+
+              <div class="config-row">
+                <div class="config-copy">
+                  <div class="config-label">Preferred Status</div>
+                  <p>
+                    Breaks ties by preferring objects with the selected workflow
+                    state.
+                  </p>
+                </div>
+                <ng-container
+                  *ngIf="isEditingConfig; else virtualStatusResolutionValue">
+                  <mat-form-field appearance="outline" class="config-field">
+                    <mat-label>Preferred Status</mat-label>
+                    <mat-select formControlName="virtualDeduplicationStatus">
+                      <mat-option
+                        *ngFor="let option of virtualDeduplicationStatusOptions"
+                        [value]="option">
+                        {{ formatConfigOption(option) }}
+                      </mat-option>
+                    </mat-select>
+                  </mat-form-field>
+                </ng-container>
+                <ng-template #virtualStatusResolutionValue>
+                  <span class="config-value">
+                    {{
+                      formatConfigOption(
+                        configForm.get('virtualDeduplicationStatus')?.value
+                      )
+                    }}
+                  </span>
+                </ng-template>
+              </div>
             </div>
-          </div>
-        </section>
+          </section>
 
-        <section class="labelled-box config-card">
-          <div class="content no-label">
-            <h3>Lifecycle Settings</h3>
+          <section class="labelled-box config-card">
+            <div class="content no-label">
+              <h3>Snapshot Schedule</h3>
 
-            <div class="config-row">
-              <div class="config-copy">
-                <div class="config-label">Member Sync Strategy</div>
-                <p>
-                  Determines if new revisions to existing member objects are
-                  automatically added as candidates.
-                </p>
-              </div>
-              <ng-container *ngIf="isEditingConfig; else memberSyncValue">
-                <mat-form-field appearance="outline" class="config-field">
-                  <mat-label>Member Sync Strategy</mat-label>
-                  <mat-select formControlName="memberSyncStrategy">
-                    <mat-option
-                      *ngFor="let option of memberSyncStrategyOptions"
-                      [value]="option">
-                      {{ formatConfigOption(option) }}
-                    </mat-option>
-                  </mat-select>
-                </mat-form-field>
-              </ng-container>
-              <ng-template #memberSyncValue>
+              <div class="config-row">
+                <div class="config-copy">
+                  <div class="config-label">Mode</div>
+                  <p>Controls how draft snapshots are scheduled.</p>
+                </div>
                 <span class="config-value">
                   {{
                     formatConfigOption(
-                      configForm.get('memberSyncStrategy')?.value
+                      configForm.get('virtualSnapshotScheduleMode')?.value
                     )
                   }}
                 </span>
-              </ng-template>
-            </div>
-
-            <mat-divider></mat-divider>
-
-            <div class="config-row">
-              <div class="config-copy">
-                <div class="config-label">Supplant Behavior</div>
-                <p>
-                  Controls how a new version is handled when the object is
-                  already tracked by this release track.
-                </p>
               </div>
-              <ng-container *ngIf="isEditingConfig; else supplantBehaviorValue">
-                <mat-form-field appearance="outline" class="config-field">
-                  <mat-label>Supplant Behavior</mat-label>
-                  <mat-select formControlName="memberSyncSupplantBehavior">
-                    <mat-option
-                      *ngFor="let option of memberSyncBehaviorOptions"
-                      [value]="option">
-                      {{ formatConfigOption(option) }}
-                    </mat-option>
-                  </mat-select>
-                </mat-form-field>
-              </ng-container>
-              <ng-template #supplantBehaviorValue>
-                <span class="config-value">
-                  {{
-                    formatConfigOption(
-                      configForm.get('memberSyncSupplantBehavior')?.value
-                    )
-                  }}
-                </span>
-              </ng-template>
-            </div>
 
-            <mat-divider></mat-divider>
+              <mat-divider></mat-divider>
 
-            <div class="config-row">
-              <div class="config-copy">
-                <div class="config-label">Supplant Status Policy</div>
-                <p>
-                  Sets whether a queued replacement keeps or resets the tracked
-                  workflow status.
-                </p>
-              </div>
-              <ng-container *ngIf="isEditingConfig; else supplantStatusValue">
-                <mat-form-field appearance="outline" class="config-field">
-                  <mat-label>Supplant Status Policy</mat-label>
-                  <mat-select formControlName="memberSyncSupplantStatusPolicy">
-                    <mat-option
-                      *ngFor="let option of memberSyncStatusPolicyOptions"
-                      [value]="option">
-                      {{ formatConfigOption(option) }}
-                    </mat-option>
-                  </mat-select>
-                </mat-form-field>
-              </ng-container>
-              <ng-template #supplantStatusValue>
-                <span class="config-value">
-                  {{
-                    formatConfigOption(
-                      configForm.get('memberSyncSupplantStatusPolicy')?.value
-                    )
-                  }}
-                </span>
-              </ng-template>
-            </div>
-          </div>
-        </section>
-
-        <section class="labelled-box config-card">
-          <div class="content no-label">
-            <h3>Conflict Resolution</h3>
-
-            <div class="config-row">
-              <div class="config-copy">
-                <div class="config-label">Candidates to Staged</div>
-                <p>
-                  Decides what happens when a candidate conflicts with another
-                  version already staged.
-                </p>
-              </div>
-              <ng-container
-                *ngIf="isEditingConfig; else candidatesConflictValue">
-                <mat-form-field appearance="outline" class="config-field">
-                  <mat-label>Candidates to Staged</mat-label>
-                  <mat-select formControlName="candidatesToStagedConflict">
-                    <mat-option
-                      *ngFor="let option of candidatesToStagedConflictOptions"
-                      [value]="option">
-                      {{ formatConfigOption(option) }}
-                    </mat-option>
-                  </mat-select>
-                </mat-form-field>
-              </ng-container>
-              <ng-template #candidatesConflictValue>
-                <span class="config-value">
-                  {{
-                    formatConfigOption(
-                      configForm.get('candidatesToStagedConflict')?.value
-                    )
-                  }}
-                </span>
-              </ng-template>
-            </div>
-
-            <mat-divider></mat-divider>
-
-            <div class="config-row">
-              <div class="config-copy">
-                <div class="config-label">Staged to Members</div>
-                <p>
-                  Decides whether release tagging can continue when staged
-                  objects conflict with released member versions.
-                </p>
-              </div>
-              <ng-container *ngIf="isEditingConfig; else stagedConflictValue">
-                <mat-form-field appearance="outline" class="config-field">
-                  <mat-label>Staged to Members</mat-label>
-                  <mat-select formControlName="stagedToMembersConflict">
-                    <mat-option
-                      *ngFor="let option of stagedToMembersConflictOptions"
-                      [value]="option">
-                      {{ formatConfigOption(option) }}
-                    </mat-option>
-                  </mat-select>
-                </mat-form-field>
-              </ng-container>
-              <ng-template #stagedConflictValue>
-                <span class="config-value">
-                  {{
-                    formatConfigOption(
-                      configForm.get('stagedToMembersConflict')?.value
-                    )
-                  }}
-                </span>
-              </ng-template>
-            </div>
-          </div>
-        </section>
-
-        <section class="labelled-box config-card">
-          <div class="content no-label">
-            <h3>Secondary Objects</h3>
-
-            <div class="config-row">
-              <div class="config-copy">
-                <div class="config-label">Include Secondary Objects</div>
-                <p>
-                  Includes supporting objects when they meet the configured
-                  workflow state threshold.
-                </p>
-              </div>
-              <ng-container
-                *ngIf="isEditingConfig; else secondaryObjectsStatus">
-                <mat-slide-toggle
-                  aria-label="Include secondary objects"
-                  formControlName="includeSecondaryObjects"></mat-slide-toggle>
-              </ng-container>
-              <ng-template #secondaryObjectsStatus>
-                <span
-                  class="config-state"
-                  [class.config-state-on]="
-                    configForm.get('includeSecondaryObjects')?.value
-                  ">
-                  {{
-                    configForm.get('includeSecondaryObjects')?.value
-                      ? 'ON'
-                      : 'OFF'
-                  }}
-                </span>
-              </ng-template>
-            </div>
-
-            <mat-divider></mat-divider>
-
-            <div
-              class="config-row"
-              [class.config-row-disabled]="
-                !configForm.get('includeSecondaryObjects')?.value
-              ">
-              <div class="config-copy">
-                <div class="config-label">Secondary Object Threshold</div>
-                <p>
-                  Defines the minimum workflow state for automatically included
-                  supporting objects.
-                </p>
-              </div>
-              <ng-container
-                *ngIf="isEditingConfig; else secondaryThresholdValue">
-                <mat-form-field appearance="outline" class="config-field">
-                  <mat-label>Secondary Object Threshold</mat-label>
-                  <mat-select formControlName="secondaryObjectThreshold">
-                    <mat-option
-                      *ngFor="let option of candidacyOptions"
-                      [value]="option">
-                      {{ formatConfigOption(option) }}
-                    </mat-option>
-                  </mat-select>
-                </mat-form-field>
-              </ng-container>
-              <ng-template #secondaryThresholdValue>
+              <div class="config-row">
+                <div class="config-copy">
+                  <div class="config-label">Cron Expression</div>
+                  <p>
+                    UTC cron expression used when the schedule mode is cron.
+                  </p>
+                </div>
                 <span
                   class="config-value"
                   [class.config-value-disabled]="
-                    !configForm.get('includeSecondaryObjects')?.value
+                    configForm.get('virtualSnapshotScheduleMode')?.value !==
+                    'cron'
                   ">
-                  {{
-                    formatConfigOption(
-                      configForm.get('secondaryObjectThreshold')?.value
-                    )
-                  }}
+                  {{ getVirtualScheduleValue('cron') }}
                 </span>
-              </ng-template>
+              </div>
             </div>
-          </div>
-        </section>
+          </section>
+        </ng-container>
+
+        <ng-template #standardConfigTpl>
+          <section class="labelled-box config-card">
+            <div class="content no-label">
+              <h3>Promotion Policy</h3>
+
+              <div class="config-row">
+                <div class="config-copy">
+                  <div class="config-label">Auto-promote Candidates</div>
+                  <p>
+                    Automatically promote candidates to Staged when they meet
+                    the configured workflow threshold.
+                  </p>
+                </div>
+                <ng-container *ngIf="isEditingConfig; else autoPromoteStatus">
+                  <mat-slide-toggle
+                    aria-label="Auto-promote candidates"
+                    formControlName="autoPromote"></mat-slide-toggle>
+                </ng-container>
+                <ng-template #autoPromoteStatus>
+                  <span
+                    class="config-state"
+                    [class.config-state-on]="
+                      configForm.get('autoPromote')?.value
+                    ">
+                    {{ configForm.get('autoPromote')?.value ? 'ON' : 'OFF' }}
+                  </span>
+                </ng-template>
+              </div>
+
+              <mat-divider></mat-divider>
+
+              <div
+                class="config-row"
+                [class.config-row-disabled]="
+                  !configForm.get('autoPromote')?.value
+                ">
+                <div class="config-copy">
+                  <div class="config-label">Candidacy Threshold</div>
+                  <p>
+                    Defines the minimum workflow state required for a candidate
+                    to be promoted to Staged.
+                  </p>
+                </div>
+                <ng-container *ngIf="isEditingConfig; else thresholdValue">
+                  <mat-form-field appearance="outline" class="config-field">
+                    <mat-label>Candidacy Threshold</mat-label>
+                    <mat-select formControlName="candidacyThreshold">
+                      <mat-option
+                        *ngFor="let option of candidacyOptions"
+                        [value]="option">
+                        {{ formatConfigOption(option) }}
+                      </mat-option>
+                    </mat-select>
+                  </mat-form-field>
+                </ng-container>
+                <ng-template #thresholdValue>
+                  <span
+                    class="config-value"
+                    [class.config-value-disabled]="
+                      !configForm.get('autoPromote')?.value
+                    ">
+                    {{
+                      formatConfigOption(
+                        configForm.get('candidacyThreshold')?.value
+                      )
+                    }}
+                  </span>
+                </ng-template>
+              </div>
+            </div>
+          </section>
+
+          <section class="labelled-box config-card">
+            <div class="content no-label">
+              <h3>Lifecycle Settings</h3>
+
+              <div class="config-row">
+                <div class="config-copy">
+                  <div class="config-label">Member Sync Strategy</div>
+                  <p>
+                    Determines if new revisions to existing member objects are
+                    automatically added as candidates.
+                  </p>
+                </div>
+                <ng-container *ngIf="isEditingConfig; else memberSyncValue">
+                  <mat-form-field appearance="outline" class="config-field">
+                    <mat-label>Member Sync Strategy</mat-label>
+                    <mat-select formControlName="memberSyncStrategy">
+                      <mat-option
+                        *ngFor="let option of memberSyncStrategyOptions"
+                        [value]="option">
+                        {{ formatConfigOption(option) }}
+                      </mat-option>
+                    </mat-select>
+                  </mat-form-field>
+                </ng-container>
+                <ng-template #memberSyncValue>
+                  <span class="config-value">
+                    {{
+                      formatConfigOption(
+                        configForm.get('memberSyncStrategy')?.value
+                      )
+                    }}
+                  </span>
+                </ng-template>
+              </div>
+
+              <mat-divider></mat-divider>
+
+              <div class="config-row">
+                <div class="config-copy">
+                  <div class="config-label">Supplant Behavior</div>
+                  <p>
+                    Controls how a new version is handled when the object is
+                    already tracked by this release track.
+                  </p>
+                </div>
+                <ng-container
+                  *ngIf="isEditingConfig; else supplantBehaviorValue">
+                  <mat-form-field appearance="outline" class="config-field">
+                    <mat-label>Supplant Behavior</mat-label>
+                    <mat-select formControlName="memberSyncSupplantBehavior">
+                      <mat-option
+                        *ngFor="let option of memberSyncBehaviorOptions"
+                        [value]="option">
+                        {{ formatConfigOption(option) }}
+                      </mat-option>
+                    </mat-select>
+                  </mat-form-field>
+                </ng-container>
+                <ng-template #supplantBehaviorValue>
+                  <span class="config-value">
+                    {{
+                      formatConfigOption(
+                        configForm.get('memberSyncSupplantBehavior')?.value
+                      )
+                    }}
+                  </span>
+                </ng-template>
+              </div>
+
+              <mat-divider></mat-divider>
+
+              <div class="config-row">
+                <div class="config-copy">
+                  <div class="config-label">Supplant Status Policy</div>
+                  <p>
+                    Sets whether a queued replacement keeps or resets the
+                    tracked workflow status.
+                  </p>
+                </div>
+                <ng-container *ngIf="isEditingConfig; else supplantStatusValue">
+                  <mat-form-field appearance="outline" class="config-field">
+                    <mat-label>Supplant Status Policy</mat-label>
+                    <mat-select
+                      formControlName="memberSyncSupplantStatusPolicy">
+                      <mat-option
+                        *ngFor="let option of memberSyncStatusPolicyOptions"
+                        [value]="option">
+                        {{ formatConfigOption(option) }}
+                      </mat-option>
+                    </mat-select>
+                  </mat-form-field>
+                </ng-container>
+                <ng-template #supplantStatusValue>
+                  <span class="config-value">
+                    {{
+                      formatConfigOption(
+                        configForm.get('memberSyncSupplantStatusPolicy')?.value
+                      )
+                    }}
+                  </span>
+                </ng-template>
+              </div>
+            </div>
+          </section>
+
+          <section class="labelled-box config-card">
+            <div class="content no-label">
+              <h3>Conflict Resolution</h3>
+
+              <div class="config-row">
+                <div class="config-copy">
+                  <div class="config-label">Candidates to Staged</div>
+                  <p>
+                    Decides what happens when a candidate conflicts with another
+                    version already staged.
+                  </p>
+                </div>
+                <ng-container
+                  *ngIf="isEditingConfig; else candidatesConflictValue">
+                  <mat-form-field appearance="outline" class="config-field">
+                    <mat-label>Candidates to Staged</mat-label>
+                    <mat-select formControlName="candidatesToStagedConflict">
+                      <mat-option
+                        *ngFor="let option of candidatesToStagedConflictOptions"
+                        [value]="option">
+                        {{ formatConfigOption(option) }}
+                      </mat-option>
+                    </mat-select>
+                  </mat-form-field>
+                </ng-container>
+                <ng-template #candidatesConflictValue>
+                  <span class="config-value">
+                    {{
+                      formatConfigOption(
+                        configForm.get('candidatesToStagedConflict')?.value
+                      )
+                    }}
+                  </span>
+                </ng-template>
+              </div>
+
+              <mat-divider></mat-divider>
+
+              <div class="config-row">
+                <div class="config-copy">
+                  <div class="config-label">Staged to Members</div>
+                  <p>
+                    Decides whether release tagging can continue when staged
+                    objects conflict with released member versions.
+                  </p>
+                </div>
+                <ng-container *ngIf="isEditingConfig; else stagedConflictValue">
+                  <mat-form-field appearance="outline" class="config-field">
+                    <mat-label>Staged to Members</mat-label>
+                    <mat-select formControlName="stagedToMembersConflict">
+                      <mat-option
+                        *ngFor="let option of stagedToMembersConflictOptions"
+                        [value]="option">
+                        {{ formatConfigOption(option) }}
+                      </mat-option>
+                    </mat-select>
+                  </mat-form-field>
+                </ng-container>
+                <ng-template #stagedConflictValue>
+                  <span class="config-value">
+                    {{
+                      formatConfigOption(
+                        configForm.get('stagedToMembersConflict')?.value
+                      )
+                    }}
+                  </span>
+                </ng-template>
+              </div>
+            </div>
+          </section>
+
+          <section class="labelled-box config-card">
+            <div class="content no-label">
+              <h3>Secondary Objects</h3>
+
+              <div class="config-row">
+                <div class="config-copy">
+                  <div class="config-label">Include Secondary Objects</div>
+                  <p>
+                    Includes supporting objects when they meet the configured
+                    workflow state threshold.
+                  </p>
+                </div>
+                <ng-container
+                  *ngIf="isEditingConfig; else secondaryObjectsStatus">
+                  <mat-slide-toggle
+                    aria-label="Include secondary objects"
+                    formControlName="includeSecondaryObjects"></mat-slide-toggle>
+                </ng-container>
+                <ng-template #secondaryObjectsStatus>
+                  <span
+                    class="config-state"
+                    [class.config-state-on]="
+                      configForm.get('includeSecondaryObjects')?.value
+                    ">
+                    {{
+                      configForm.get('includeSecondaryObjects')?.value
+                        ? 'ON'
+                        : 'OFF'
+                    }}
+                  </span>
+                </ng-template>
+              </div>
+
+              <mat-divider></mat-divider>
+
+              <div
+                class="config-row"
+                [class.config-row-disabled]="
+                  !configForm.get('includeSecondaryObjects')?.value
+                ">
+                <div class="config-copy">
+                  <div class="config-label">Secondary Object Threshold</div>
+                  <p>
+                    Defines the minimum workflow state for automatically
+                    included supporting objects.
+                  </p>
+                </div>
+                <ng-container
+                  *ngIf="isEditingConfig; else secondaryThresholdValue">
+                  <mat-form-field appearance="outline" class="config-field">
+                    <mat-label>Secondary Object Threshold</mat-label>
+                    <mat-select formControlName="secondaryObjectThreshold">
+                      <mat-option
+                        *ngFor="let option of candidacyOptions"
+                        [value]="option">
+                        {{ formatConfigOption(option) }}
+                      </mat-option>
+                    </mat-select>
+                  </mat-form-field>
+                </ng-container>
+                <ng-template #secondaryThresholdValue>
+                  <span
+                    class="config-value"
+                    [class.config-value-disabled]="
+                      !configForm.get('includeSecondaryObjects')?.value
+                    ">
+                    {{
+                      formatConfigOption(
+                        configForm.get('secondaryObjectThreshold')?.value
+                      )
+                    }}
+                  </span>
+                </ng-template>
+              </div>
+            </div>
+          </section>
+        </ng-template>
       </form>
     </div>
   </ng-template>

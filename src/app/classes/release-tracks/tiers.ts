@@ -1,11 +1,25 @@
 import { WorkflowStatusType } from 'src/app/utils/types';
 
+export interface TierEntryModifiedByUser {
+  id?: string;
+  username?: string;
+  displayName?: string;
+  name?: string;
+}
+
+export interface TierEntryDisplayFields {
+  attack_id?: string;
+  name?: string;
+  description?: string;
+  modified_by_user?: TierEntryModifiedByUser;
+}
+
 export interface MemberEntry {
   object_ref: string;
   object_modified: Date;
 }
 
-export interface StagedEntry {
+export interface StagedEntry extends TierEntryDisplayFields {
   object_ref: string;
   object_modified: Date;
   object_status: WorkflowStatusType;
@@ -13,7 +27,7 @@ export interface StagedEntry {
   object_staged_by: string;
 }
 
-export interface CandidateEntry {
+export interface CandidateEntry extends TierEntryDisplayFields {
   object_ref: string;
   object_modified: Date;
   object_status: WorkflowStatusType;

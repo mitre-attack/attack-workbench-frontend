@@ -22,52 +22,58 @@ describe('UserAvatarComponent', () => {
   });
 
   it('should show first and last initials for a display name with middle names', () => {
-    component.name = 'Cassandra Lauren Smith';
+    component.name = 'Example Middle User';
 
-    expect(component.initials).toBe('CS');
+    expect(component.initials).toBe('EU');
   });
 
   it('should show first and last initials for a two-word display name', () => {
-    component.name = 'Laurent Hacks';
+    component.name = 'Release Analyst';
 
-    expect(component.initials).toBe('LH');
+    expect(component.initials).toBe('RA');
+  });
+
+  it('should show first and last initials for the modified by user display name', () => {
+    component.name = 'Review User';
+
+    expect(component.initials).toBe('RU');
   });
 
   it('should show the first two letters for usernames', () => {
-    component.name = 'clsmith';
+    component.name = 'exampleuser';
 
-    expect(component.initials).toBe('CL');
+    expect(component.initials).toBe('EX');
   });
 
   it('should show the first two letters for usernames that match display initials', () => {
-    component.name = 'lhacks';
+    component.name = 'releaseuser';
 
-    expect(component.initials).toBe('LH');
+    expect(component.initials).toBe('RE');
   });
 
   it('should ignore prefixes and suffixes when building display initials', () => {
-    component.name = 'Dr. Cassandra Lauren Smith Jr.';
+    component.name = 'Dr. Example Middle User Jr.';
 
-    expect(component.initials).toBe('CS');
+    expect(component.initials).toBe('EU');
   });
 
   it('should ignore professional suffixes when building display initials', () => {
-    component.name = 'Laurent Hacks, PhD';
+    component.name = 'Release Analyst, PhD';
 
-    expect(component.initials).toBe('LH');
+    expect(component.initials).toBe('RA');
   });
 
   it('should build initials from the remaining name when only a prefix is ignored', () => {
-    component.name = 'Dr. Cassandra';
+    component.name = 'Dr. Example';
 
-    expect(component.initials).toBe('CA');
+    expect(component.initials).toBe('EX');
   });
 
   it('should assign the same background to the same name', () => {
-    component.name = 'Mary Jackson';
+    component.name = 'Stable User';
     const background = component.background;
 
-    component.name = 'Mary Jackson';
+    component.name = 'Stable User';
 
     expect(component.background).toBe(background);
   });
