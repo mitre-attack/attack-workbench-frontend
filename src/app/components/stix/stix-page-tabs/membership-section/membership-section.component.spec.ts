@@ -1,6 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { of } from 'rxjs';
 import { Router } from '@angular/router';
+import { vi } from 'vitest';
 
 import { AuthenticationService } from 'src/app/services/connectors/authentication/authentication.service';
 import { MembershipSectionComponent } from './membership-section.component';
@@ -40,25 +41,24 @@ describe('MembershipSectionComponent', () => {
   ];
 
   beforeEach(async () => {
-    membershipDataService = jasmine.createSpyObj(
-      'MembershipSectionDataService',
-      ['getDefaultTracks', 'loadMemberships']
-    );
+    membershipDataService = {
+      getDefaultTracks: vi.fn(),
+      loadMemberships: vi.fn(),
+    };
 
-    membershipDataService.getDefaultTracks.and.callFake(() =>
+    membershipDataService.getDefaultTracks.mockImplementation(() =>
       defaultTracks.map(track => ({ ...track }))
     );
 
-    membershipDataService.loadMemberships.and.returnValue(
+    membershipDataService.loadMemberships.mockReturnValue(
       of(defaultTracks.map(track => ({ ...track })))
     );
 
-    authenticationService = jasmine.createSpyObj('AuthenticationService', [
-      'isAuthorized',
-    ]);
-    authenticationService.isAuthorized.and.returnValue(true);
+    authenticationService = {
+      isAuthorized: vi.fn().mockReturnValue(true),
+    };
 
-    router = jasmine.createSpyObj('Router', ['navigate']);
+    router = { navigate: vi.fn() };
 
     await TestBed.configureTestingModule({
       declarations: [MembershipSectionComponent],
@@ -140,6 +140,36 @@ describe('MembershipSectionComponent', () => {
     expect(component.getDraftDateLabel(membership)).toBe('As of TBD');
   });
 
+  it('should identify a draft that is awaiting review', () => {
+    const membership = {
+      ...component.memberships[0],
+      current_draft: {
+        status: 'awaiting-review',
+        in_current_draft: true,
+      },
+    };
+
+    expect(component.getDraftStatusLabel(membership)).toBe('In Review');
+    expect(component.isDraftInReview(membership)).toBe(true);
+  });
+
+  it('should identify a staged draft', () => {
+    const membership = {
+      ...component.memberships[0],
+      tier: 'staged',
+      status: 'reviewed',
+      current_draft: {
+        tier: 'staged',
+        status: 'reviewed',
+        in_current_draft: true,
+      },
+    };
+
+    expect(component.getDraftStatusLabel(membership)).toBe('Staged');
+    expect(component.isDraftStaged(membership)).toBe(true);
+    expect(component.isDraftInReview(membership)).toBe(false);
+  });
+
   it('should render Clear and Compare buttons', () => {
     const element: HTMLElement = fixture.nativeElement;
 
@@ -150,12 +180,32 @@ describe('MembershipSectionComponent', () => {
   it('should navigate authorized users to the release track dashboard', () => {
     const track = component.memberships[0];
 
+    component.toggleReleaseSelection(
+      { id: 'release--1', version: '1.0' },
+      track,
+      true
+    );
+
     component.viewTrack(track);
 
     expect(router.navigate).toHaveBeenCalledWith([
       '/dashboard/release-management',
       track.id,
     ]);
+  });
+
+  it('should enable View Track only for a track with a selected release', () => {
+    const selectedTrack = component.memberships[0];
+    const otherTrack = component.memberships[1];
+
+    component.toggleReleaseSelection(
+      { id: 'release--1', version: '1.0' },
+      selectedTrack,
+      true
+    );
+
+    expect(component.hasSelectedReleaseForTrack(selectedTrack)).toBe(true);
+    expect(component.hasSelectedReleaseForTrack(otherTrack)).toBe(false);
   });
 
   it('should allow no more than two selected releases', () => {

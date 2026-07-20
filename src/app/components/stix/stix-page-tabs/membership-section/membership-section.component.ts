@@ -198,7 +198,10 @@ export class MembershipSectionComponent
   viewTrack(membership: MembershipTrack, event?: Event): void {
     event?.stopPropagation();
 
-    if (!this.canViewReleaseTrackDashboard) {
+    if (
+      !this.canViewReleaseTrackDashboard ||
+      !this.hasSelectedReleaseForTrack(membership)
+    ) {
       return;
     }
 
@@ -237,12 +240,20 @@ export class MembershipSectionComponent
       membership?.tier ??
       'work-in-progress';
 
+    if (this.isDraftStaged(membership)) {
+      return 'Staged';
+    }
+
     if (
       ['work-in-progress', 'wip', 'candidate', 'candidates', 'draft'].includes(
         this.normalizeStatus(status)
       )
     ) {
       return 'Work in Progress';
+    }
+
+    if (this.isDraftInReview(membership)) {
+      return 'In Review';
     }
 
     return this.formatStatus(status);
@@ -259,6 +270,31 @@ export class MembershipSectionComponent
       draft?.created;
 
     return date ? `As of ${this.formatDate(date, true)}` : 'As of TBD';
+  }
+
+  isDraftInReview(membership: MembershipTrack): boolean {
+    const draft = this.getCurrentDraft(membership);
+
+    const status = this.normalizeStatus(
+      draft?.status ?? draft?.state ?? membership?.status
+    );
+
+    return (
+      !this.isDraftStaged(membership) &&
+      ['awaiting-review', 'review', 'reviewed'].includes(status)
+    );
+  }
+
+  isDraftStaged(membership: MembershipTrack): boolean {
+    const draft = this.getCurrentDraft(membership);
+
+    return [
+      draft?.tier,
+      draft?.state,
+      draft?.status,
+      membership?.tier,
+      membership?.status,
+    ].some(value => this.normalizeStatus(value) === 'staged');
   }
 
   isDraftStepActive(membership: MembershipTrack, step: string): boolean {
@@ -285,11 +321,11 @@ export class MembershipSectionComponent
     }
 
     if (normalizedStep === 'review') {
-      return ['awaiting-review', 'review', 'reviewed'].includes(status);
+      return this.isDraftInReview(membership);
     }
 
     if (normalizedStep === 'staged') {
-      return status === 'staged';
+      return this.isDraftStaged(membership);
     }
 
     return status === normalizedStep;
@@ -336,6 +372,8 @@ export class MembershipSectionComponent
       release?.releasedAt ??
       release?.release_date ??
       release?.releaseDate ??
+      release?.tagged_at ??
+      release?.taggedAt ??
       release?.modified ??
       release?.created_at ??
       release?.createdAt ??
@@ -381,6 +419,14 @@ export class MembershipSectionComponent
 
     return this.selectedReleases.has(
       this.getReleaseSelectionKey(release, membership)
+    );
+  }
+
+  hasSelectedReleaseForTrack(membership: MembershipTrack): boolean {
+    const trackId = this.getTrackId(membership);
+
+    return [...this.selectedReleases.values()].some(
+      selection => this.getTrackId(selection.membership) === trackId
     );
   }
 

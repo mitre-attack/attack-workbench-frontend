@@ -108,8 +108,12 @@ export class MembershipSectionDataService {
             return of(null);
           })
         ),
+      releasesResponse: this.releaseTracksConnector.listReleasesForObject(
+        objectRef,
+        { order: 'desc', limit: 100, offset: 0 }
+      ),
     }).pipe(
-      map(({ rawObject, releaseTracksResponse }) => {
+      map(({ rawObject, releaseTracksResponse, releasesResponse }) => {
         const memberships = suppliedMemberships.length
           ? suppliedMemberships
           : this.extractMemberships(rawObject, {
@@ -120,7 +124,10 @@ export class MembershipSectionDataService {
           releaseTracksResponse
         );
 
-        return this.buildTracks(availableTracks, memberships, objectRef);
+        return this.applyTaggedReleases(
+          this.buildTracks(availableTracks, memberships, objectRef),
+          releasesResponse
+        );
       }),
       switchMap(tracks =>
         this.loadVersionsForMembershipTracks(tracks, objectRef)
@@ -304,15 +311,21 @@ export class MembershipSectionDataService {
       response?.releases ??
       null;
 
-    const currentDraft =
-      responseDraft ??
-      versions.find(version => this.isDraftVersion(version)) ??
-      track.current_draft ??
-      null;
+    const currentDraft = responseDraft
+      ? responseDraft
+      : versions.length
+        ? (versions.find(version => this.isDraftVersion(version)) ?? null)
+        : (track.current_draft ?? null);
+
+    const versionReleases = versions.filter(version =>
+      this.isProductionVersion(version)
+    );
 
     const productionReleases = Array.isArray(directReleases)
       ? directReleases
-      : versions.filter(version => this.isProductionVersion(version));
+      : versionReleases.length
+        ? versionReleases
+        : (track.production_releases ?? []);
 
     return {
       ...track,
@@ -321,6 +334,31 @@ export class MembershipSectionDataService {
       releases: productionReleases,
       versions,
     };
+  }
+
+  private applyTaggedReleases(
+    tracks: MembershipTrack[],
+    response: any
+  ): MembershipTrack[] {
+    const releases = Array.isArray(response)
+      ? response
+      : Array.isArray(response?.data)
+        ? response.data
+        : [];
+
+    return tracks.map(track => {
+      const trackId = this.getTrackApiId(track);
+      const trackReleases = releases.filter(
+        (release: any) =>
+          String(release?.track_id ?? release?.trackId ?? '') === trackId
+      );
+
+      return {
+        ...track,
+        production_releases: trackReleases,
+        releases: trackReleases,
+      };
+    });
   }
 
   private normalizeVersionList(response: any): any[] {

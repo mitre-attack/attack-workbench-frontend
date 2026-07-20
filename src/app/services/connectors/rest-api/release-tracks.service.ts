@@ -152,6 +152,21 @@ export class ReleaseTracksConnectorService extends ApiConnector {
     );
   }
 
+  /** List tagged releases that directly contain an object. */
+  public listReleasesForObject(
+    objectRef: string,
+    options?: { order?: 'asc' | 'desc'; limit?: number; offset?: number }
+  ): Observable<any> {
+    const params = this.buildHttpParams(options);
+    const url = `${this.apiUrl}/release-tracks/objects/${encodeURIComponent(objectRef)}/releases`;
+
+    return this.http.get(url, { params }).pipe(
+      tap(() => logger.log(`retrieved tagged releases for ${objectRef}`)),
+      catchError(this.handleError_continue<any>(null)),
+      share()
+    );
+  }
+
   /**
    * POST /api/release-tracks/new
    * Create a new release track.

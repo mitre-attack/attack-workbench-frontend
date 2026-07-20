@@ -40,6 +40,7 @@
             *ngIf="canViewReleaseTrackDashboard"
             type="button"
             class="view-track-button"
+            [disabled]="!hasSelectedReleaseForTrack(membership)"
             (click)="viewTrack(membership, $event)">
             View Track
 
@@ -86,7 +87,10 @@
                 " />
 
               <span class="release-information">
-                <strong class="draft-status">
+                <strong
+                  class="draft-status"
+                  [class.draft-status--in-review]="isDraftInReview(membership)"
+                  [class.draft-status--staged]="isDraftStaged(membership)">
                   {{ getDraftStatusLabel(membership) }}
                 </strong>
 
@@ -107,6 +111,7 @@
 
               <span
                 class="status-step"
+                [class.status-step--review-active]="isDraftInReview(membership)"
                 [class.status-step--active]="
                   isDraftStepActive(membership, 'review')
                 ">
@@ -115,6 +120,7 @@
 
               <span
                 class="status-step"
+                [class.status-step--staged-active]="isDraftStaged(membership)"
                 [class.status-step--active]="
                   isDraftStepActive(membership, 'staged')
                 ">

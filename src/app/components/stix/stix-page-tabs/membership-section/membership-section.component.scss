@@ -5,6 +5,7 @@
 $membership-accent: colors.color(mitre-light-blue);
 $membership-accent-dark: #62c9ff;
 $membership-success: colors.color(secondary);
+$membership-release: colors.color(active);
 
 // Explicit purple values for the virtual release-track badge.
 $membership-virtual: #8c5bd6;
@@ -260,6 +261,18 @@ button.membership-action-button {
   transition:
     background-color 120ms ease,
     border-color 120ms ease;
+
+  .release-information strong {
+    color: $membership-release;
+  }
+
+  .release-tag-icon {
+    border-color: $membership-release;
+
+    &::after {
+      background: $membership-release;
+    }
+  }
 }
 
 .release-information {
@@ -286,6 +299,14 @@ button.membership-action-button {
 
 .draft-status {
   text-transform: capitalize;
+}
+
+.draft-status--in-review {
+  color: colors.color(pending) !important;
+}
+
+.draft-status--staged {
+  color: colors.color(active) !important;
 }
 
 .release-tag-icon {
@@ -346,6 +367,18 @@ input[type='checkbox'] {
   border-color: rgba($membership-success, 0.65) !important;
   background: rgba($membership-success, 0.18) !important;
   color: $membership-success !important;
+}
+
+.status-step--review-active {
+  border-color: rgba(colors.color(pending), 0.8) !important;
+  background: rgba(colors.color(pending), 0.16) !important;
+  color: colors.color(pending) !important;
+}
+
+.status-step--staged-active {
+  border-color: rgba(colors.color(active), 0.8) !important;
+  background: rgba(colors.color(active), 0.16) !important;
+  color: colors.color(active) !important;
 }
 
 /*
@@ -615,6 +648,18 @@ input[type='checkbox'] {
     border-color: rgba($membership-accent-dark, 0.9) !important;
     background: rgba($membership-accent-dark, 0.2) !important;
     color: $membership-accent-dark !important;
+  }
+
+  .status-step--review-active {
+    border-color: rgba(colors.color(pending), 0.9) !important;
+    background: rgba(colors.color(pending), 0.2) !important;
+    color: colors.color(pending) !important;
+  }
+
+  .status-step--staged-active {
+    border-color: rgba(colors.color(active), 0.9) !important;
+    background: rgba(colors.color(active), 0.2) !important;
+    color: colors.color(active) !important;
   }
 }
 
