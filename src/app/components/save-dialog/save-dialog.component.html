@@ -1,64 +1,167 @@
-<div class="save-dialog grid spacing-20">
-  <div *ngIf="stage === 0" class="row">
-    <div class="column validation">
-      <h3>Validation</h3>
-      <div *ngIf="validation; else validating">
-        <app-validation-results
-          [validation]="validation"
-          [patchId]="config.patchId"
-          [patchAnalytics]="config.patchAnalytics">
-        </app-validation-results>
+<div class="save-dialog">
+  <div *ngIf="stage === 0" class="save-dialog-content">
+    <div class="save-top-grid">
+      <section class="save-section validation-section">
+        <div class="save-section-header">
+          <h3>
+            <mat-icon>verified_user</mat-icon>
+            Validation
+          </h3>
+          <span
+            *ngIf="validation"
+            class="validation-status"
+            [ngClass]="'validation-status-' + validationStatus">
+            {{ validationStatusLabel }}
+          </span>
+        </div>
+        <div class="validation-context" *ngIf="validationReviewStatusLabel">
+          Validating against
+          <strong>{{ validationReviewStatusLabel }}</strong>
+          requirements.
+        </div>
+        <div *ngIf="validation; else validating">
+          <app-validation-results
+            [validation]="validation"
+            [patchId]="config.patchId"
+            [patchAnalytics]="config.patchAnalytics">
+          </app-validation-results>
+        </div>
+        <ng-template #validating>
+          <app-loading-overlay></app-loading-overlay>
+        </ng-template>
+      </section>
+
+      <section class="save-section version-section">
+        <h4>Version Increment</h4>
+        <mat-radio-group
+          class="version-options"
+          [(ngModel)]="versionChoice"
+          aria-label="Version increment">
+          <mat-radio-button value="keep" [disabled]="!saveEnabled">
+            <span class="version-option-label">Keep</span>
+            <span class="version-option-value">v{{ currentVersion }}</span>
+          </mat-radio-button>
+          <mat-radio-button
+            value="minor"
+            [disabled]="config.versionAlreadyIncremented || !saveEnabled">
+            <span class="version-option-label">Minor</span>
+            <span class="version-option-value">
+              v{{ currentVersion }} &rarr; v{{ nextMinorVersion }}
+            </span>
+          </mat-radio-button>
+          <mat-radio-button
+            value="major"
+            [disabled]="config.versionAlreadyIncremented || !saveEnabled">
+            <span class="version-option-label">Major</span>
+            <span class="version-option-value">
+              v{{ currentVersion }} &rarr; v{{ nextMajorVersion }}
+            </span>
+          </mat-radio-button>
+        </mat-radio-group>
+      </section>
+    </div>
+
+    <section class="save-section track-section">
+      <div class="track-section-header">
+        <h4>Object Review Status</h4>
+        <span *ngIf="loadingTracks" class="track-loading">
+          Loading tracks...
+        </span>
       </div>
-      <ng-template #validating>
-        <app-loading-overlay></app-loading-overlay>
+
+      <div class="track-table" *ngIf="hasStatusRows; else noEnrolledTracks">
+        <div class="track-table-row track-table-head">
+          <span>Release Track</span>
+          <span>Current Draft</span>
+          <span>New Status</span>
+        </div>
+
+        <div class="track-table-row" *ngFor="let row of statusRows">
+          <span class="track-name">{{ row.name }}</span>
+
+          <app-status-chip
+            *ngIf="row.enrolled; else notEnrolledStatus"
+            [status]="row.status"></app-status-chip>
+          <ng-template #notEnrolledStatus>
+            <span class="track-not-enrolled">Not enrolled</span>
+          </ng-template>
+
+          <mat-button-toggle-group
+            class="track-status-toggle"
+            [(ngModel)]="row.targetStatus"
+            (change)="onTrackStatusChanged()"
+            hideSingleSelectionIndicator
+            aria-label="Track status">
+            <mat-button-toggle
+              *ngFor="let option of trackStatusOptions"
+              [value]="option.value">
+              {{ option.label }}
+            </mat-button-toggle>
+          </mat-button-toggle-group>
+        </div>
+      </div>
+
+      <ng-template #noEnrolledTracks>
+        <div class="track-empty">
+          {{
+            loadingTracks
+              ? 'Loading release tracks.'
+              : 'This object is not enrolled in any release tracks.'
+          }}
+        </div>
       </ng-template>
-    </div>
-    <div class="column narrow version-buttons">
-      <mat-action-list>
-        <mat-form-field class="workflow-status" appearance="outline">
-          <mat-label>mark as...</mat-label>
-          <mat-select
-            [(ngModel)]="newState"
-            (selectionChange)="onStatusChanged($event)">
-            <mat-option
-              *ngFor="let workflow of workflows"
-              [value]="workflow[0]">
-              {{ workflow[1] }}
+
+      <div class="track-enrollment">
+        <h5>Enroll in New Release Track</h5>
+        <mat-form-field appearance="outline" class="enrollment-field no-hint">
+          <input
+            matInput
+            type="text"
+            [(ngModel)]="enrollmentSearch"
+            [disabled]="!saveEnabled || loadingTracks"
+            [matAutocomplete]="enrollmentAutocomplete"
+            placeholder="Search release tracks..." />
+          <mat-autocomplete
+            #enrollmentAutocomplete="matAutocomplete"
+            [displayWith]="displayTrack"
+            (optionSelected)="selectEnrollmentTrack($event)">
+            <mat-option *ngFor="let row of enrollmentOptions" [value]="row">
+              {{ row.name }}
             </mat-option>
-          </mat-select>
+            <mat-option *ngIf="!enrollmentOptions.length" disabled>
+              No matching standard tracks
+            </mat-option>
+          </mat-autocomplete>
         </mat-form-field>
-        <button
-          mat-list-item
-          [disabled]="config.versionAlreadyIncremented || !saveEnabled"
-          (click)="saveNextMajorVersion()">
-          <div class="save-list-item">save new major version</div>
-          <div>{{ currentVersion }} &#8594; {{ nextMajorVersion }}</div>
+      </div>
+    </section>
+
+    <footer class="save-footer">
+      <div class="save-footer-summary">
+        <mat-icon>schedule</mat-icon>
+        Saves revision as
+        <strong>{{ selectedVersionLabel }}</strong>
+      </div>
+      <div class="save-footer-actions">
+        <button mat-stroked-button mat-dialog-close>
+          Cancel, Keep Editing
         </button>
         <button
-          mat-list-item
-          [disabled]="config.versionAlreadyIncremented || !saveEnabled"
-          (click)="saveNextMinorVersion()">
-          <div class="save-list-item">save new minor version</div>
-          <div>{{ currentVersion }} &#8594; {{ nextMinorVersion }}</div>
-        </button>
-        <button
-          mat-list-item
+          mat-raised-button
+          color="primary"
           [disabled]="!saveEnabled"
-          (click)="saveCurrentVersion()">
-          <div class="save-list-item">save current version</div>
-          <div>{{ currentVersion }} &#8594; {{ currentVersion }}</div>
+          (click)="onConfirmSave()">
+          Save & Update Status
         </button>
-        <button mat-list-item mat-dialog-close>
-          <div class="save-list-item">cancel</div>
-          <div>keep editing</div>
-        </button>
-      </mat-action-list>
-    </div>
+      </div>
+    </footer>
   </div>
+
   <div *ngIf="stage === 1" class="stage parsing">
     <h1>Determining required knowledge base patches...</h1>
     <app-loading-overlay></app-loading-overlay>
   </div>
+
   <div *ngIf="stage === 2" class="stage reviewing">
     <h1>Required Patches</h1>
     <ng-container *ngIf="patch_objects.length === 0; else linkPatches">
@@ -101,6 +204,7 @@
       </button>
     </div>
   </div>
+
   <div *ngIf="stage === 3" class="stage patching">
     <h1>Patching links...</h1>
     <app-loading-overlay></app-loading-overlay>
