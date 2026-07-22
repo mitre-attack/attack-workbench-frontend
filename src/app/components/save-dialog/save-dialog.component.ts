@@ -13,11 +13,7 @@ import { StixObject } from 'src/app/classes/stix/stix-object';
 import { VersionNumber } from 'src/app/classes/version-number';
 import { ReleaseTracksConnectorService } from 'src/app/services/connectors/rest-api/release-tracks.service';
 import { RestApiConnectorService } from 'src/app/services/connectors/rest-api/rest-api-connector.service';
-import {
-  WORKFLOW_STATUS_OPTIONS,
-  WORKFLOW_STATUS_RANK,
-  WorkflowStatus,
-} from 'src/app/utils/types';
+import { WORKFLOW_STATUS_LABELS, WorkflowStatus } from 'src/app/utils/types';
 import type {
   ReleaseTrackStatus,
   WorkflowStatusType,
@@ -45,7 +41,7 @@ export class SaveDialogComponent implements OnInit {
   public trackRows: TrackRow[] = [];
   public enrollmentSearch: string | TrackRow = '';
   public loadingTracks = false;
-  public trackStatusOptions = WORKFLOW_STATUS_OPTIONS;
+  public readonly resetWorkflowStatus = WorkflowStatus.WorkInProgress;
   private validationRequestId = 0;
 
   public get saveEnabled() {
@@ -79,9 +75,7 @@ export class SaveDialogComponent implements OnInit {
 
   public get validationReviewStatus(): WorkflowStatusType | undefined {
     if (this.config.object.attackType === 'relationship') return undefined;
-    return this.getHighestWorkflowStatus(
-      this.statusRows.map(row => row.targetStatus)
-    );
+    return this.resetWorkflowStatus;
   }
 
   public get validationReviewStatusLabel(): string {
@@ -185,13 +179,7 @@ export class SaveDialogComponent implements OnInit {
     if (!row) return;
 
     row.selected = true;
-    row.targetStatus = WorkflowStatus.WorkInProgress;
     this.enrollmentSearch = '';
-    this.onTrackStatusChanged();
-  }
-
-  public onTrackStatusChanged(): void {
-    this.validateObject();
   }
 
   /**
@@ -449,7 +437,6 @@ export class SaveDialogComponent implements OnInit {
         : workspaceTrack?.objectRef || this.config.object.stixID,
       enrolled: !!entry || !!workspaceTrack,
       selected: false,
-      targetStatus: WorkflowStatus.WorkInProgress,
     };
   }
 
@@ -550,23 +537,8 @@ export class SaveDialogComponent implements OnInit {
     this.validation = result;
   }
 
-  private getHighestWorkflowStatus(
-    statuses: WorkflowStatusType[]
-  ): WorkflowStatusType {
-    return statuses.reduce(
-      (highest, status) =>
-        WORKFLOW_STATUS_RANK[status] > WORKFLOW_STATUS_RANK[highest]
-          ? status
-          : highest,
-      WorkflowStatus.WorkInProgress
-    );
-  }
-
   private getWorkflowStatusLabel(status: WorkflowStatusType): string {
-    return (
-      this.trackStatusOptions.find(option => option.value === status)?.label ||
-      status
-    );
+    return WORKFLOW_STATUS_LABELS[status] || status;
   }
 
   private syncTracks(): Observable<unknown> {
@@ -588,7 +560,7 @@ export class SaveDialogComponent implements OnInit {
   private syncTrack(row: TrackRow): Observable<unknown> {
     if (!row.trackId) return of(null);
     if (!row.enrolled) return this.addCandidateToTrack(row);
-    if (row.status === row.targetStatus) return of(null);
+    if (row.status === this.resetWorkflowStatus) return of(null);
     if (row.tier === SnapshotTier.Staged) {
       return this.releaseTracksService
         .demoteStaged(row.trackId, [row.objectRef])
@@ -596,7 +568,7 @@ export class SaveDialogComponent implements OnInit {
           concatMap(() =>
             this.releaseTracksService.reviewCandidates(row.trackId, {
               from: row.status,
-              to: row.targetStatus,
+              to: this.resetWorkflowStatus,
               object_refs: [row.objectRef],
             })
           )
@@ -604,26 +576,15 @@ export class SaveDialogComponent implements OnInit {
     }
     return this.releaseTracksService.reviewCandidates(row.trackId, {
       from: row.status,
-      to: row.targetStatus,
+      to: this.resetWorkflowStatus,
       object_refs: [row.objectRef],
     });
   }
 
   private addCandidateToTrack(row: TrackRow): Observable<unknown> {
-    return this.releaseTracksService
-      .addCandidates(row.trackId, [row.objectRef])
-      .pipe(
-        concatMap(() => {
-          if (row.targetStatus === WorkflowStatus.WorkInProgress) {
-            return of(null);
-          }
-          return this.releaseTracksService.reviewCandidates(row.trackId, {
-            from: WorkflowStatus.WorkInProgress,
-            to: row.targetStatus,
-            object_refs: [row.objectRef],
-          });
-        })
-      );
+    return this.releaseTracksService.addCandidates(row.trackId, [
+      row.objectRef,
+    ]);
   }
 
   private getTrackList(result: any): any[] {
@@ -731,7 +692,6 @@ interface TrackRow {
   objectRef: StixObjectRef;
   enrolled: boolean;
   selected: boolean;
-  targetStatus: WorkflowStatusType;
 }
 
 export interface SaveDialogConfig {

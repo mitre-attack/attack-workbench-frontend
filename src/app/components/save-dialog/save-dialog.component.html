@@ -72,32 +72,22 @@
       <div class="track-table" *ngIf="hasStatusRows; else noEnrolledTracks">
         <div class="track-table-row track-table-head">
           <span>Release Track</span>
-          <span>Current Draft</span>
-          <span>New Status</span>
+          <span>Status Change</span>
         </div>
 
         <div class="track-table-row" *ngFor="let row of statusRows">
           <span class="track-name">{{ row.name }}</span>
 
-          <app-status-chip
-            *ngIf="row.enrolled; else notEnrolledStatus"
-            [status]="row.status"></app-status-chip>
-          <ng-template #notEnrolledStatus>
-            <span class="track-not-enrolled">Not enrolled</span>
-          </ng-template>
-
-          <mat-button-toggle-group
-            class="track-status-toggle"
-            [(ngModel)]="row.targetStatus"
-            (change)="onTrackStatusChanged()"
-            hideSingleSelectionIndicator
-            aria-label="Track status">
-            <mat-button-toggle
-              *ngFor="let option of trackStatusOptions"
-              [value]="option.value">
-              {{ option.label }}
-            </mat-button-toggle>
-          </mat-button-toggle-group>
+          <div class="track-status-change">
+            <app-status-chip
+              *ngIf="row.enrolled; else notEnrolledStatus"
+              [status]="row.status"></app-status-chip>
+            <ng-template #notEnrolledStatus>
+              <span class="track-not-enrolled">Not enrolled</span>
+            </ng-template>
+            <mat-icon>arrow_forward</mat-icon>
+            <app-status-chip [status]="resetWorkflowStatus"></app-status-chip>
+          </div>
         </div>
       </div>
 
