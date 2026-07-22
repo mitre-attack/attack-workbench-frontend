@@ -24,7 +24,11 @@ import { ReleaseTracksConnectorService } from 'src/app/services/connectors/rest-
 import { RestApiConnectorService } from 'src/app/services/connectors/rest-api/rest-api-connector.service';
 import { EditorService } from 'src/app/services/editor/editor.service';
 import { WorkflowStatusDialogComponent } from 'src/app/components/workflow-status-dialog/workflow-status-dialog.component';
-import { WORKFLOW_STATUS_OPTIONS, WorkflowStatus } from 'src/app/utils/types';
+import {
+  WORKFLOW_STATUS_OPTIONS,
+  WORKFLOW_STATUS_RANK,
+  WorkflowStatus,
+} from 'src/app/utils/types';
 import type {
   ReleaseTrackStatus,
   WorkflowStatusType,
@@ -174,6 +178,13 @@ export class NamePropertyComponent implements OnInit {
     status: WorkflowStatusType
   ): boolean {
     return row.status === status;
+  }
+
+  public isStatusDisabled(
+    row: ReleaseTrackStatus,
+    status: WorkflowStatusType
+  ): boolean {
+    return WORKFLOW_STATUS_RANK[status] <= WORKFLOW_STATUS_RANK[row.status];
   }
 
   private loadTrackStatuses(): void {

@@ -79,7 +79,7 @@
                   type="button"
                   [class]="'workflow-option-' + action.modifier"
                   [class.active]="isStatusActive(rt, action.status)"
-                  [disabled]="isStatusActive(rt, action.status)"
+                  [disabled]="isStatusDisabled(rt, action.status)"
                   (click)="
                     openStatusDialog(action.status, workflowMenuTrigger, rt)
                   ">

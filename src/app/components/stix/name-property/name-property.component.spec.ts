@@ -213,4 +213,20 @@ describe('NamePropertyComponent', () => {
       }),
     ]);
   });
+
+  it('should only allow forward workflow status changes from the menu', () => {
+    const row = {
+      status: WorkflowStatus.AwaitingReview,
+    } as any;
+
+    expect(component.isStatusDisabled(row, WorkflowStatus.WorkInProgress)).toBe(
+      true
+    );
+    expect(component.isStatusDisabled(row, WorkflowStatus.AwaitingReview)).toBe(
+      true
+    );
+    expect(component.isStatusDisabled(row, WorkflowStatus.Reviewed)).toBe(
+      false
+    );
+  });
 });
