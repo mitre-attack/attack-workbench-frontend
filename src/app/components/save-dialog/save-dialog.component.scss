@@ -190,10 +190,10 @@
 
   .track-table-row {
     display: grid;
-    grid-template-columns: minmax(180px, 1fr) 140px 230px;
+    grid-template-columns: minmax(180px, 1fr) minmax(300px, 1fr);
     align-items: center;
-    gap: 12px;
-    min-width: 574px;
+    column-gap: 24px;
+    min-width: 540px;
     padding: 10px 0;
 
     & + .track-table-row {
@@ -208,23 +208,10 @@
     font-weight: 700;
     line-height: 20px;
     @include colors.theme-text-deemphasis;
-
-    span:last-child {
-      .dark & {
-        color: colors.color(primary);
-      }
-
-      .light & {
-        color: colors.color(primary);
-      }
-    }
   }
 
-  .track-table-head span:nth-child(2),
   .track-table-head span:last-child,
-  app-status-chip,
-  .track-status-toggle,
-  .track-not-enrolled {
+  .track-status-change {
     justify-self: start;
   }
 
@@ -237,33 +224,20 @@
     font-weight: 400;
   }
 
-  .track-status-toggle {
-    display: flex;
-    width: fit-content;
-    max-width: 100%;
-    overflow: hidden;
-    border: 1px solid;
-    border-radius: 4px;
-    white-space: nowrap;
-    @include colors.theme-border-color;
+  .track-status-change {
+    display: grid;
+    grid-template-columns: 180px 18px max-content;
+    align-items: center;
+    column-gap: 12px;
+    min-width: 0;
 
-    .mat-button-toggle {
-      font-size: 12px;
-      font-weight: 600;
-      line-height: 28px;
-    }
-
-    .mat-button-toggle-label-content {
-      line-height: 28px;
-      padding: 0 10px;
-    }
-
-    .mat-button-toggle-checked {
-      .dark &,
-      .light & {
-        color: colors.on-color(dark);
-        background: colors.color(primary);
-      }
+    .mat-icon {
+      width: 17px;
+      height: 17px;
+      font-size: 17px;
+      line-height: 17px;
+      justify-self: center;
+      @include colors.theme-text-deemphasis;
     }
   }
 

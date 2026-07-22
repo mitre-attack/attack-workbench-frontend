@@ -3,7 +3,6 @@ import { NO_ERRORS_SCHEMA } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { FormsModule } from '@angular/forms';
 import { MatAutocompleteModule } from '@angular/material/autocomplete';
-import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
@@ -111,7 +110,6 @@ describe('SaveDialogComponent', () => {
       imports: [
         FormsModule,
         MatAutocompleteModule,
-        MatButtonToggleModule,
         MatFormFieldModule,
         MatInputModule,
         MatRadioModule,
@@ -164,14 +162,12 @@ describe('SaveDialogComponent', () => {
         name: 'Core Objects',
         selected: false,
         enrolled: true,
-        targetStatus: WorkflowStatus.WorkInProgress,
       }),
       expect.objectContaining({
         trackId: 'release-track--groups',
         name: 'Groups & Campaigns',
         selected: false,
         enrolled: false,
-        targetStatus: WorkflowStatus.WorkInProgress,
       }),
     ]);
     expect(component.statusRows).toEqual([
@@ -193,7 +189,6 @@ describe('SaveDialogComponent', () => {
     component.selectEnrollmentTrack({ option: { value: row } });
 
     expect(row.selected).toBe(true);
-    expect(row.targetStatus).toBe(WorkflowStatus.WorkInProgress);
     expect(component.statusRows).toEqual([
       expect.objectContaining({
         trackId: 'release-track--core',
@@ -205,35 +200,17 @@ describe('SaveDialogComponent', () => {
     expect(component.enrollmentOptions).toEqual([]);
   });
 
-  it('should revalidate against the highest selected release track status', async () => {
+  it('should always validate save updates against WIP', async () => {
     await new Promise(resolve => setTimeout(resolve, 10));
 
     expect(component.validationReviewStatus).toBe(
       WorkflowStatus.WorkInProgress
     );
     expect(component.validationReviewStatusLabel).toBe('WIP');
-
-    mockObject.validate.mockClear();
-    component.trackRows[0].targetStatus = WorkflowStatus.Reviewed;
-    component.onTrackStatusChanged();
-    await new Promise(resolve => setTimeout(resolve, 10));
-
-    expect(component.validationReviewStatus).toBe(WorkflowStatus.Reviewed);
-    expect(component.validationReviewStatusLabel).toBe('Reviewed');
     expect(mockObject.validate).toHaveBeenCalledWith(
       expect.anything(),
-      WorkflowStatus.Reviewed
+      WorkflowStatus.WorkInProgress
     );
-    expect(component.validationStatus).toBe('error');
-
-    component.trackRows[0].targetStatus = WorkflowStatus.AwaitingReview;
-    component.onTrackStatusChanged();
-    await new Promise(resolve => setTimeout(resolve, 10));
-
-    expect(component.validationReviewStatus).toBe(
-      WorkflowStatus.AwaitingReview
-    );
-    expect(component.validationReviewStatusLabel).toBe('Awaiting Review');
     expect(component.validationStatus).toBe('success');
   });
 
