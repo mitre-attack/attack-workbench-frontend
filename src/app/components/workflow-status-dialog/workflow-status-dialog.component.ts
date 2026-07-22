@@ -18,7 +18,11 @@ import { StixObject } from 'src/app/classes/stix/stix-object';
 import { ReleaseTracksConnectorService } from 'src/app/services/connectors/rest-api/release-tracks.service';
 import { RestApiConnectorService } from 'src/app/services/connectors/rest-api/rest-api-connector.service';
 import { WORKFLOW_STATUS_LABELS, WorkflowStatus } from 'src/app/utils/types';
-import type { ReleaseTrackStatus, WorkflowStatusDialogData, WorkflowStatusType } from 'src/app/utils/types';
+import type {
+  ReleaseTrackStatus,
+  WorkflowStatusDialogData,
+  WorkflowStatusType,
+} from 'src/app/utils/types';
 import { logger } from 'src/app/utils/logger';
 
 @Component({
