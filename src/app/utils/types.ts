@@ -1,5 +1,8 @@
-import { ReleaseTrackObjectTier, StixObjectRef } from "../classes/release-tracks";
-import { StixObject } from "../classes/stix";
+import {
+  ReleaseTrackObjectTier,
+  StixObjectRef,
+} from '../classes/release-tracks';
+import { StixObject } from '../classes/stix';
 
 /**
  * ATT&CK type definitions
