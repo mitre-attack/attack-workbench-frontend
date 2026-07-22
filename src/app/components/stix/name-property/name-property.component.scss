@@ -1,4 +1,71 @@
+@use '../../../../style/colors';
+
+.workflow-status-icon {
+  &.warn {
+    color: colors.color(warn) !important;
+  }
+
+  &.error {
+    color: colors.color(error) !important;
+  }
+
+  &.success {
+    color: colors.color(success) !important;
+  }
+}
+
 .name-property {
+  .workflow-select {
+    margin-left: 0.5rem;
+    width: auto;
+
+    .mat-mdc-form-field-subscript-wrapper {
+      display: none;
+    }
+
+    .mat-mdc-text-field-wrapper {
+      padding: 0 0.35rem;
+    }
+
+    .mat-mdc-form-field-infix {
+      min-height: auto;
+      padding: 0.35rem 0;
+      width: auto;
+    }
+
+    .mat-mdc-select-trigger {
+      align-items: center;
+      display: inline-flex;
+      justify-content: center;
+      width: 100%;
+    }
+
+    .mat-mdc-select-arrow-wrapper {
+      margin-left: 0.15rem;
+    }
+
+    .mat-mdc-select-value {
+      display: flex;
+      justify-content: center;
+    }
+
+    .mdc-notched-outline__leading,
+    .mdc-notched-outline__trailing {
+      width: 8px !important;
+    }
+
+    .mdc-notched-outline__notch {
+      border-right: none;
+    }
+  }
+
+  .workflow-option {
+    align-items: center;
+    display: flex;
+    justify-content: center;
+    width: 100%;
+  }
+
   .name-edit {
     width: 100%;
     text-align: center;
@@ -28,6 +95,11 @@
   }
   .lowercase {
     margin: 0 !important;
+    align-items: center;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+    justify-content: center;
   }
   .c-align {
     text-align: center !important;
@@ -36,5 +108,18 @@
   .status {
     margin: 0;
     text-align: center;
+  }
+}
+
+.workflow-select-panel {
+  .mat-mdc-option {
+    .mat-icon {
+      margin-left: -3px !important;
+      margin-right: 0 !important;
+    }
+
+    .mat-pseudo-checkbox {
+      display: none !important;
+    }
   }
 }

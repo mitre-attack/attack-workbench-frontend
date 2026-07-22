@@ -4,9 +4,12 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
 import { MatIconModule } from '@angular/material/icon';
 import { MatTooltipModule } from '@angular/material/tooltip';
+import moment from 'moment';
+import { MarkdownModule } from 'ngx-markdown';
 import { StixTypeToAttackType } from 'src/app/utils/type-mappings';
 import { StixType, WorkflowStatusType } from 'src/app/utils/types';
 import { UserAvatarComponent } from '../user-avatar/user-avatar.component';
+import type { TierEntryModifiedByUser } from 'src/app/classes/release-tracks';
 
 export interface ReleaseTrackObjectItem {
   object_ref: string;
@@ -16,6 +19,10 @@ export interface ReleaseTrackObjectItem {
   object_added_by?: string;
   object_staged_at?: Date | string;
   object_staged_by?: string;
+  attack_id?: string;
+  name?: string;
+  description?: string;
+  modified_by_user?: TierEntryModifiedByUser;
   [key: string]: any;
 }
 
@@ -28,6 +35,7 @@ export interface ReleaseTrackObjectItem {
     MatCardModule,
     MatIconModule,
     MatTooltipModule,
+    MarkdownModule,
     UserAvatarComponent,
   ],
   templateUrl: './release-track-object-card.component.html',
@@ -45,15 +53,20 @@ export class ReleaseTrackObjectCardComponent {
   @Output() diffObject = new EventEmitter<ReleaseTrackObjectItem>();
 
   public get title(): string {
-    return this.item?.name || this.fallbackObjectLabel;
+    return (
+      this.item?.name || this.item?.object_name || this.fallbackObjectLabel
+    );
   }
 
   public get subtitle(): string {
-    return this.item?.attackId || '<<ATT&CK ID>>';
+    return this.item?.attack_id || this.item?.attackId || '<<ATT&CK ID>>';
   }
 
   public get description(): string {
-    const description = this.item?.description || 'No description available.';
+    const description =
+      this.item?.description ||
+      this.item?.object_description ||
+      'No description available.';
     return this.firstParagraph(description);
   }
 
@@ -61,8 +74,32 @@ export class ReleaseTrackObjectCardComponent {
     return this.item?.object_modified || null;
   }
 
+  public get modifiedHumanized(): string {
+    if (!this.modified) return 'Unknown';
+    const now = moment();
+    const then = moment(this.modified);
+    const difference = moment.duration(then.diff(now));
+    return difference.asWeeks() > -1
+      ? difference.humanize(true)
+      : then.format('D MMMM YYYY');
+  }
+
+  public get modifiedTimestamp(): string {
+    if (!this.modified) return '';
+    return moment(this.modified).format('D MMMM YYYY, h:mm A');
+  }
+
   public get modifiedByName(): string {
-    return this.item?.modified_by_user || 'Unknown User';
+    return (
+      this.userDisplayName(this.item?.modified_by_user, false) ||
+      this.userDisplayName(
+        this.item?.object_modified_by ||
+          this.item?.object_added_by ||
+          this.item?.object_staged_by ||
+          this.item?.modified_by_ref
+      ) ||
+      'Unknown User'
+    );
   }
 
   public get cardClasses(): Record<string, boolean> {
@@ -101,5 +138,17 @@ export class ReleaseTrackObjectCardComponent {
       .map(part => part.trim())
       .filter(Boolean);
     return paragraph || 'No description available.';
+  }
+
+  private userDisplayName(value: any, includeId = true): string | null {
+    if (!value) return null;
+    if (typeof value === 'string') return value;
+
+    return (
+      value.displayName ||
+      value.username ||
+      value.name ||
+      (includeId ? value.id : null)
+    );
   }
 }

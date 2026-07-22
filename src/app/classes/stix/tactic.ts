@@ -150,4 +150,22 @@ export class Tactic extends StixObject {
     });
     return putObservable;
   }
+
+  /**
+   * Revoke the STIX object in the database.
+   * @param restAPIService [RestApiConnectorService] the service to perform the revoke through
+   * @param revokingObject the revoking object payload
+   * @returns {Observable} of the revoke
+   */
+  public revoke(
+    restAPIService: RestApiConnectorService,
+    revokingObject: { revoking: { stixId: string; modified: string } },
+    preserveRelationships = false
+  ): Observable<object> {
+    return restAPIService.revokeTactic(
+      this.stixID,
+      revokingObject,
+      preserveRelationships
+    );
+  }
 }

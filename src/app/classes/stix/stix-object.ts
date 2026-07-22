@@ -85,7 +85,7 @@ export abstract class StixObject extends Serializable {
       this.version = new VersionNumber('0.1');
       this.attackID = '';
       this.external_references = new ExternalReferences();
-      if (this.type !== 'x-mitre-collection') {
+      if (this.type !== 'x-mitre-collection' && this.type !== 'relationship') {
         this.workflow = {
           state: WorkflowStatus.WorkInProgress,
         };
@@ -791,6 +791,18 @@ export abstract class StixObject extends Serializable {
    * @returns {Observable} of the pout
    */
   abstract update(restAPIService: RestApiConnectorService): Observable<object>;
+
+  /**
+   * Revoke the STIX object in the database.
+   * @param restAPIService [RestApiConnectorService] the service to perform the revoke through
+   * @param revokingObject the revoking object payload
+   * @returns {Observable} of the revoke
+   */
+  public revoke?(
+    restAPIService: RestApiConnectorService,
+    revokingObject: { revoking: { stixId: string; modified: string } },
+    preserveRelationships?: boolean
+  ): Observable<object>;
 
   /**
    * Updates the object's marking definitions with the default the first time an object is created

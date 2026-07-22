@@ -1494,6 +1494,23 @@ export class RestApiConnectorService extends ApiConnector {
     };
   }
 
+  private revokeStixObjectFactory(attackType: AttackType) {
+    const plural = AttackTypeToPlural[attackType];
+    return function (
+      id: string,
+      revokingObject: { revoking: { stixId: string; modified: string } },
+      preserveRelationships = false
+    ): Observable<{}> {
+      const url = `${this.apiUrl}/${plural}/${id}/revoke`;
+      const params = { preserveRelationships };
+      return this.http.post(url, revokingObject, { params }).pipe(
+        tap(this.handleSuccess(`${attackType} revoked`)),
+        catchError(this.handleError_raise()),
+        share() // multicast so that multiple subscribers don't trigger the call twice. THIS MUST BE THE LAST LINE OF THE PIPE
+      );
+    };
+  }
+
   /**
    * DELETE a technique
    * @param {string} id the STIX ID of the object to delete
@@ -1589,6 +1606,86 @@ export class RestApiConnectorService extends ApiConnector {
    */
   public get deleteMatrix() {
     return this.deleteStixObjectFactory('matrix');
+  }
+  /**
+   * REVOKE a technique
+   * @param {string} id the STIX ID of the object to revoke
+   * @returns {Observable<{}>} observable of the response body
+   */
+  public get revokeTechnique() {
+    return this.revokeStixObjectFactory('technique');
+  }
+  /**
+   * REVOKE a tactic
+   * @param {string} id the STIX ID of the object to revoke
+   * @returns {Observable<{}>} observable of the response body
+   */
+  public get revokeTactic() {
+    return this.revokeStixObjectFactory('tactic');
+  }
+  /**
+   * REVOKE a group
+   * @param {string} id the STIX ID of the object to revoke
+   * @returns {Observable<{}>} observable of the response body
+   */
+  public get revokeGroup() {
+    return this.revokeStixObjectFactory('group');
+  }
+  /**
+   * REVOKE a matrix
+   * @param {string} id the STIX ID of the object to revoke
+   * @returns {Observable<{}>} observable of the response body
+   */
+  public get revokeMatrix() {
+    return this.revokeStixObjectFactory('matrix');
+  }
+  /**
+   * REVOKE a campaign
+   * @param {string} id the STIX ID of the object to revoke
+   * @returns {Observable<{}>} observable of the response body
+   */
+  public get revokeCampaign() {
+    return this.revokeStixObjectFactory('campaign');
+  }
+  /**
+   * REVOKE an asset
+   * @param {string} id the STIX ID of the object to revoke
+   * @returns {Observable<{}>} observable of the response body
+   */
+  public get revokeAsset() {
+    return this.revokeStixObjectFactory('asset');
+  }
+  /**
+   * REVOKE a software
+   * @param {string} id the STIX ID of the object to revoke
+   * @returns {Observable<{}>} observable of the response body
+   */
+  public get revokeSoftware() {
+    return this.revokeStixObjectFactory('software');
+  }
+  /**
+   * REVOKE a mitigation
+   * @param {string} id the STIX ID of the object to revoke
+   * @returns {Observable<{}>} observable of the response body
+   */
+  public get revokeMitigation() {
+    return this.revokeStixObjectFactory('mitigation');
+  }
+  /**
+   * REVOKE a data source
+   * @param {string} id the STIX ID of the object to revoke
+   * @returns {Observable<{}>} observable of the response body
+   */
+  public get revokeDataSource() {
+    return this.revokeStixObjectFactory('data-source');
+  }
+  /**
+   * REVOKE a data component
+   * @param {string} id the STIX ID of the object to revoke
+   * @returns {Observable<{}>} observable of the response body
+   */
+  public get revokeDataComponent() {
+    return this.revokeStixObjectFactory('data-component');
   }
   /**
    * DELETE a collection

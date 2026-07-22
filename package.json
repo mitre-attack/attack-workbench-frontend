@@ -4,7 +4,7 @@
   "description": "An application allowing users to explore, create, annotate, and share extensions of the MITRE ATT&CK® knowledge base. This repository contains an Angular-based web application providing the user interface for the ATT&CK Workbench application.",
   "repository": {
     "type": "git",
-    "url": "https://github.com/center-for-threat-informed-defense/attack-workbench-frontend.git"
+    "url": "https://github.com/mitre-attack/attack-workbench-frontend.git"
   },
   "keywords": [
     "cti",
@@ -13,7 +13,7 @@
     "mitre-attack",
     "mitre-corporation",
     "ctid",
-    "center-for-threat-informed-defense",
+    "mitre-attack",
     "cybersecurity",
     "stix"
   ],
@@ -39,18 +39,18 @@
     "check:lockfile": "bash scripts/check-package-lock.sh"
   },
   "dependencies": {
-    "@angular/animations": "^19.2.20",
+    "@angular/animations": "^19.2.25",
     "@angular/cdk": "^19.2.16",
-    "@angular/common": "^19.2.20",
-    "@angular/compiler": "^19.2.20",
-    "@angular/core": "^19.2.20",
-    "@angular/forms": "^19.2.20",
+    "@angular/common": "^19.2.25",
+    "@angular/compiler": "^19.2.25",
+    "@angular/core": "^19.2.25",
+    "@angular/forms": "^19.2.25",
     "@angular/material": "^19.2.16",
     "@angular/material-moment-adapter": "^19.2.16",
-    "@angular/platform-browser": "^19.2.20",
-    "@angular/platform-browser-dynamic": "^19.2.20",
-    "@angular/router": "^19.2.20",
-    "@mitre-attack/attack-data-model": "^5.0.0-beta.1",
+    "@mitre-attack/attack-data-model": "^5.0.0-beta.3",
+    "@angular/platform-browser": "^19.2.25",
+    "@angular/platform-browser-dynamic": "^19.2.25",
+    "@angular/router": "^19.2.25",
     "@ng-matero/extensions": "^19.5.1",
     "diff-match-patch-ts": "^0.8.0",
     "lodash": "^4.17.21",
@@ -68,12 +68,12 @@
   "devDependencies": {
     "@analogjs/vite-plugin-angular": "^1.22.1",
     "@analogjs/vitest-angular": "^1.22.1",
-    "@angular-devkit/build-angular": "^19.2.23",
-    "@angular/cli": "^19.2.23",
-    "@angular/compiler-cli": "^19.2.20",
-    "@codedependant/semantic-release-docker": "^5.1.1",
-    "@commitlint/config-conventional": "^20.5.0",
     "@eslint/js": "^9.39.1",
+    "@angular-devkit/build-angular": "^19.2.27",
+    "@angular/cli": "^19.2.27",
+    "@angular/compiler-cli": "^19.2.25",
+    "@codedependant/semantic-release-docker": "^5.1.1",
+    "@commitlint/config-conventional": "^20.5.3",
     "@types/jasmine": "^6.0.0",
     "@types/jasminewd2": "^2.0.10",
     "@types/node": "^20.19.37",

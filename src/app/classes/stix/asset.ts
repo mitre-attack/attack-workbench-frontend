@@ -80,11 +80,9 @@ export class Asset extends StixObject {
   }
 
   public isRelatedAssetArray(arr: any[]): boolean {
-    return arr.every(a => this.instanceOfRelatedAsset(a));
-  }
-
-  public instanceOfRelatedAsset(object: any): boolean {
-    return 'name' in object && 'related_asset_sectors' in object;
+    return (
+      Array.isArray(arr) && arr.every(a => typeof a === 'object' && 'name' in a)
+    );
   }
 
   /**
@@ -194,6 +192,24 @@ export class Asset extends StixObject {
       },
     });
     return putObservable;
+  }
+
+  /**
+   * Revoke the STIX object in the database.
+   * @param restAPIService [RestApiConnectorService] the service to perform the revoke through
+   * @param revokingObject the revoking object payload
+   * @returns {Observable} of the revoke
+   */
+  public revoke(
+    restAPIService: RestApiConnectorService,
+    revokingObject: { revoking: { stixId: string; modified: string } },
+    preserveRelationships = false
+  ): Observable<object> {
+    return restAPIService.revokeAsset(
+      this.stixID,
+      revokingObject,
+      preserveRelationships
+    );
   }
 }
 

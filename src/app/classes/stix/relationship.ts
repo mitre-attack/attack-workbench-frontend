@@ -488,7 +488,7 @@ export class Relationship extends StixObject {
     restAPIService: RestApiConnectorService,
     tempWorkflowState?: WorkflowStatusType
   ): Observable<ValidationData> {
-    return this.base_validate(restAPIService, tempWorkflowState).pipe(
+    return this.base_validate(restAPIService).pipe(
       map(result => {
         // presence of source-ref
         if (!this.source_ref) {

@@ -22,16 +22,14 @@ export interface Composition {
   };
 }
 
-export interface DeduplicationReport {
-  total_objects_before?: number;
-  total_objects_after?: number;
-  duplicates_found?: number;
-  conflicts_resolved?: any[];
-}
-
 export interface CompositionResolution {
   resolved_at?: Date;
   component_snapshots?: ComponentSnapshotResolution[];
-  deduplication?: DeduplicationReport;
+  deduplication?: {
+    total_objects_before?: number;
+    total_objects_after?: number;
+    duplicates_found?: number;
+    conflicts_resolved?: any[];
+  };
   summary?: any;
 }

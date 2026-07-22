@@ -4,7 +4,7 @@ Thanks for contributing to `attack-workbench-frontend`!
 
 You are welcome to comment on issues, open new issues, and open pull requests.
 
-Pull requests should target the **develop** branch of the repository. If your pull request is reliant on changes to the [REST API](https://github.com/center-for-threat-informed-defense/attack-workbench-rest-api), please make sure to document this in your pull request and link to the corresponding REST API pull request.
+Pull requests should target the **develop** branch of the repository. If your pull request is reliant on changes to the [REST API](https://github.com/mitre-attack/attack-workbench-rest-api), please make sure to document this in your pull request and link to the corresponding REST API pull request.
 
 Also, if you contribute any source code, we need you to agree to the following Developer's Certificate of Origin below.
 

@@ -18,50 +18,50 @@
   </mat-card-header>
 
   <mat-card-content *ngIf="showDescription">
-    <p class="object-description">
-      {{ description }}
-    </p>
+    <markdown class="object-description" [data]="description"></markdown>
   </mat-card-content>
 
   <mat-card-actions>
-    <div class="object-actions">
-      <button
-        class="view-button"
-        mat-stroked-button
-        type="button"
-        (click)="onView()">
-        <mat-icon>open_in_browser</mat-icon>
-        View
-      </button>
-      <button
-        *ngIf="showDiff"
-        mat-stroked-button
-        type="button"
-        (click)="onDiff()">
-        <mat-icon>difference</mat-icon>
-        Diff
-      </button>
+    <div class="object-meta" *ngIf="showModifiedMeta">
+      <app-user-avatar
+        class="object-avatar"
+        [name]="modifiedByName"
+        [size]="20"
+        [matTooltip]="modifiedByName"
+        matTooltipPosition="below"></app-user-avatar>
+      <span class="object-modified">
+        <strong
+          *ngIf="modified; else unknownModified"
+          [matTooltip]="modifiedTimestamp">
+          {{ modifiedHumanized }}
+        </strong>
+        <ng-template #unknownModified>
+          <strong>Unknown</strong>
+        </ng-template>
+      </span>
     </div>
 
     <div class="object-footer-right">
-      <ng-content select="[card-footer-action]"></ng-content>
+      <div class="object-actions">
+        <button
+          class="view-button"
+          mat-stroked-button
+          type="button"
+          (click)="onView()">
+          <mat-icon>open_in_browser</mat-icon>
+          View
+        </button>
 
-      <div class="object-meta" *ngIf="showModifiedMeta">
-        <app-user-avatar
-          class="object-avatar"
-          [name]="modifiedByName"
-          [size]="20"
-          [matTooltip]="modifiedByName"
-          matTooltipPosition="below"></app-user-avatar>
-        <span class="object-modified">
-          Modified
-          <strong *ngIf="modified; else unknownModified">
-            {{ modified | date: 'M/d/yy' }}
-          </strong>
-          <ng-template #unknownModified>
-            <strong>Unknown</strong>
-          </ng-template>
-        </span>
+        <ng-content select="[card-footer-action]"></ng-content>
+
+        <button
+          *ngIf="showDiff"
+          mat-stroked-button
+          type="button"
+          (click)="onDiff()">
+          <mat-icon>difference</mat-icon>
+          Diff
+        </button>
       </div>
     </div>
   </mat-card-actions>

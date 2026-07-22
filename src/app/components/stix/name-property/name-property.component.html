@@ -8,8 +8,40 @@
         >:&nbsp;
       </span>
       {{ config.object[field] }}
-      <app-icon-view
-        [config]="{ object: config.object, field: 'workflow' }"></app-icon-view>
+      <mat-form-field
+        *ngIf="showWorkflowControl"
+        class="workflow-select"
+        appearance="outline">
+        <mat-select
+          [formControl]="statusControl"
+          [aria-label]="'workflow status'"
+          [panelClass]="'workflow-select-panel'">
+          <mat-select-trigger>
+            <mat-icon
+              class="workflow-status-icon"
+              [class]="workflowColor(statusControl.value)"
+              [matTooltip]="statusControl.value?.replaceAll('-', ' ')"
+              matTooltipPosition="below">
+              {{ workflowIcon(statusControl.value) }}
+            </mat-icon>
+          </mat-select-trigger>
+          <mat-option
+            *ngFor="let workflow of workflows"
+            (onSelectionChange)="workflowChange($event)"
+            [value]="workflow[0]"
+            [attr.aria-label]="workflow[1]">
+            <div class="workflow-option">
+              <mat-icon
+                class="workflow-status-icon"
+                [class]="workflowColor(workflow[0])"
+                [matTooltip]="workflow[1]"
+                matTooltipPosition="right">
+                {{ workflowIcon(workflow[0]) }}
+              </mat-icon>
+            </div>
+          </mat-option>
+        </mat-select>
+      </mat-form-field>
     </h1>
     <h3 class="status">
       <span class="error-text" *ngIf="config.object['deprecated']"
