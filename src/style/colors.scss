@@ -146,6 +146,40 @@ $colors: (
   // @return rgba(invert(color($name)), 0.125);
 }
 
+@mixin theme-property($property, $dark-value, $light-value) {
+  .dark & {
+    #{$property}: $dark-value;
+  }
+
+  .light & {
+    #{$property}: $light-value;
+  }
+}
+
+@mixin theme-border-color {
+  @include theme-property(
+    border-color,
+    border-color(dark),
+    border-color(light)
+  );
+}
+
+@mixin theme-text-emphasis {
+  @include theme-property(
+    color,
+    on-color-emphasis(dark),
+    on-color-emphasis(light)
+  );
+}
+
+@mixin theme-text-deemphasis {
+  @include theme-property(
+    color,
+    on-color-deemphasis(dark),
+    on-color-deemphasis(light)
+  );
+}
+
 // escape the color. Note param is a color and not a color name: this is not an accessor to the color map above.
 // replaces # with %23 in hex colors
 // see https://codepen.io/gunnarbittersmann/pen/BoovjR for explanation of why we have to escape # for the background image
