@@ -9,13 +9,21 @@ import { MatDialogRef, MAT_DIALOG_DATA } from '@angular/material/dialog';
   standalone: false,
 })
 export class DeleteDialogComponent {
-  private deleteConfirmation = 'DELETE';
   public confirmInput: string;
+  public get title(): string {
+    return this.config?.title || 'Are you sure you want to delete this object?';
+  }
+  public get warning(): string {
+    return this.config?.warning || '';
+  }
+  public get confirmationText(): string {
+    return this.config?.stixId || this.config?.stixID || 'DELETE';
+  }
   public get hardDelete(): boolean {
     return this.config && this.config.hardDelete;
   }
   public get invalid(): boolean {
-    return this.confirmInput != this.deleteConfirmation;
+    return this.confirmInput != this.confirmationText;
   }
   public get collectionDelete(): boolean {
     return this.config && this.config.collectionDelete;
