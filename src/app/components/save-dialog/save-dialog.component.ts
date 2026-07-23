@@ -1,7 +1,7 @@
 import { Component, Inject, OnInit, ViewEncapsulation } from '@angular/core';
 import { MatDialogRef, MAT_DIALOG_DATA } from '@angular/material/dialog';
 import { forkJoin, Observable, of } from 'rxjs';
-import { catchError, concatMap, map, switchMap } from 'rxjs/operators';
+import { catchError, map, switchMap } from 'rxjs/operators';
 import { SnapshotTier } from 'src/app/classes/release-tracks';
 import type {
   ReleaseTrackObjectTier,
@@ -559,31 +559,12 @@ export class SaveDialogComponent implements OnInit {
 
   private syncTrack(row: TrackRow): Observable<unknown> {
     if (!row.trackId) return of(null);
-    if (!row.enrolled) return this.addCandidateToTrack(row);
-    if (row.status === this.resetWorkflowStatus) return of(null);
-    if (row.tier === SnapshotTier.Staged) {
-      return this.releaseTracksService
-        .demoteStaged(row.trackId, [row.objectRef])
-        .pipe(
-          concatMap(() =>
-            this.releaseTracksService.reviewCandidates(row.trackId, {
-              from: row.status,
-              to: this.resetWorkflowStatus,
-              object_refs: [row.objectRef],
-            })
-          )
-        );
-    }
-    return this.releaseTracksService.reviewCandidates(row.trackId, {
-      from: row.status,
-      to: this.resetWorkflowStatus,
-      object_refs: [row.objectRef],
-    });
+    return this.addCandidateToTrack(row);
   }
 
   private addCandidateToTrack(row: TrackRow): Observable<unknown> {
     return this.releaseTracksService.addCandidates(row.trackId, [
-      row.objectRef,
+      this.config.object.stixID,
     ]);
   }
 
