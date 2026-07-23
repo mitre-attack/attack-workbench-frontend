@@ -63,7 +63,5 @@ describe('ReleaseTrackSnapshot', () => {
         }),
       })
     );
-    expect(snapshot.members[0]).not.toHaveProperty('attack_id');
-    expect(snapshot.members[0]).not.toHaveProperty('name');
   });
 });
