@@ -32,4 +32,8 @@ describe('ResourcesDrawerComponent', () => {
   it('should create', () => {
     expect(component).toBeTruthy();
   });
+
+  it('should include notes as a sidebar tab', () => {
+    expect(component.tabs.some(tab => tab.name === 'notes')).toBe(true);
+  });
 });

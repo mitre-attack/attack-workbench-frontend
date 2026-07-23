@@ -14,11 +14,18 @@ import {
 describe('NotesEditorComponent', () => {
   let component: NotesEditorComponent;
   let fixture: ComponentFixture<NotesEditorComponent>;
+  let mockRestApiConnector: any;
+  let mockRouter: any;
 
   beforeEach(async () => {
-    const mockRestApiConnector = createMockRestApiConnector({
-      getAllNotes: () => createAsyncObservable(createPaginatedResponse()),
+    mockRestApiConnector = createMockRestApiConnector({
+      getAllNotes: vi.fn(() =>
+        createAsyncObservable(createPaginatedResponse())
+      ),
     });
+    mockRouter = {
+      url: '/test/mock-id?param=value',
+    };
 
     await TestBed.configureTestingModule({
       declarations: [NotesEditorComponent],
@@ -26,9 +33,7 @@ describe('NotesEditorComponent', () => {
         provideHttpClient(),
         {
           provide: Router,
-          useValue: {
-            url: '/test/mock-id?param=value',
-          },
+          useValue: mockRouter,
         },
         { provide: RestApiConnectorService, useValue: mockRestApiConnector },
       ],
@@ -44,5 +49,17 @@ describe('NotesEditorComponent', () => {
 
   it('should create', () => {
     expect(component).toBeTruthy();
+  });
+
+  it('should not load notes when there is no object STIX ID in the URL', () => {
+    mockRouter.url = '/dashboard/release-management';
+    mockRestApiConnector.getAllNotes.mockClear();
+
+    const dashboardFixture = TestBed.createComponent(NotesEditorComponent);
+    const dashboardComponent = dashboardFixture.componentInstance;
+    dashboardFixture.detectChanges();
+
+    expect(dashboardComponent.objectStixID).toBe('');
+    expect(mockRestApiConnector.getAllNotes).not.toHaveBeenCalled();
   });
 });

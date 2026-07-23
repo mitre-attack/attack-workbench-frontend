@@ -44,7 +44,7 @@ export class NotesEditorComponent implements OnInit, AfterViewInit {
   ) {}
 
   ngOnInit(): void {
-    this.objectStixID = this.router.url.split('/')[2].split('?')[0];
+    this.objectStixID = this.getObjectStixID();
     this.selected = new FormControl('date-descending');
     this.parseNotes();
   }
@@ -66,6 +66,12 @@ export class NotesEditorComponent implements OnInit, AfterViewInit {
   /** Retrieve objects from backend */
   private parseNotes(): void {
     this.loading = true;
+    if (!this.objectStixID) {
+      this.notes = [];
+      this.loading = false;
+      return;
+    }
+
     const query = this.search
       ? this.search.nativeElement.value.toLowerCase()
       : '';
@@ -101,6 +107,13 @@ export class NotesEditorComponent implements OnInit, AfterViewInit {
         subscription.unsubscribe();
       },
     });
+  }
+
+  private getObjectStixID(): string {
+    const [path] = this.router.url.split('?');
+    const segments = path.split('/').filter(Boolean);
+    if (segments[0] === 'dashboard') return '';
+    return segments[1] || '';
   }
 
   /** Limit editing to one note at a time */

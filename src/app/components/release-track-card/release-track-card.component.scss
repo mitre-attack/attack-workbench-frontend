@@ -1,25 +1,96 @@
+@use 'sass:color';
 @use '../../../style/colors';
+
+$virtual-light: #5c4fa3;
+$virtual-dark: #c7b9ff;
+$candidate-dark: colors.color(mitre-light-blue);
+$staged-dark: color.mix(white, colors.color(success), 28%);
 
 .list-card {
   cursor: pointer;
-  background: #ffffff;
   width: 22rem;
   height: 18rem;
   box-sizing: border-box;
+  color: colors.on-color-emphasis(light);
 }
 
 .card-top {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
+  gap: 12px;
+  min-height: 3.5rem;
   margin-bottom: 8px;
+}
+
+.subheading {
+  display: -webkit-box;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.release-track-type-chip {
+  flex: none;
+}
+
+.release-track-type-chip.mat-mdc-standard-chip {
+  font-size: 12px;
+  font-weight: 700;
+  min-height: 24px;
+
+  &.standard-chip {
+    --mdc-chip-elevated-container-color: #{rgba(colors.color(secondary), 0.16)};
+    --mdc-chip-label-text-color: #{colors.color(secondary)};
+  }
+
+  &.virtual-chip {
+    --mdc-chip-elevated-container-color: #{rgba($virtual-light, 0.16)};
+    --mdc-chip-label-text-color: #{$virtual-light};
+  }
+}
+
+:host ::ng-deep .release-track-type-chip.mat-mdc-standard-chip {
+  background: var(--mdc-chip-elevated-container-color) !important;
+  color: var(--mdc-chip-label-text-color) !important;
+
+  .mdc-evolution-chip__action--primary {
+    border: 1px solid transparent;
+    border-radius: 999px;
+    background: var(--mdc-chip-elevated-container-color);
+  }
+
+  .mat-mdc-chip-action-label,
+  .mdc-evolution-chip__text-label {
+    color: inherit !important;
+  }
+
+  &.standard-chip .mdc-evolution-chip__action--primary {
+    border-color: rgba(colors.color(secondary), 0.38);
+  }
+
+  &.virtual-chip .mdc-evolution-chip__action--primary {
+    border-color: rgba($virtual-light, 0.38);
+  }
 }
 
 .card-body {
   display: flex;
   flex-direction: column;
-  height: 100%;
-  flex: 1; /* push the footer to the bottom */
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.card-desc {
+  display: -webkit-box;
+  flex: 0 1 auto;
+  margin-bottom: 12px;
+  overflow: hidden;
+  line-height: 1.25;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 4;
 }
 
 .card-middle {
@@ -40,7 +111,7 @@
   min-height: 3.25rem;
   padding: 12px 16px;
   box-sizing: border-box;
-  background: rgba(0, 0, 0, 0.06);
+  background: colors.color-alternate(light);
   border-radius: 8px;
 }
 
@@ -61,26 +132,27 @@
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  border: 1px solid rgba(0, 0, 0, 0.25);
+  background: colors.color(light);
+  border: 1px solid colors.border-color(light);
+  color: colors.on-color-emphasis(light);
+  overflow: hidden;
+  transition:
+    background-color 120ms ease,
+    border-color 120ms ease,
+    color 120ms ease;
 
   &:hover {
-    border: 1px solid colors.color(secondary);
+    border-color: colors.color(secondary);
+
     .subheading {
       color: colors.color(secondary);
     }
   }
 
-  .light & {
-    background: colors.color(light);
-  }
-
-  .dark & {
-    background: colors.color(dark);
-  }
-
   .stat-label {
     font-size: 11px;
-    color: colors.on-color-deemphasis(dark);
+    color: colors.on-color-deemphasis(light);
+    line-height: 13px;
     text-transform: uppercase;
     letter-spacing: 0.06em;
     margin-bottom: 6px;
@@ -101,12 +173,77 @@
 
   .card-sep {
     margin: 12px 0;
+    border-top-color: colors.border-color(light);
   }
 
   .card-footer {
     display: flex;
     justify-content: space-between;
-    color: colors.on-color-deemphasis(dark);
+    color: colors.on-color-deemphasis(light);
     font-size: 13px;
+  }
+}
+
+:host-context(.dark) {
+  .list-card {
+    color: colors.on-color-emphasis(dark);
+  }
+
+  .release-track-type-chip.mat-mdc-standard-chip {
+    &.standard-chip {
+      --mdc-chip-elevated-container-color: #{rgba($candidate-dark, 0.18)};
+      --mdc-chip-label-text-color: #{$candidate-dark};
+    }
+
+    &.virtual-chip {
+      --mdc-chip-elevated-container-color: #{rgba($virtual-dark, 0.18)};
+      --mdc-chip-label-text-color: #{$virtual-dark};
+    }
+  }
+
+  ::ng-deep .release-track-type-chip.mat-mdc-standard-chip {
+    &.standard-chip .mdc-evolution-chip__action--primary {
+      border-color: rgba($candidate-dark, 0.44);
+    }
+
+    &.virtual-chip .mdc-evolution-chip__action--primary {
+      border-color: rgba($virtual-dark, 0.44);
+    }
+  }
+
+  .card-stats {
+    background: colors.color-alternate(dark);
+  }
+
+  .card-standard,
+  .card-virtual {
+    background: colors.color(dark);
+    border-color: colors.border-color(dark);
+    color: colors.on-color-emphasis(dark);
+
+    &:hover {
+      border-color: colors.color(mitre-light-blue);
+
+      .subheading {
+        color: colors.color(mitre-light-blue);
+      }
+    }
+
+    .stat-label,
+    .card-footer {
+      color: colors.on-color-deemphasis(dark);
+    }
+
+    .candidates-stat-value {
+      color: $candidate-dark;
+    }
+
+    .staged-stat-value {
+      color: $staged-dark;
+    }
+
+    .card-sep {
+      border-top-color: colors.border-color(dark);
+    }
   }
 }

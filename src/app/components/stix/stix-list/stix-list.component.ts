@@ -1012,7 +1012,7 @@ export class StixListComponent implements OnInit, AfterViewInit, OnDestroy {
     //filter by domains
     if (Array.isArray(domains) && domains.length > 0) {
       filtered = filtered.filter((obj: any) =>
-        obj.domains.some((object_domain: any) =>
+        this.getArrayField(obj, 'domains').some((object_domain: any) =>
           domains.includes(object_domain)
         )
       );
@@ -1021,7 +1021,7 @@ export class StixListComponent implements OnInit, AfterViewInit, OnDestroy {
     //filter by platforms
     if (Array.isArray(platforms) && platforms.length > 0) {
       filtered = filtered.filter((obj: any) =>
-        obj.platforms.some((object_platform: any) =>
+        this.getArrayField(obj, 'platforms').some((object_platform: any) =>
           platforms.includes(object_platform)
         )
       );
@@ -1065,6 +1065,11 @@ export class StixListComponent implements OnInit, AfterViewInit, OnDestroy {
     // filter to objects matching searchString
     filtered = this.filterObjects(this.searchQuery, filtered);
     return filtered;
+  }
+
+  private getArrayField(object: any, field: string): any[] {
+    const value = object?.[field];
+    return Array.isArray(value) ? value : [];
   }
 
   private sortObjects(objects: StixObject[]): StixObject[] {
