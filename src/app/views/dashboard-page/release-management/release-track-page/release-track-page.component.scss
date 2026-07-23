@@ -728,16 +728,16 @@ $released-members-disabled-dark: colors.on-color-deemphasis(dark);
     }
 
     td {
-      border-top: 1px solid;
+      border-top: 1px solid rgba(colors.on-color(light), 0.06);
       font-size: 14px;
       line-height: 20px;
 
       .dark & {
-        border-color: colors.border-color(dark);
+        border-color: rgba(colors.on-color(dark), 0.1);
       }
 
       .light & {
-        border-color: colors.border-color(light);
+        border-color: rgba(colors.on-color(light), 0.06);
       }
 
       strong,
