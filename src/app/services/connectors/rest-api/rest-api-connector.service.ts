@@ -69,6 +69,20 @@ export interface Namespace {
   range_start: string;
 }
 
+export interface ValidationBypassRule {
+  _id?: string;
+  id?: string;
+  fieldPath: string[];
+  errorCode: string;
+  stixType: string;
+  suppressError: boolean;
+  autoCreated?: boolean;
+  autoCreatedReason?: string | null;
+  triggerEvent?: string | null;
+  warningMessage?: string | null;
+  __v?: number;
+}
+
 @Injectable({
   providedIn: 'root',
 })
@@ -2582,6 +2596,94 @@ export class RestApiConnectorService extends ApiConnector {
         }),
         catchError(this.handleError_raise<any>()),
         share() // multicast so that multiple subscribers don't trigger the call twice. THIS MUST BE THE LAST LINE OF THE PIPE
+      );
+  }
+
+  /**
+   * Get all ADM validation bypass rules.
+   * @returns {Observable<ValidationBypassRule[]>} validation bypass rules
+   */
+  public getValidationBypassRules(): Observable<ValidationBypassRule[]> {
+    return this.http
+      .get<ValidationBypassRule[]>(`${this.apiUrl}/config/validation-bypasses`)
+      .pipe(
+        tap(() => logger.log('retrieved validation bypass rules')),
+        catchError(this.handleError_continue<ValidationBypassRule[]>([])),
+        share()
+      );
+  }
+
+  /**
+   * Get one ADM validation bypass rule.
+   * @param id validation bypass rule id
+   * @returns {Observable<ValidationBypassRule>} validation bypass rule
+   */
+  public getValidationBypassRule(id: string): Observable<ValidationBypassRule> {
+    return this.http
+      .get<ValidationBypassRule>(
+        `${this.apiUrl}/config/validation-bypasses/${id}`
+      )
+      .pipe(
+        tap(() => logger.log('retrieved validation bypass rule')),
+        catchError(this.handleError_continue<ValidationBypassRule>()),
+        share()
+      );
+  }
+
+  /**
+   * Create an ADM validation bypass rule.
+   * @param rule validation bypass rule to create
+   * @returns {Observable<ValidationBypassRule>} created validation bypass rule
+   */
+  public postValidationBypassRule(
+    rule: ValidationBypassRule
+  ): Observable<ValidationBypassRule> {
+    return this.http
+      .post<ValidationBypassRule>(
+        `${this.apiUrl}/config/validation-bypasses`,
+        rule
+      )
+      .pipe(
+        tap(this.handleSuccess('validation bypass rule saved')),
+        catchError(this.handleError_raise<ValidationBypassRule>()),
+        share()
+      );
+  }
+
+  /**
+   * Update an ADM validation bypass rule.
+   * @param id validation bypass rule id
+   * @param rule validation bypass rule updates
+   * @returns {Observable<ValidationBypassRule>} updated validation bypass rule
+   */
+  public putValidationBypassRule(
+    id: string,
+    rule: ValidationBypassRule
+  ): Observable<ValidationBypassRule> {
+    return this.http
+      .put<ValidationBypassRule>(
+        `${this.apiUrl}/config/validation-bypasses/${id}`,
+        rule
+      )
+      .pipe(
+        tap(this.handleSuccess('validation bypass rule saved')),
+        catchError(this.handleError_raise<ValidationBypassRule>()),
+        share()
+      );
+  }
+
+  /**
+   * Delete an ADM validation bypass rule.
+   * @param id validation bypass rule id
+   * @returns {Observable<object>} observable of the response body
+   */
+  public deleteValidationBypassRule(id: string): Observable<object> {
+    return this.http
+      .delete<object>(`${this.apiUrl}/config/validation-bypasses/${id}`)
+      .pipe(
+        tap(this.handleSuccess('validation bypass rule deleted')),
+        catchError(this.handleError_raise<object>()),
+        share()
       );
   }
 
