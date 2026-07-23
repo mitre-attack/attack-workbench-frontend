@@ -214,7 +214,7 @@ describe('SaveDialogComponent', () => {
     expect(component.validationStatus).toBe('success');
   });
 
-  it('should sync existing and newly enrolled release tracks on save', async () => {
+  it('should add the saved object as a WIP candidate without reviewing tracks', async () => {
     await new Promise(resolve => setTimeout(resolve, 10));
 
     const newTrack = component.enrollmentOptions[0];
@@ -224,18 +224,11 @@ describe('SaveDialogComponent', () => {
     component.onConfirmSave();
     await new Promise(resolve => setTimeout(resolve, 10));
 
-    expect(mockReleaseTracksService.reviewCandidates).toHaveBeenCalledWith(
+    expect(mockReleaseTracksService.reviewCandidates).not.toHaveBeenCalled();
+    expect(mockReleaseTracksService.demoteStaged).not.toHaveBeenCalled();
+    expect(mockReleaseTracksService.addCandidates).toHaveBeenCalledWith(
       'release-track--core',
-      {
-        from: WorkflowStatus.AwaitingReview,
-        to: WorkflowStatus.WorkInProgress,
-        object_refs: [
-          {
-            id: 'attack-pattern--123',
-            modified: '2026-01-01T00:00:00.000Z',
-          },
-        ],
-      }
+      ['attack-pattern--123']
     );
     expect(mockReleaseTracksService.addCandidates).toHaveBeenCalledWith(
       'release-track--groups',

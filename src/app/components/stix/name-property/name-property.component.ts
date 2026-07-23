@@ -2,7 +2,9 @@ import {
   Component,
   ElementRef,
   Input,
+  OnChanges,
   OnInit,
+  SimpleChanges,
   ViewChild,
   ViewEncapsulation,
 } from '@angular/core';
@@ -42,7 +44,7 @@ import { logger } from 'src/app/utils/logger';
   encapsulation: ViewEncapsulation.None,
   standalone: false,
 })
-export class NamePropertyComponent implements OnInit {
+export class NamePropertyComponent implements OnChanges, OnInit {
   @Input() public config: NamePropertyConfig;
   @ViewChild('workflowTriggerButton')
   private workflowTriggerButton?: ElementRef<HTMLElement>;
@@ -51,6 +53,7 @@ export class NamePropertyComponent implements OnInit {
   public statusControl: FormControl<WorkflowStatus | null>;
   public trackStatuses: ReleaseTrackStatus[] = [];
   public loadingTracks = false;
+  private trackStatusLoadKey: string | null = null;
   public statusActions: WorkflowStatusAction[] = WORKFLOW_STATUS_OPTIONS.map(
     option => ({
       ...option,
@@ -109,13 +112,16 @@ export class NamePropertyComponent implements OnInit {
     public snackbar: MatSnackBar
   ) {}
 
+  ngOnChanges(changes: SimpleChanges): void {
+    if (!changes.config) return;
+    this.syncStatusControl();
+    this.loadTrackStatuses();
+  }
+
   ngOnInit(): void {
     const object = this.object;
-    this.statusControl = new FormControl(WorkflowStatus.WorkInProgress);
-    this.statusControl.setValue(
-      object?.workflow?.state || WorkflowStatus.WorkInProgress
-    );
-    if (this.showWorkflowControl) this.loadTrackStatuses();
+    this.syncStatusControl();
+    this.loadTrackStatuses();
     if (this.config.mode !== 'diff' && object.revoked) {
       // retrieve revoking object
       const data$ = this.restAPIService.getRelatedTo({
@@ -165,7 +171,7 @@ export class NamePropertyComponent implements OnInit {
     dialogRef.afterClosed().subscribe(result => {
       if (result) {
         this.statusControl.setValue(targetStatus);
-        this.loadTrackStatuses();
+        this.getTrackStatuses();
         this.editorService.onReload.emit();
       } else {
         this.statusControl.setValue(previousWorkflowState);
@@ -187,7 +193,54 @@ export class NamePropertyComponent implements OnInit {
     return WORKFLOW_STATUS_RANK[status] <= WORKFLOW_STATUS_RANK[row.status];
   }
 
+  private syncStatusControl(): void {
+    const state = this.object?.workflow?.state || WorkflowStatus.WorkInProgress;
+    if (!this.statusControl) {
+      this.statusControl = new FormControl(state);
+      return;
+    }
+    this.statusControl.setValue(state, { emitEvent: false });
+  }
+
   private loadTrackStatuses(): void {
+    if (!this.showWorkflowControl) {
+      this.trackStatuses = [];
+      this.trackStatusLoadKey = null;
+      return;
+    }
+
+    const loadKey = this.getTrackStatusLoadKey();
+    if (loadKey === this.trackStatusLoadKey) return;
+    this.trackStatusLoadKey = loadKey;
+    this.getTrackStatuses();
+  }
+
+  private getTrackStatusLoadKey(): string {
+    const object = this.object;
+    const releaseTracks = Array.isArray(object?.workspace?.release_tracks)
+      ? object.workspace.release_tracks
+      : [];
+    const trackKey = releaseTracks
+      .map(track => {
+        if (typeof track === 'string') return track;
+        return [
+          this.getTrackId(track),
+          this.getEntryWorkflowStatus(track),
+          this.getEntryTier(track),
+          this.toIsoString(track?.object_modified || track?.modified),
+        ].join(':');
+      })
+      .join('|');
+
+    return [
+      this.config?.mode || 'view',
+      object?.stixID || '',
+      this.toIsoString(object?.modified),
+      trackKey,
+    ].join('|');
+  }
+
+  private getTrackStatuses(): void {
     if (!this.object?.stixID) {
       this.trackStatuses = [];
       return;

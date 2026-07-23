@@ -27,6 +27,7 @@ describe('NamePropertyComponent', () => {
   let mockEditorService;
   let mockReleaseTracksService;
   let mockSnackbar;
+  let snapshotStatus;
 
   beforeEach(async () => {
     const mockRestApiConnector = createMockRestApiConnector({});
@@ -43,15 +44,16 @@ describe('NamePropertyComponent', () => {
     mockSnackbar = {
       open: vi.fn(),
     };
+    snapshotStatus = WorkflowStatus.WorkInProgress;
     mockReleaseTracksService = {
-      getLatestSnapshot: vi.fn().mockReturnValue(
+      getLatestSnapshot: vi.fn(() =>
         createAsyncObservable({
           name: 'Core Objects',
           description: 'Core workflow',
           candidates: [
             {
               object_ref: 'attack-pattern--123',
-              object_status: WorkflowStatus.WorkInProgress,
+              object_status: snapshotStatus,
             },
           ],
           staged: [],
@@ -212,6 +214,67 @@ describe('NamePropertyComponent', () => {
         status: WorkflowStatus.WorkInProgress,
       }),
     ]);
+  });
+
+  it('should refresh release track statuses when the saved object reloads', async () => {
+    const object = Object.create(StixObject.prototype);
+    object.stixID = 'attack-pattern--123';
+    object.attackType = 'technique';
+    object.modified = new Date('2026-01-01T00:00:00.000Z');
+    object.workflow = { state: WorkflowStatus.WorkInProgress };
+    object.workspace = {
+      release_tracks: [
+        {
+          track_id: 'release-track--core',
+          name: 'Core Objects',
+          object_ref: 'attack-pattern--123',
+          object_modified: '2026-01-01T00:00:00.000Z',
+          object_status: WorkflowStatus.WorkInProgress,
+        },
+      ],
+    };
+    component.config = {
+      mode: 'view',
+      object,
+    };
+    component.ngOnInit();
+    await new Promise(resolve => setTimeout(resolve, 10));
+
+    snapshotStatus = WorkflowStatus.AwaitingReview;
+    const updatedObject = Object.create(StixObject.prototype);
+    updatedObject.stixID = 'attack-pattern--123';
+    updatedObject.attackType = 'technique';
+    updatedObject.modified = new Date('2026-01-02T00:00:00.000Z');
+    updatedObject.workflow = { state: WorkflowStatus.WorkInProgress };
+    updatedObject.workspace = {
+      release_tracks: [
+        {
+          track_id: 'release-track--core',
+          name: 'Core Objects',
+          object_ref: 'attack-pattern--123',
+          object_modified: '2026-01-02T00:00:00.000Z',
+          object_status: WorkflowStatus.AwaitingReview,
+        },
+      ],
+    };
+    component.config = {
+      mode: 'view',
+      object: updatedObject,
+    };
+    component.ngOnChanges({
+      config: {
+        previousValue: { mode: 'view', object },
+        currentValue: component.config,
+        firstChange: false,
+        isFirstChange: () => false,
+      },
+    });
+    await new Promise(resolve => setTimeout(resolve, 10));
+
+    expect(mockReleaseTracksService.getLatestSnapshot).toHaveBeenCalledTimes(2);
+    expect(component.trackStatuses[0].status).toBe(
+      WorkflowStatus.AwaitingReview
+    );
   });
 
   it('should only allow forward workflow status changes from the menu', () => {
