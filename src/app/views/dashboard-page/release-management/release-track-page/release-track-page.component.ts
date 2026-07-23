@@ -606,9 +606,10 @@ export class ReleaseTrackPageComponent implements OnInit {
     });
   }
 
-  public getViewUrl(stixId: string): string {
-    const stixType = stixId.split('-')[0] as StixType;
-    return `/${StixTypeToAttackType[stixType]}/${stixId}`;
+  public getViewUrl(stixId: string): string | null {
+    const [stixType] = stixId.split('--');
+    const attackType = StixTypeToAttackType[stixType as StixType];
+    return attackType ? `/${attackType}/${stixId}` : null;
   }
 
   public promote(objectIds: string[]): void {
@@ -673,7 +674,12 @@ export class ReleaseTrackPageComponent implements OnInit {
   }
 
   public onView(id: string): void {
-    this.router.navigate([this.getViewUrl(id)]);
+    const viewUrl = this.getViewUrl(id);
+    if (!viewUrl) {
+      console.error('Unable to resolve object route', id);
+      return;
+    }
+    this.router.navigate([viewUrl]);
   }
 
   public onDiff(item: any): void {

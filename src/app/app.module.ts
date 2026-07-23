@@ -85,6 +85,7 @@ import { ToolbarComponent } from './components/toolbar/toolbar.component';
 import { UserAvatarComponent } from './components/user-avatar/user-avatar.component';
 import { ValidationResultsComponent } from './components/validation-results/validation-results.component';
 import { VersionPopoverComponent } from './components/version-popover/version-popover.component';
+import { WorkflowStatusDialogComponent } from './components/workflow-status-dialog/workflow-status-dialog.component';
 
 // STIX components
 import { StixListComponent } from './components/stix/stix-list/stix-list.component';
@@ -257,6 +258,7 @@ export function initConfig(appConfigService: AppConfigService) {
     MarkdownViewDialogComponent,
     CollectionImportSummaryComponent,
     SaveDialogComponent,
+    WorkflowStatusDialogComponent,
     AddDialogComponent,
     DeleteDialogComponent,
     HistoryTimelineComponent,

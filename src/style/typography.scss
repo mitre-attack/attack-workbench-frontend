@@ -2,6 +2,10 @@
 @use 'colors';
 @use 'fonts';
 
+$mono-font:
+  Roboto Mono,
+  monospace;
+
 .superheading {
   //super big display text
   font-size: 60px;

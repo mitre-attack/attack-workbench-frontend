@@ -65,6 +65,7 @@ export abstract class StixObject extends Serializable {
     state: WorkflowStatusType;
     created_by_user_account?: string;
   };
+  public workspace?: any;
 
   public deprecated = false; //is object deprecated?
   public revoked = false; //is object revoked?
@@ -356,6 +357,7 @@ export abstract class StixObject extends Serializable {
     if ('workspace' in raw) {
       // parse workspace fields
       const workspaceData = raw.workspace;
+      this.workspace = workspaceData;
       if ('workflow' in workspaceData && workspaceData.workflow !== undefined) {
         if (typeof workspaceData.workflow == 'object') {
           this.workflow = workspaceData.workflow;
