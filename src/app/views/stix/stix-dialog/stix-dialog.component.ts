@@ -210,6 +210,9 @@ export class StixDialogComponent implements OnInit {
       maxWidth: '35em',
       disableClose: true,
       autoFocus: false, // disables auto focus on the dialog form field
+      data: {
+        stixId: object.stixID,
+      },
     });
     const subscription = prompt.afterClosed().subscribe({
       next: confirm => {

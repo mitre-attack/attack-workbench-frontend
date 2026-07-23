@@ -1,16 +1,55 @@
 @use '../../../style/colors.scss';
 .delete-dialog {
   margin: 0 24px;
+
   .confirm-form {
+    font-size: 14px;
+    line-height: 20px;
+
     .mat-mdc-form-field {
       display: block;
+      width: 100%;
     }
   }
+
+  .confirm-instruction {
+    margin: 0 0 8px;
+  }
+
+  .confirmation-token {
+    background: transparent;
+    border: 0;
+    color: colors.color(secondary);
+    cursor: pointer;
+    display: inline-flex;
+    font: inherit;
+    gap: 4px;
+    max-width: 100%;
+    padding: 0 2px;
+    text-align: left;
+    vertical-align: baseline;
+    white-space: normal;
+
+    .confirmation-text {
+      overflow-wrap: anywhere;
+      user-select: all;
+      white-space: normal;
+    }
+
+    mat-icon {
+      font-size: 16px;
+      height: 16px;
+      width: 16px;
+    }
+  }
+
   .buttons {
     margin: 18px 0;
+
     button + button {
       margin-left: 10px;
     }
+
     .warn {
       color: colors.color(error);
     }

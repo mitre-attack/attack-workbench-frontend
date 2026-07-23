@@ -15,6 +15,8 @@ import { BreadcrumbService } from 'src/app/services/helpers/breadcrumb.service';
 import { RestApiConnectorService } from 'src/app/services/connectors/rest-api/rest-api-connector.service';
 import { MultipleChoiceDialogComponent } from 'src/app/components/multiple-choice-dialog/multiple-choice-dialog.component';
 import { AddDialogComponent } from 'src/app/components/add-dialog/add-dialog.component';
+import { DeleteDialogComponent } from 'src/app/components/delete-dialog/delete-dialog.component';
+import { AuthenticationService } from 'src/app/services/connectors/authentication/authentication.service';
 import { FormsModule, ReactiveFormsModule } from '@angular/forms';
 import {
   ConflictPolicy,
@@ -34,6 +36,7 @@ describe('ReleaseTrackPageComponent', () => {
   let mockDialog: any;
   let mockRestApiConnector: any;
   let mockRouter: any;
+  let mockAuthenticationService: any;
 
   beforeEach(async () => {
     mockReleaseTrackApiConnector = createMockReleaseTrackApiConnector({
@@ -53,6 +56,7 @@ describe('ReleaseTrackPageComponent', () => {
       reviewCandidates: vi.fn(() => createAsyncObservable({})),
       updateMetadataByLatest: vi.fn(() => createAsyncObservable({})),
       addCandidates: vi.fn(() => createAsyncObservable({})),
+      deleteReleaseTrack: vi.fn(() => createAsyncObservable({})),
     });
     mockDialog = {
       open: vi.fn(),
@@ -69,6 +73,9 @@ describe('ReleaseTrackPageComponent', () => {
     mockRouter = {
       navigate: vi.fn(),
     };
+    mockAuthenticationService = {
+      canEdit: vi.fn(() => true),
+    };
 
     await TestBed.configureTestingModule({
       declarations: [ReleaseTrackPageComponent],
@@ -81,6 +88,10 @@ describe('ReleaseTrackPageComponent', () => {
         {
           provide: RestApiConnectorService,
           useValue: mockRestApiConnector,
+        },
+        {
+          provide: AuthenticationService,
+          useValue: mockAuthenticationService,
         },
         {
           provide: MatDialog,
@@ -113,6 +124,61 @@ describe('ReleaseTrackPageComponent', () => {
 
   it('should create', () => {
     expect(component).toBeTruthy();
+  });
+
+  it('should delete the release track after confirmation', () => {
+    mockDialog.open.mockReturnValue({
+      afterClosed: () => of(true),
+    });
+    mockReleaseTrackApiConnector.deleteReleaseTrack.mockReturnValue(of({}));
+    component.id = 'release-track--123';
+    component.releaseTrack = { name: 'Enterprise Release' } as any;
+
+    component.onDeleteReleaseTrack();
+
+    expect(mockDialog.open).toHaveBeenCalledWith(
+      DeleteDialogComponent,
+      expect.objectContaining({
+        maxWidth: '35em',
+        disableClose: true,
+        autoFocus: false,
+        data: expect.objectContaining({
+          title: 'Are you sure you want to delete this release track?',
+          warning:
+            'Enterprise Release and its snapshots will be permanently deleted.',
+          stixId: 'release-track--123',
+        }),
+      })
+    );
+    expect(
+      mockReleaseTrackApiConnector.deleteReleaseTrack
+    ).toHaveBeenCalledWith('release-track--123');
+    expect(mockRouter.navigate).toHaveBeenCalledWith([
+      '/dashboard/release-management',
+    ]);
+  });
+
+  it('should not delete the release track when confirmation is cancelled', () => {
+    mockDialog.open.mockReturnValue({
+      afterClosed: () => of(false),
+    });
+    component.id = 'release-track--123';
+
+    component.onDeleteReleaseTrack();
+
+    expect(
+      mockReleaseTrackApiConnector.deleteReleaseTrack
+    ).not.toHaveBeenCalled();
+    expect(mockRouter.navigate).not.toHaveBeenCalled();
+  });
+
+  it('should not open the delete dialog without editor authorization', () => {
+    mockAuthenticationService.canEdit.mockReturnValue(false);
+    component.id = 'release-track--123';
+
+    component.onDeleteReleaseTrack();
+
+    expect(mockDialog.open).not.toHaveBeenCalled();
   });
 
   it('should download the release track in the selected export format', () => {

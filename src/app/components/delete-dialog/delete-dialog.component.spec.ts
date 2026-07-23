@@ -31,4 +31,19 @@ describe('DeleteDialogComponent', () => {
   it('should create', () => {
     expect(component).toBeTruthy();
   });
+
+  it('should default the confirmation text to DELETE', () => {
+    component.confirmInput = 'DELETE';
+
+    expect(component.confirmationText).toBe('DELETE');
+    expect(component.invalid).toBe(false);
+  });
+
+  it('should use a STIX ID as the confirmation text when provided', () => {
+    component.config = { stixId: 'attack-pattern--123' };
+    component.confirmInput = 'attack-pattern--123';
+
+    expect(component.confirmationText).toBe('attack-pattern--123');
+    expect(component.invalid).toBe(false);
+  });
 });

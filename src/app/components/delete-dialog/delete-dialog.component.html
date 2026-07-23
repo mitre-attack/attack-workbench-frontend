@@ -1,12 +1,24 @@
 <div class="delete-dialog">
-  <h2>Are you sure you want to delete this object?</h2>
+  <h2>{{ title }}</h2>
+  <h4 *ngIf="warning">{{ warning }}</h4>
   <h4 *ngIf="hardDelete">WARNING: This object will be permanently deleted.</h4>
   <h4 *ngIf="collectionDelete">
     WARNING: This will delete ALL objects associated with the collection. If an
     object is referenced in another collection, it will not be deleted.
   </h4>
   <div class="confirm-form">
-    <span>Please type <strong>DELETE</strong> to confirm.</span>
+    <p class="confirm-instruction">
+      Please enter
+      <button
+        type="button"
+        class="confirmation-token"
+        [cdkCopyToClipboard]="confirmationText"
+        [attr.aria-label]="'Copy ' + confirmationText">
+        <strong class="confirmation-text">{{ confirmationText }}</strong>
+        <mat-icon>content_copy</mat-icon>
+      </button>
+      to confirm.
+    </p>
     <mat-form-field appearance="outline">
       <input matInput required [(ngModel)]="confirmInput" />
     </mat-form-field>

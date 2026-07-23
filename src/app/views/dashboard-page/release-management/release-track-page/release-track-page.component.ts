@@ -29,8 +29,10 @@ import {
   StixObjectRef,
 } from 'src/app/classes/release-tracks';
 import { AddDialogComponent } from 'src/app/components/add-dialog/add-dialog.component';
+import { DeleteDialogComponent } from 'src/app/components/delete-dialog/delete-dialog.component';
 import { MultipleChoiceDialogComponent } from 'src/app/components/multiple-choice-dialog/multiple-choice-dialog.component';
 import { ReleaseTrackObjectItem } from 'src/app/components/release-track-object-card/release-track-object-card.component';
+import { AuthenticationService } from 'src/app/services/connectors/authentication/authentication.service';
 import { ReleaseTracksConnectorService } from 'src/app/services/connectors/rest-api/release-tracks.service';
 import { RestApiConnectorService } from 'src/app/services/connectors/rest-api/rest-api-connector.service';
 import { BreadcrumbService } from 'src/app/services/helpers/breadcrumb.service';
@@ -154,6 +156,7 @@ export class ReleaseTrackPageComponent implements OnInit {
   public isEditingDescription = false;
   public isSavingDescription = false;
   public isCreatingDraft = false;
+  public isDeleting = false;
   public isLoadingSnapshotHistory = false;
   public isReleasing = false;
   public isLoadingConfig = false;
@@ -194,6 +197,7 @@ export class ReleaseTrackPageComponent implements OnInit {
     private router: Router,
     private dialog: MatDialog,
     private restApiConnectorService: RestApiConnectorService,
+    private authenticationService: AuthenticationService,
     private fb: FormBuilder
   ) {
     this.configForm = this.fb.group({
@@ -458,6 +462,10 @@ export class ReleaseTrackPageComponent implements OnInit {
     return !!this.id && this.isVirtualReleaseTrack && !this.isCreatingDraft;
   }
 
+  public get canEditReleaseTrack(): boolean {
+    return this.authenticationService.canEdit();
+  }
+
   public getReleaseTrack(): void {
     this.connector
       .getLatestSnapshot(this.id, { include: 'all' })
@@ -494,6 +502,46 @@ export class ReleaseTrackPageComponent implements OnInit {
   private refreshReleaseTrackState(): void {
     this.getReleaseTrack();
     this.getSnapshotHistory();
+  }
+
+  public onDeleteReleaseTrack(): void {
+    if (!this.id || !this.canEditReleaseTrack || this.isDeleting) return;
+
+    const prompt = this.dialog.open(DeleteDialogComponent, {
+      maxWidth: '35em',
+      disableClose: true,
+      autoFocus: false,
+      data: {
+        title: 'Are you sure you want to delete this release track?',
+        warning: `${this.releaseTrackName || 'This release track'} and its snapshots will be permanently deleted.`,
+        stixId: this.id,
+      },
+    });
+
+    prompt
+      .afterClosed()
+      .pipe(take(1))
+      .subscribe(confirm => {
+        if (!confirm) return;
+
+        this.isDeleting = true;
+        this.connector
+          .deleteReleaseTrack(this.id)
+          .pipe(
+            take(1),
+            finalize(() => {
+              this.isDeleting = false;
+            })
+          )
+          .subscribe({
+            next: () => {
+              this.router.navigate(['/dashboard/release-management']);
+            },
+            error: err => {
+              console.error('Failed to delete release track', err);
+            },
+          });
+      });
   }
 
   public getSnapshotHistory(): void {

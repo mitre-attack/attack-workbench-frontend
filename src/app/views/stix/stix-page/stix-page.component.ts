@@ -143,6 +143,7 @@ export class StixPageComponent implements OnInit, OnDestroy {
       autoFocus: false,
       data: {
         collectionDelete: this.objectType == 'collection',
+        stixId: this.objects[0]?.stixID,
       },
     });
     const closeSubscription = prompt.afterClosed().subscribe({
