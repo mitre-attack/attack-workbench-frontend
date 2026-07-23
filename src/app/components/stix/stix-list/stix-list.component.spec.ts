@@ -83,4 +83,31 @@ describe('StixListComponent', () => {
       'modified',
     ]);
   });
+
+  it('should not show the workflow status column for STIX object lists', () => {
+    const types: StixListConfig['type'][] = [
+      'asset',
+      'campaign',
+      'data-component',
+      'data-source',
+      'detection-strategy',
+      'group',
+      'matrix',
+      'mitigation',
+      'software',
+      'tactic',
+      'technique',
+    ];
+
+    types.forEach(type => {
+      component.config = { type };
+      component.tableColumns = [];
+      component.tableColumns_settings = new Map<string, any>();
+
+      (component as any).buildTable();
+
+      expect(component.tableColumns).not.toContain('workflow');
+      expect(component.tableColumns).toContain('state');
+    });
+  });
 });

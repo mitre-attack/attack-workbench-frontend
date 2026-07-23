@@ -282,24 +282,24 @@ export class StixListComponent implements OnInit, AfterViewInit, OnDestroy {
         case 'mitigation':
         case 'tactic':
         case 'data-component':
-          this.addWorkflowAndStateColumns();
+          this.addStateColumnOnly();
           this.addIdAndNameColumns(sticky_allowed);
           this.addDomainColumn();
           this.addColumn('modified', 'modified', 'timestamp');
           break;
         case 'matrix':
-          this.addWorkflowAndStateColumns();
+          this.addStateColumnOnly();
           this.addNameColumn(sticky_allowed);
           this.addColumn('modified', 'modified', 'timestamp');
           break;
         case 'detection-strategy':
         case 'campaign':
-          this.addWorkflowAndStateColumns();
+          this.addStateColumnOnly();
           this.addIdAndNameColumns(sticky_allowed);
           this.addColumn('modified', 'modified', 'timestamp');
           break;
         case 'analytic':
-          this.addWorkflowAndStateColumns();
+          this.addStateColumnOnly();
           this.addColumn('ID', 'attackID', 'plain', false);
           this.addColumn(
             'related detection strategy',
@@ -314,13 +314,13 @@ export class StixListComponent implements OnInit, AfterViewInit, OnDestroy {
           this.addColumn('modified', 'modified', 'timestamp');
           break;
         case 'group':
-          this.addWorkflowAndStateColumns();
+          this.addStateColumnOnly();
           this.addIdAndNameColumns(sticky_allowed);
           this.addColumn('associated groups', 'aliases', 'list');
           this.addColumn('modified', 'modified', 'timestamp');
           break;
         case 'software':
-          this.addWorkflowAndStateColumns();
+          this.addStateColumnOnly();
           this.addIdAndNameColumns(sticky_allowed);
           this.addColumn('type', 'type', 'plain');
           this.addDomainColumn();
@@ -328,14 +328,14 @@ export class StixListComponent implements OnInit, AfterViewInit, OnDestroy {
           break;
         case 'data-source':
         case 'technique':
-          this.addWorkflowAndStateColumns();
+          this.addStateColumnOnly();
           this.addIdAndNameColumns(sticky_allowed);
           this.addDomainColumn();
           this.addPlatformsColumn();
           this.addColumn('modified', 'modified', 'timestamp');
           break;
         case 'asset':
-          this.addWorkflowAndStateColumns();
+          this.addStateColumnOnly();
           this.addIdAndNameColumns(sticky_allowed);
           this.addPlatformsColumn();
           this.addColumn('sectors', 'sectors', 'list');
@@ -419,11 +419,6 @@ export class StixListComponent implements OnInit, AfterViewInit, OnDestroy {
       this.addIdAndNameColumns(true);
       this.addColumn('modified', 'modified', 'timestamp');
     }
-  }
-
-  private addWorkflowAndStateColumns(): void {
-    this.addColumn('', 'workflow', 'icon');
-    this.addColumn('', 'state', 'icon');
   }
 
   private addStateColumnOnly(): void {
