@@ -26,12 +26,20 @@
   .app-content {
     display: flex;
     flex-direction: column;
-    .router-padding {
-      flex: 1;
-      box-sizing: border-box;
-      padding: 24px;
-      overflow: auto;
-    }
+  }
+  .page-body {
+    flex: 1;
+    min-height: 0;
+  }
+  .page-content {
+    display: flex;
+    min-height: 0;
+  }
+  .router-padding {
+    flex: 1;
+    box-sizing: border-box;
+    padding: 24px;
+    overflow: auto;
   }
   mat-drawer {
     border-left: none !important;

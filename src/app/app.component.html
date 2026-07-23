@@ -31,15 +31,23 @@
             <mat-icon>close</mat-icon>
           </button>
         </div>
-        <div class="router-padding main-body" #scrollRef>
-          <router-outlet></router-outlet>
-        </div>
+        <mat-drawer-container class="page-body">
+          <mat-drawer-content class="page-content">
+            <div class="router-padding main-body" #scrollRef>
+              <router-outlet></router-outlet>
+            </div>
+          </mat-drawer-content>
+          <mat-drawer
+            mode="side"
+            position="end"
+            #sidebar
+            [opened]="sidebarOpened">
+            <div class="app-drawer">
+              <app-resources-drawer></app-resources-drawer>
+            </div>
+          </mat-drawer>
+        </mat-drawer-container>
       </div>
     </mat-drawer-content>
-    <mat-drawer mode="side" position="end" #sidebar [opened]="sidebarOpened">
-      <div class="app-drawer">
-        <app-resources-drawer></app-resources-drawer>
-      </div>
-    </mat-drawer>
   </mat-drawer-container>
 </div>
