@@ -7,7 +7,7 @@ import {
 } from '@angular/core';
 import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 import { Observable, of } from 'rxjs';
-import { catchError, concatMap, map, switchMap } from 'rxjs/operators';
+import { catchError, concatMap, map } from 'rxjs/operators';
 import { SnapshotTier } from 'src/app/classes/release-tracks';
 import type {
   ReleaseTrackObjectTier,
@@ -132,21 +132,20 @@ export class WorkflowStatusDialogComponent implements OnInit, OnDestroy {
     if (!this.saveEnabled) return;
 
     this.saving = true;
-    this.config.object.workflow = { state: this.config.targetStatus };
-    const subscription = this.config.object
-      .save(this.restApiService)
-      .pipe(switchMap(() => this.syncTrack()))
-      .subscribe({
-        next: () => {
-          this.saved = true;
-          this.dialogRef.close(true);
-        },
-        error: err => {
-          logger.error(err);
-          this.saving = false;
-        },
-        complete: () => subscription.unsubscribe(),
-      });
+    this.restorePreviousWorkflow();
+    const subscription = this.syncTrack().subscribe({
+      next: () => {
+        this.saved = true;
+        this.restorePreviousWorkflow();
+        this.dialogRef.close(true);
+      },
+      error: err => {
+        logger.error(err);
+        this.restorePreviousWorkflow();
+        this.saving = false;
+      },
+      complete: () => subscription.unsubscribe(),
+    });
   }
 
   private validateObject(): void {
@@ -158,12 +157,15 @@ export class WorkflowStatusDialogComponent implements OnInit, OnDestroy {
       .subscribe({
         next: result => {
           this.validation = result;
+          this.restorePreviousWorkflow();
         },
         error: err => {
           logger.error(err);
+          this.restorePreviousWorkflow();
           this.validating = false;
         },
         complete: () => {
+          this.restorePreviousWorkflow();
           this.validating = false;
         },
       });

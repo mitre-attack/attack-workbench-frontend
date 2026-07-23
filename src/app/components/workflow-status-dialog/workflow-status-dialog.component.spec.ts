@@ -161,16 +161,16 @@ describe('WorkflowStatusDialogComponent', () => {
     );
   });
 
-  it('should save the object and update the target release track', async () => {
+  it('should update the target release track without saving the object', async () => {
     await new Promise(resolve => setTimeout(resolve, 10));
 
     component.onConfirm();
     await new Promise(resolve => setTimeout(resolve, 10));
 
     expect(mockObject.workflow).toEqual({
-      state: WorkflowStatus.AwaitingReview,
+      state: WorkflowStatus.WorkInProgress,
     });
-    expect(mockObject.save).toHaveBeenCalled();
+    expect(mockObject.save).not.toHaveBeenCalled();
     expect(mockReleaseTracksService.reviewCandidates).toHaveBeenCalledWith(
       'release-track--core',
       {
@@ -189,10 +189,6 @@ describe('WorkflowStatusDialogComponent', () => {
 
   it('should restore the previous workflow status on cancel', async () => {
     await new Promise(resolve => setTimeout(resolve, 10));
-
-    expect(mockObject.workflow).toEqual({
-      state: WorkflowStatus.AwaitingReview,
-    });
 
     component.onCancel();
 
