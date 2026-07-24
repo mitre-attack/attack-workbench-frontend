@@ -374,6 +374,8 @@
             [config]="{
               type: 'relationship',
               targetRef: technique.stixID,
+              relationshipCreatedBefore: config.relationshipCreatedBefore,
+              relationshipAddedAfter: config.relationshipAddedAfter,
               relationshipType: 'subtechnique-of',
               allowEdits: true,
               clickBehavior: 'none',
@@ -396,6 +398,8 @@
               [config]="{
                 type: 'relationship',
                 targetRef: technique.parentTechnique.stixID,
+                relationshipCreatedBefore: config.relationshipCreatedBefore,
+                relationshipAddedAfter: config.relationshipAddedAfter,
                 relationshipType: 'subtechnique-of',
                 clickBehavior: 'none',
                 allowEdits: true,
@@ -432,6 +436,8 @@
           [config]="{
             type: 'relationship',
             targetRef: technique.stixID,
+            relationshipCreatedBefore: config.relationshipCreatedBefore,
+            relationshipAddedAfter: config.relationshipAddedAfter,
             sourceType: 'campaign',
             relationshipType: 'uses',
             clickBehavior: 'dialog',
@@ -465,6 +471,8 @@
           [config]="{
             type: 'relationship',
             targetRef: technique.stixID,
+            relationshipCreatedBefore: config.relationshipCreatedBefore,
+            relationshipAddedAfter: config.relationshipAddedAfter,
             relationshipType: 'mitigates',
             clickBehavior: 'dialog',
             allowEdits: true,
@@ -497,6 +505,8 @@
           [config]="{
             type: 'relationship',
             targetRef: technique.stixID,
+            relationshipCreatedBefore: config.relationshipCreatedBefore,
+            relationshipAddedAfter: config.relationshipAddedAfter,
             relationshipType: 'uses',
             clickBehavior: 'dialog',
             allowEdits: true,
@@ -525,6 +535,8 @@
             [config]="{
               type: 'relationship',
               targetRef: technique.stixID,
+              relationshipCreatedBefore: config.relationshipCreatedBefore,
+              relationshipAddedAfter: config.relationshipAddedAfter,
               relationshipType: 'detects',
               sourceType: 'data-component',
               clickBehavior: 'dialog',
@@ -560,6 +572,8 @@
           [config]="{
             type: 'relationship',
             targetRef: technique.stixID,
+            relationshipCreatedBefore: config.relationshipCreatedBefore,
+            relationshipAddedAfter: config.relationshipAddedAfter,
             relationshipType: 'detects',
             sourceType: 'detection-strategy',
             clickBehavior: 'dialog',
@@ -593,6 +607,8 @@
           [config]="{
             type: 'relationship',
             sourceRef: technique.stixID,
+            relationshipCreatedBefore: config.relationshipCreatedBefore,
+            relationshipAddedAfter: config.relationshipAddedAfter,
             targetType: 'asset',
             relationshipType: 'targets',
             clickBehavior: 'dialog',

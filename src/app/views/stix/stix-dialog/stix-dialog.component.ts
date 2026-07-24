@@ -71,6 +71,8 @@ export class StixDialogComponent implements OnInit {
       sourceType: this._config.sourceType ? this._config.sourceType : null,
       targetType: this._config.targetType ? this._config.targetType : null,
       showRelationships: this.showRelationships,
+      relationshipCreatedBefore: this._config.relationshipCreatedBefore,
+      relationshipAddedAfter: this._config.relationshipAddedAfter,
       editable: this._config.editable && this.authenticationService.canEdit(),
       is_new: this._config.is_new ? true : false,
       sidebarControl:

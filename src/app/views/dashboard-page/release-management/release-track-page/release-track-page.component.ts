@@ -711,7 +711,10 @@ export class ReleaseTrackPageComponent implements OnInit {
       tier === 'candidate'
         ? this.resolveCandidateDiffObjects(item)
         : this.resolveStagedDiffObjects(item);
-
+    const relationshipAddedAfter =
+      tier === 'candidate'
+        ? this.findStagedEntry(item.object_ref)?.object_modified
+        : undefined;
     diff.pipe(take(1)).subscribe(({ current, prior, expectedBaseline }) => {
       if (!current) {
         this.snackbar.open(
@@ -735,7 +738,12 @@ export class ReleaseTrackPageComponent implements OnInit {
         return;
       }
 
-      this.openDiffDialog(current, prior);
+      this.openDiffDialog(
+        current,
+        prior,
+        tier === 'staged' ? item.object_modified : undefined,
+        relationshipAddedAfter
+      );
     });
   }
 
@@ -1525,13 +1533,17 @@ export class ReleaseTrackPageComponent implements OnInit {
     );
   }
 
-  private resolveCandidateDiffObjects(item: ReleaseTrackObjectItem): Observable<{
+  private resolveCandidateDiffObjects(
+    item: ReleaseTrackObjectItem
+  ): Observable<{
     current: StixObject | null;
     prior: StixObject | null;
     expectedBaseline: boolean;
   }> {
     const stagedEntry = this.findStagedEntry(item.object_ref);
-    const memberEntry = stagedEntry ? null : this.findMemberEntry(item.object_ref);
+    const memberEntry = stagedEntry
+      ? null
+      : this.findMemberEntry(item.object_ref);
     const baselineEntry = stagedEntry ?? memberEntry;
 
     return forkJoin({
@@ -1585,22 +1597,40 @@ export class ReleaseTrackPageComponent implements OnInit {
     let requestObject: Observable<StixObject[]>;
     switch (attackType) {
       case 'technique':
-        requestObject = this.restApiConnectorService.getTechnique(objectRef, modified);
+        requestObject = this.restApiConnectorService.getTechnique(
+          objectRef,
+          modified
+        );
         break;
       case 'tactic':
-        requestObject = this.restApiConnectorService.getTactic(objectRef, modified);
+        requestObject = this.restApiConnectorService.getTactic(
+          objectRef,
+          modified
+        );
         break;
       case 'group':
-        requestObject = this.restApiConnectorService.getGroup(objectRef, modified);
+        requestObject = this.restApiConnectorService.getGroup(
+          objectRef,
+          modified
+        );
         break;
       case 'campaign':
-        requestObject = this.restApiConnectorService.getCampaign(objectRef, modified);
+        requestObject = this.restApiConnectorService.getCampaign(
+          objectRef,
+          modified
+        );
         break;
       case 'asset':
-        requestObject = this.restApiConnectorService.getAsset(objectRef, modified);
+        requestObject = this.restApiConnectorService.getAsset(
+          objectRef,
+          modified
+        );
         break;
       case 'software':
-        requestObject = this.restApiConnectorService.getSoftware(objectRef, modified);
+        requestObject = this.restApiConnectorService.getSoftware(
+          objectRef,
+          modified
+        );
         break;
       case 'mitigation':
         requestObject = this.restApiConnectorService.getMitigation(
@@ -1609,7 +1639,10 @@ export class ReleaseTrackPageComponent implements OnInit {
         );
         break;
       case 'matrix':
-        requestObject = this.restApiConnectorService.getMatrix(objectRef, modified);
+        requestObject = this.restApiConnectorService.getMatrix(
+          objectRef,
+          modified
+        );
         break;
       case 'data-source':
         requestObject = this.restApiConnectorService.getDataSource(
@@ -1630,7 +1663,10 @@ export class ReleaseTrackPageComponent implements OnInit {
         );
         break;
       case 'analytic':
-        requestObject = this.restApiConnectorService.getAnalytic(objectRef, modified);
+        requestObject = this.restApiConnectorService.getAnalytic(
+          objectRef,
+          modified
+        );
         break;
       default:
         return of(null);
@@ -1642,13 +1678,20 @@ export class ReleaseTrackPageComponent implements OnInit {
     );
   }
 
-  private openDiffDialog(current: StixObject, prior: StixObject | null): void {
+  private openDiffDialog(
+    current: StixObject,
+    prior: StixObject | null,
+    relationshipCreatedBefore?: Date | string,
+    relationshipAddedAfter?: Date | string
+  ): void {
     this.dialog.open(StixDialogComponent, {
       data: {
         object: [current, prior],
         mode: 'diff',
         editable: false,
         sidebarControl: 'disable',
+        relationshipCreatedBefore,
+        relationshipAddedAfter,
       },
       maxHeight: '75vh',
       autoFocus: false,

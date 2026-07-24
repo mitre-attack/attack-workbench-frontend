@@ -369,6 +369,7 @@
           mat-row
           *matRowDef="let element; columns: tableColumns_controls"
           class="element-row"
+          [class.relationship-added]="isNewRelationship(element)"
           [class.expanded]="
             isCollectionType() && expandedElement === element
           "></tr>

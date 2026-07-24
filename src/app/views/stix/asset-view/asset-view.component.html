@@ -180,6 +180,8 @@
           #techniqueList
           [config]="{
             type: 'relationship',
+            relationshipCreatedBefore: config.relationshipCreatedBefore,
+            relationshipAddedAfter: config.relationshipAddedAfter,
             targetRef: asset.stixID,
             sourceType: 'technique',
             relationshipType: 'targets',

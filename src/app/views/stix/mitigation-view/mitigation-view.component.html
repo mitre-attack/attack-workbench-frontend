@@ -127,6 +127,8 @@
           #mitigatesList
           [config]="{
             type: 'relationship',
+            relationshipCreatedBefore: config.relationshipCreatedBefore,
+            relationshipAddedAfter: config.relationshipAddedAfter,
             sourceRef: mitigation.stixID,
             relationshipType: 'mitigates',
             clickBehavior: 'dialog',

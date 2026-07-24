@@ -168,6 +168,8 @@
           #techniquesList
           [config]="{
             type: 'relationship',
+            relationshipCreatedBefore: config.relationshipCreatedBefore,
+            relationshipAddedAfter: config.relationshipAddedAfter,
             sourceRef: software.stixID,
             targetType: 'technique',
             relationshipType: 'uses',
@@ -202,6 +204,8 @@
           #groupList
           [config]="{
             type: 'relationship',
+            relationshipCreatedBefore: config.relationshipCreatedBefore,
+            relationshipAddedAfter: config.relationshipAddedAfter,
             targetRef: software.stixID,
             sourceType: 'group',
             relationshipType: 'uses',
@@ -236,6 +240,8 @@
           #campaignList
           [config]="{
             type: 'relationship',
+            relationshipCreatedBefore: config.relationshipCreatedBefore,
+            relationshipAddedAfter: config.relationshipAddedAfter,
             targetRef: software.stixID,
             sourceType: 'campaign',
             relationshipType: 'uses',

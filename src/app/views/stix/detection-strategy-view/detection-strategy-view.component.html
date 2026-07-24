@@ -133,6 +133,8 @@
           #detectsList
           [config]="{
             type: 'relationship',
+            relationshipCreatedBefore: config.relationshipCreatedBefore,
+            relationshipAddedAfter: config.relationshipAddedAfter,
             sourceRef: detectionStrategy.stixID,
             relationshipType: 'detects',
             clickBehavior: 'dialog',
