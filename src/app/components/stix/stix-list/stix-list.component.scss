@@ -128,7 +128,8 @@
           }
         }
 
-        tr.element-row.relationship-added {
+        tr.element-row.relationship-added,
+        tr.element-row.relationship-changed {
           .light & td {
             background-color: #c0f8c0 !important;
           }

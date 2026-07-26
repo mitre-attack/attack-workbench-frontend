@@ -387,10 +387,12 @@ export class StixListComponent implements OnInit, AfterViewInit, OnDestroy {
               this.config.sourceRef ? sticky_allowed : false,
               ['relationship-name']
             );
-            if (!(
-              this.config.relationshipType &&
-              this.config.relationshipType == 'subtechnique-of'
-            ))
+            if (
+              !(
+                this.config.relationshipType &&
+                this.config.relationshipType == 'subtechnique-of'
+              )
+            )
               this.addColumn(
                 'description',
                 'description',
@@ -1050,6 +1052,32 @@ export class StixListComponent implements OnInit, AfterViewInit, OnDestroy {
       Number.isFinite(baseline) &&
       Number.isFinite(created) &&
       created > baseline
+    );
+  }
+
+  /**
+   * Determines whether an existing relationship changed after the staged
+   * baseline. Candidate relationships are fetched at their current version,
+   * so this highlights changes that cannot be represented accurately in the
+   * staged table without relationship version history.
+   */
+  public isChangedRelationship(relationship: StixObject): boolean {
+    if (
+      this.config.type !== 'relationship' ||
+      !this.config.relationshipAddedAfter
+    ) {
+      return false;
+    }
+
+    const baseline = new Date(this.config.relationshipAddedAfter).getTime();
+    const created = new Date(relationship.created).getTime();
+    const modified = new Date(relationship.modified).getTime();
+    return (
+      Number.isFinite(baseline) &&
+      Number.isFinite(created) &&
+      Number.isFinite(modified) &&
+      created <= baseline &&
+      modified > baseline
     );
   }
 
