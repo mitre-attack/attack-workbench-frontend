@@ -1,6 +1,7 @@
 import { Component, Input, ViewEncapsulation } from '@angular/core';
 import { StixViewConfig } from 'src/app/views/stix/stix-view-page';
 import { EditorService } from 'src/app/services/editor/editor.service';
+import { StixObject } from 'src/app/classes/stix/stix-object';
 
 @Component({
   selector: 'app-subheading',
@@ -19,6 +20,17 @@ export class SubheadingComponent {
   }
   public get editing(): boolean {
     return this.editorService.editing;
+  }
+
+  public get showStixIdProperty(): boolean {
+    return (
+      !!this.object?.stixID &&
+      !(
+        this.config.mode === 'view' &&
+        this.object instanceof StixObject &&
+        this.object.attackType !== 'collection'
+      )
+    );
   }
 
   constructor(private editorService: EditorService) {

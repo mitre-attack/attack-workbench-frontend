@@ -9,6 +9,15 @@
         <mat-icon>file_download</mat-icon>
       </button>
       <button
+        *ngIf="canEditReleaseTrack"
+        mat-stroked-button
+        color="warn"
+        [disabled]="!id || isDeleting"
+        (click)="onDeleteReleaseTrack()">
+        Delete
+        <mat-icon>delete</mat-icon>
+      </button>
+      <button
         *ngIf="isVirtualReleaseTrack"
         mat-stroked-button
         [disabled]="!canCreateDraft"
@@ -30,7 +39,6 @@
   <app-stix-page-tabs
     [detailsTemplate]="detailsTpl"
     [showHistory]="false"
-    [showNotes]="false"
     [customTabs]="[
       { label: 'History', template: historyTpl },
       { label: 'Config', template: configTpl },

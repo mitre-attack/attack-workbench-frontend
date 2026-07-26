@@ -83,4 +83,58 @@ describe('StixListComponent', () => {
       'modified',
     ]);
   });
+
+  it('should not show the workflow status column for STIX object lists', () => {
+    const types: StixListConfig['type'][] = [
+      'asset',
+      'campaign',
+      'data-component',
+      'data-source',
+      'detection-strategy',
+      'group',
+      'matrix',
+      'mitigation',
+      'software',
+      'tactic',
+      'technique',
+    ];
+
+    types.forEach(type => {
+      component.config = { type };
+      component.tableColumns = [];
+      component.tableColumns_settings = new Map<string, any>();
+
+      (component as any).buildTable();
+
+      expect(component.tableColumns).not.toContain('workflow');
+      expect(component.tableColumns).toContain('state');
+    });
+  });
+
+  it('should ignore objects without domains when filtering local objects by domain', () => {
+    const domainlessObject = {
+      stixID: 'campaign--1',
+      name: 'Operation Triangulation',
+    };
+    const domainObject = {
+      stixID: 'attack-pattern--1',
+      name: 'Technique',
+      domains: ['enterprise-attack'],
+    };
+
+    const result = (component as any).filterLocalObjects(
+      [domainlessObject, domainObject],
+      {
+        deprecated: false,
+        revoked: false,
+        state: undefined,
+        platforms: [],
+        domains: ['enterprise-attack'],
+        exclusiveDeprecated: false,
+        exclusiveRevoked: false,
+      }
+    );
+
+    expect(result).toEqual([domainObject]);
+  });
 });

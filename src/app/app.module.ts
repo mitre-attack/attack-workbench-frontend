@@ -85,6 +85,7 @@ import { ToolbarComponent } from './components/toolbar/toolbar.component';
 import { UserAvatarComponent } from './components/user-avatar/user-avatar.component';
 import { ValidationResultsComponent } from './components/validation-results/validation-results.component';
 import { VersionPopoverComponent } from './components/version-popover/version-popover.component';
+import { WorkflowStatusDialogComponent } from './components/workflow-status-dialog/workflow-status-dialog.component';
 
 // STIX components
 import { StixListComponent } from './components/stix/stix-list/stix-list.component';
@@ -161,6 +162,8 @@ import { DataQualityComponent } from './views/dashboard-page/data-quality/data-q
 import { OrgSettingsPageComponent } from './views/dashboard-page/org-settings-page/org-settings-page.component';
 import { UserAccountsPageComponent } from './views/dashboard-page/user-accounts-page/user-accounts-page.component';
 import { DefaultMarkingDefinitionsComponent } from './views/dashboard-page/default-marking-definitions/default-marking-definitions.component';
+import { ValidationBypassRuleDialogComponent } from './views/dashboard-page/validation-bypasses/validation-bypass-rule-dialog/validation-bypass-rule-dialog.component';
+import { ValidationBypassesComponent } from './views/dashboard-page/validation-bypasses/validation-bypasses.component';
 import { ProfilePageComponent } from './views/profile-page/profile-page.component';
 import { ReferenceManagerComponent } from './views/reference-manager/reference-manager.component';
 
@@ -257,6 +260,7 @@ export function initConfig(appConfigService: AppConfigService) {
     MarkdownViewDialogComponent,
     CollectionImportSummaryComponent,
     SaveDialogComponent,
+    WorkflowStatusDialogComponent,
     AddDialogComponent,
     DeleteDialogComponent,
     HistoryTimelineComponent,
@@ -303,6 +307,8 @@ export function initConfig(appConfigService: AppConfigService) {
     OrgSettingsPageComponent,
     UserAccountsPageComponent,
     DefaultMarkingDefinitionsComponent,
+    ValidationBypassesComponent,
+    ValidationBypassRuleDialogComponent,
     ProfilePageComponent,
     ReferenceManagerComponent,
     StixDialogComponent,
