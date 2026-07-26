@@ -200,7 +200,7 @@ export class ReleaseTracksConnectorService extends ApiConnector {
   }
 
   /**
-   * GET /api/release-tracks/:id
+   * GET /api/release-tracks/:id/snapshots/latest
    * Get latest snapshot for a track.
    * @param id Release track id
    * @param options Query options forwarded to endpoint
@@ -211,7 +211,7 @@ export class ReleaseTracksConnectorService extends ApiConnector {
     options?: ReleaseTrackSnapshotOptions
   ): Observable<ReleaseTrackSnapshot | null> {
     const params = this.buildHttpParams(options);
-    const url = `${this.apiUrl}/release-tracks/${id}`;
+    const url = `${this.apiUrl}/release-tracks/${id}/snapshots/latest`;
     return this.http.get(url, { params }).pipe(
       tap(result =>
         logger.log(`retrieved latest snapshot for track ${id}`, result)
@@ -223,15 +223,15 @@ export class ReleaseTracksConnectorService extends ApiConnector {
   }
 
   /**
-   * GET /api/release-tracks/:id
-   * Build snapshot history from the latest snapshot and its version_history.
+   * GET /api/release-tracks/:id/snapshots
+   * List snapshot history for a track.
    * @param id Release track id
    * @returns Observable<ReleaseTrackSnapshotHistoryItem[]>
    */
   public listSnapshots(
     id: string
   ): Observable<ReleaseTrackSnapshotHistoryItem[]> {
-    const url = `${this.apiUrl}/release-tracks/${id}`;
+    const url = `${this.apiUrl}/release-tracks/${id}/snapshots`;
     return this.http.get(url).pipe(
       tap(result => logger.log(`retrieved snapshots for track ${id}`, result)),
       map(result => this.normalizeSnapshotHistory(result)),
@@ -243,7 +243,7 @@ export class ReleaseTracksConnectorService extends ApiConnector {
   }
 
   /**
-   * GET /api/release-tracks/:id?format=:format
+   * GET /api/release-tracks/:id/snapshots/latest?format=:format
    * Retrieve the latest snapshot in an export format without deserializing it.
    * @param id Release track id
    * @param format Export format
@@ -256,7 +256,7 @@ export class ReleaseTracksConnectorService extends ApiConnector {
     options?: Omit<ReleaseTrackSnapshotOptions, 'format'>
   ): Observable<any> {
     const params = this.buildHttpParams({ ...options, format });
-    const url = `${this.apiUrl}/release-tracks/${id}`;
+    const url = `${this.apiUrl}/release-tracks/${id}/snapshots/latest`;
     return this.http.get(url, { params }).pipe(
       tap(result =>
         logger.log(
