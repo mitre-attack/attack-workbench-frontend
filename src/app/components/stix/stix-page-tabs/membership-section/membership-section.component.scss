@@ -94,6 +94,47 @@ button.membership-action-button {
   text-align: center;
 }
 
+.empty-membership-state {
+  padding: 28px;
+  border: 1px solid;
+  border-radius: 4px;
+  text-align: center;
+
+  h3 {
+    margin: 0 0 6px;
+    font-size: 16px;
+  }
+
+  p {
+    margin: 0;
+    font-size: 13px;
+  }
+}
+
+.add-track-button {
+  min-height: 34px;
+  margin-top: 18px;
+  padding: 0 14px;
+  border: 1px solid;
+  border-radius: 4px;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 650;
+
+  &:disabled {
+    cursor: default;
+    opacity: 0.65;
+  }
+}
+
+.membership-error {
+  margin: 12px 0 0;
+  color: colors.color(error);
+  font-size: 13px;
+  text-align: center;
+}
+
 .release-track-list {
   display: flex;
   flex-direction: column;
@@ -435,6 +476,7 @@ input[type='checkbox'] {
   }
 
   .loading-state,
+  .empty-membership-state,
   .release-track-card {
     border-color: colors.border-color(light);
     background: #ffffff;
@@ -442,6 +484,29 @@ input[type='checkbox'] {
 
   .loading-state {
     color: colors.on-color-deemphasis(light);
+  }
+
+  .draft-column,
+  .releases-column {
+    h4 {
+      color: colors.color(primary-dark);
+    }
+  }
+
+  .empty-membership-state {
+    h3 {
+      color: colors.color(dark);
+    }
+
+    p {
+      color: colors.on-color-deemphasis(light);
+    }
+  }
+
+  .add-track-button {
+    border-color: colors.color(primary);
+    background: colors.color(primary);
+    color: colors.on-color(primary);
   }
 
   .release-track-header {
@@ -563,6 +628,7 @@ input[type='checkbox'] {
   }
 
   .loading-state,
+  .empty-membership-state,
   .release-track-card {
     border-color: colors.border-color(dark);
     background: color.mix(colors.color(dark), #ffffff, 94%);
@@ -570,6 +636,22 @@ input[type='checkbox'] {
 
   .loading-state {
     color: colors.on-color-deemphasis(dark);
+  }
+
+  .empty-membership-state {
+    h3 {
+      color: colors.color(light);
+    }
+
+    p {
+      color: colors.on-color-deemphasis(dark);
+    }
+  }
+
+  .add-track-button {
+    border-color: $membership-accent;
+    background: transparent;
+    color: $membership-accent;
   }
 
   .release-track-header {

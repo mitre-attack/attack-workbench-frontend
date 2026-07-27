@@ -25,7 +25,31 @@
     Loading release track membership...
   </div>
 
-  <div *ngIf="!loading" class="release-track-list">
+  <div
+    *ngIf="!loading && !loadError && memberships.length === 0"
+    class="empty-membership-state">
+    <h3>This object is not in any release tracks yet.</h3>
+    <p>Add it to a standard release track to begin managing its release.</p>
+
+    <button
+      *ngIf="canViewReleaseTrackDashboard"
+      type="button"
+      class="add-track-button"
+      [disabled]="addingToTrack"
+      (click)="addToReleaseTrack()">
+      {{ addingToTrack ? 'Adding...' : 'Add to Release Track' }}
+    </button>
+
+    <p *ngIf="addError" class="membership-error" role="alert">
+      {{ addError }}
+    </p>
+  </div>
+
+  <p *ngIf="!loading && loadError" class="membership-error" role="alert">
+    {{ loadError }}
+  </p>
+
+  <div *ngIf="!loading && memberships.length > 0" class="release-track-list">
     <article
       *ngFor="let membership of memberships; trackBy: trackByMembership"
       class="release-track-card">

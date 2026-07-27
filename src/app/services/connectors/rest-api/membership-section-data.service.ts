@@ -47,39 +47,10 @@ export class MembershipSectionDataService {
     return environment.integrations.rest_api.url.replace(/\/+$/, '');
   }
 
-  private readonly defaultTracks: MembershipTrack[] = [
-    {
-      id: 'core-objects',
-      name: 'Core Objects',
-      description:
-        'Standard release track for core ATT&CK objects like techniques and mitigations.',
-      type: 'STANDARD',
-      current_draft: null,
-      production_releases: [],
-      releases: [],
-      versions: [],
-    },
-    {
-      id: 'enterprise-attack',
-      name: 'Enterprise ATT&CK',
-      description:
-        'Virtual track consolidating all Enterprise-related objects.',
-      type: 'VIRTUAL',
-      current_draft: null,
-      production_releases: [],
-      releases: [],
-      versions: [],
-    },
-  ];
-
   constructor(
     private readonly http: HttpClient,
     private readonly releaseTracksConnector: ReleaseTracksConnectorService
   ) {}
-
-  public getDefaultTracks(): MembershipTrack[] {
-    return this.defaultTracks.map(track => this.copyTrack(track));
-  }
 
   public loadMemberships(
     objectRef: string,
@@ -145,11 +116,7 @@ export class MembershipSectionDataService {
       ),
       switchMap(tracks =>
         this.loadVersionsForMembershipTracks(tracks, objectRef)
-      ),
-      catchError(error => {
-        console.error('Failed to load membership data', error);
-        return of(this.getDefaultTracks());
-      })
+      )
     );
   }
 
@@ -293,17 +260,7 @@ export class MembershipSectionDataService {
       return track;
     });
 
-    return this.defaultTracks.map(defaultTrack => {
-      const matchingTrack = memberTracks.find(
-        memberTrack =>
-          this.normalizeTrackType(memberTrack.type) ===
-          this.normalizeTrackType(defaultTrack.type)
-      );
-
-      return matchingTrack
-        ? this.mergeTrack(defaultTrack, matchingTrack)
-        : this.copyTrack(defaultTrack);
-    });
+    return memberTracks;
   }
 
   private loadVersionsForMembershipTracks(
@@ -661,36 +618,6 @@ export class MembershipSectionDataService {
     );
   }
 
-  private mergeTrack(
-    displayTrack: MembershipTrack,
-    sourceTrack: MembershipTrack
-  ): MembershipTrack {
-    return {
-      ...sourceTrack,
-      id: sourceTrack.id,
-      apiId: sourceTrack.apiId,
-      name: displayTrack.name,
-      description: displayTrack.description,
-      type: displayTrack.type,
-      current_draft:
-        sourceTrack.current_draft ??
-        sourceTrack.currentDraft ??
-        sourceTrack.draft ??
-        null,
-      production_releases:
-        sourceTrack.production_releases ??
-        sourceTrack.productionReleases ??
-        sourceTrack.releases ??
-        [],
-      releases:
-        sourceTrack.production_releases ??
-        sourceTrack.productionReleases ??
-        sourceTrack.releases ??
-        [],
-      versions: sourceTrack.versions ?? [],
-    };
-  }
-
   private getTrackApiId(track: MembershipTrack): string | null {
     const id =
       track.track_id ??
@@ -768,12 +695,6 @@ export class MembershipSectionDataService {
       .replace(/[\s_]+/g, '-');
   }
 
-  private normalizeTrackType(value: unknown): string {
-    return String(value ?? 'standard')
-      .trim()
-      .toLowerCase();
-  }
-
   private normalizeVersionValue(version: any): string | null {
     if (version === null || version === undefined) {
       return null;
@@ -807,15 +728,5 @@ export class MembershipSectionDataService {
     return identifierName
       .replace(/[_-]+/g, ' ')
       .replace(/\b\w/g, character => character.toUpperCase());
-  }
-
-  private copyTrack(track: MembershipTrack): MembershipTrack {
-    return {
-      ...track,
-      current_draft: null,
-      production_releases: [],
-      releases: [],
-      versions: [],
-    };
   }
 }

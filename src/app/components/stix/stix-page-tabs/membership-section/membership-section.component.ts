@@ -1,6 +1,6 @@
 import {
+  ChangeDetectorRef,
   Component,
-  ElementRef,
   EventEmitter,
   Input,
   OnChanges,
@@ -12,13 +12,17 @@ import {
 import { Subject } from 'rxjs';
 import { finalize, takeUntil } from 'rxjs/operators';
 import { Router } from '@angular/router';
+import { MatDialog } from '@angular/material/dialog';
 
 import { Role } from 'src/app/classes/authn/role';
+import { ReleaseTrackType } from 'src/app/classes/release-tracks/enums';
+import { MultipleChoiceDialogComponent } from 'src/app/components/multiple-choice-dialog/multiple-choice-dialog.component';
 import { AuthenticationService } from 'src/app/services/connectors/authentication/authentication.service';
 import {
   MembershipSectionDataService,
   MembershipTrack,
 } from 'src/app/services/connectors/rest-api/membership-section-data.service';
+import { ReleaseTracksConnectorService } from 'src/app/services/connectors/rest-api/release-tracks.service';
 
 interface SelectedRelease {
   key: string;
@@ -43,7 +47,9 @@ export class MembershipSectionComponent
   memberships: MembershipTrack[] = [];
 
   loading = false;
+  addingToTrack = false;
   loadError: string | null = null;
+  addError: string | null = null;
   private loadedObjectRef: string | null = null;
 
   private selectedReleases = new Map<string, SelectedRelease>();
@@ -52,12 +58,12 @@ export class MembershipSectionComponent
 
   constructor(
     private readonly membershipData: MembershipSectionDataService,
+    private readonly releaseTracksConnector: ReleaseTracksConnectorService,
     private readonly authenticationService: AuthenticationService,
+    private readonly dialog: MatDialog,
     private readonly router: Router,
-    private readonly elementRef: ElementRef<HTMLElement>
-  ) {
-    this.memberships = this.membershipData.getDefaultTracks();
-  }
+    private readonly changeDetectorRef: ChangeDetectorRef
+  ) {}
 
   ngOnInit(): void {
     this.loadMembershipData();
@@ -112,7 +118,7 @@ export class MembershipSectionComponent
     const objectRef = this.objectRef;
 
     if (!objectRef) {
-      this.memberships = this.membershipData.getDefaultTracks();
+      this.memberships = [];
 
       this.loadError =
         'Unable to load release-track membership because the object ID is missing.';
@@ -127,6 +133,7 @@ export class MembershipSectionComponent
     this.loadedObjectRef = objectRef;
     this.loading = true;
     this.loadError = null;
+    this.addError = null;
     this.selectedReleases = new Map<string, SelectedRelease>();
 
     this.membershipData
@@ -144,11 +151,107 @@ export class MembershipSectionComponent
         error: error => {
           console.error('Unable to load release-track membership', error);
 
-          this.memberships = this.membershipData.getDefaultTracks();
+          this.memberships = [];
 
           this.loadError = 'Release-track membership could not be loaded.';
         },
       });
+  }
+
+  addToReleaseTrack(): void {
+    const objectRef = this.objectRef;
+
+    if (!objectRef || !this.canViewReleaseTrackDashboard) {
+      return;
+    }
+
+    this.addError = null;
+    this.releaseTracksConnector
+      .listReleaseTracks({ type: ReleaseTrackType.Standard })
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: response => {
+          const membershipIds = new Set(
+            this.memberships
+              .map(track => this.getTrackId(track))
+              .filter((id): id is string => !!id)
+          );
+          const tracks = this.normalizeTrackList(response).filter(
+            track =>
+              String(track?.type ?? track?.track_type).toLowerCase() ===
+                ReleaseTrackType.Standard &&
+              !membershipIds.has(String(track?.track_id ?? track?.id))
+          );
+
+          if (!tracks.length) {
+            this.addError = 'No available standard release tracks found.';
+            return;
+          }
+
+          this.dialog
+            .open(MultipleChoiceDialogComponent, {
+              maxWidth: '35em',
+              data: {
+                title: 'Add to a release track',
+                description:
+                  'Choose the standard release track to add this object to.',
+                choices: tracks.map(track => ({
+                  label: track.name ?? track.title ?? 'Release Track',
+                  value: String(track.track_id ?? track.id),
+                  description: track.description,
+                })),
+              },
+            })
+            .afterClosed()
+            .pipe(takeUntil(this.destroy$))
+            .subscribe(trackId => {
+              if (trackId) {
+                this.enrollInTrack(String(trackId), objectRef);
+              }
+            });
+        },
+        error: error => {
+          console.error('Unable to load available release tracks', error);
+          this.addError = 'Available release tracks could not be loaded.';
+        },
+      });
+  }
+
+  private enrollInTrack(trackId: string, objectRef: string): void {
+    this.addingToTrack = true;
+    this.addError = null;
+
+    this.releaseTracksConnector
+      .addCandidates(trackId, [objectRef])
+      .pipe(
+        takeUntil(this.destroy$),
+        finalize(() => {
+          this.addingToTrack = false;
+        })
+      )
+      .subscribe({
+        next: () => this.loadMembershipData(),
+        error: error => {
+          console.error('Unable to add object to release track', error);
+          this.addError = 'The object could not be added to the release track.';
+        },
+      });
+  }
+
+  private normalizeTrackList(response: any): any[] {
+    if (Array.isArray(response)) {
+      return response;
+    }
+
+    const tracks =
+      response?.data ??
+      response?.release_tracks ??
+      response?.releaseTracks ??
+      response?.items ??
+      response?.results ??
+      [];
+
+    return Array.isArray(tracks) ? tracks : [];
   }
 
   getTrackName(membership: MembershipTrack): string {
@@ -432,12 +535,7 @@ export class MembershipSectionComponent
 
   clearSelection(): void {
     this.selectedReleases = new Map<string, SelectedRelease>();
-
-    this.elementRef.nativeElement
-      .querySelectorAll<HTMLInputElement>('input[type="checkbox"]')
-      .forEach(checkbox => {
-        checkbox.checked = false;
-      });
+    this.changeDetectorRef.markForCheck();
   }
 
   compareSelectedReleases(): void {

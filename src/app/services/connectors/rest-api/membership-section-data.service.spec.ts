@@ -231,7 +231,7 @@ describe('MembershipSectionDataService', () => {
       )
     );
 
-    const standardTrack = tracks.find(track => track.type === 'STANDARD');
+    const standardTrack = tracks.find(track => track.type === 'standard');
 
     expect(standardTrack?.current_draft).toBeNull();
     expect(standardTrack?.production_releases).toHaveLength(1);
@@ -243,5 +243,20 @@ describe('MembershipSectionDataService', () => {
       objectRef,
       { order: 'desc', limit: 100, offset: 0 }
     );
+  });
+
+  it('returns no cards when the object is not a member of any tracks', async () => {
+    httpClient.get.mockReturnValue(
+      of({
+        type: 'attack-pattern',
+        workspace: { release_tracks: [] },
+      })
+    );
+
+    const tracks = await firstValueFrom(
+      service.loadMemberships(objectRef, { type: 'attack-pattern' }, null)
+    );
+
+    expect(tracks).toEqual([]);
   });
 });

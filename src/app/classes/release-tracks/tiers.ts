@@ -2,7 +2,8 @@ import { WorkflowStatusType } from 'src/app/utils/types';
 import { SnapshotTier } from './enums';
 
 export type ReleaseTrackObjectTier =
-  SnapshotTier.Candidate | SnapshotTier.Staged;
+  | SnapshotTier.Candidate
+  | SnapshotTier.Staged;
 
 export interface TierEntryModifiedByUser {
   id?: string;

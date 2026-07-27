@@ -1,6 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { of } from 'rxjs';
 import { Router } from '@angular/router';
+import { MatDialog } from '@angular/material/dialog';
 import { vi } from 'vitest';
 
 import { AuthenticationService } from 'src/app/services/connectors/authentication/authentication.service';
@@ -9,30 +10,33 @@ import {
   MembershipSectionDataService,
   MembershipTrack,
 } from 'src/app/services/connectors/rest-api/membership-section-data.service';
+import { ReleaseTracksConnectorService } from 'src/app/services/connectors/rest-api/release-tracks.service';
 
 describe('MembershipSectionComponent', () => {
   let component: MembershipSectionComponent;
   let fixture: ComponentFixture<MembershipSectionComponent>;
   let membershipDataService: any;
   let authenticationService: any;
+  let releaseTracksConnector: any;
+  let dialog: any;
   let router: any;
 
-  const defaultTracks: MembershipTrack[] = [
+  const membershipTracks: MembershipTrack[] = [
     {
-      id: 'core-objects',
-      name: 'Core Objects',
-      description: 'Core objects',
-      type: 'STANDARD',
+      id: 'release-track--standard',
+      name: 'Core Release Track',
+      description: 'Standard release track',
+      type: 'standard',
       current_draft: null,
       production_releases: [],
       releases: [],
       versions: [],
     },
     {
-      id: 'enterprise-attack',
-      name: 'Enterprise ATT&CK',
-      description: 'Enterprise ATT&CK',
-      type: 'VIRTUAL',
+      id: 'release-track--virtual',
+      name: 'Enterprise Release Track',
+      description: 'Virtual release track',
+      type: 'virtual',
       current_draft: null,
       production_releases: [],
       releases: [],
@@ -42,16 +46,11 @@ describe('MembershipSectionComponent', () => {
 
   beforeEach(async () => {
     membershipDataService = {
-      getDefaultTracks: vi.fn(),
       loadMemberships: vi.fn(),
     };
 
-    membershipDataService.getDefaultTracks.mockImplementation(() =>
-      defaultTracks.map(track => ({ ...track }))
-    );
-
     membershipDataService.loadMemberships.mockReturnValue(
-      of(defaultTracks.map(track => ({ ...track })))
+      of(membershipTracks.map(track => ({ ...track })))
     );
 
     authenticationService = {
@@ -59,6 +58,11 @@ describe('MembershipSectionComponent', () => {
     };
 
     router = { navigate: vi.fn() };
+    dialog = { open: vi.fn() };
+    releaseTracksConnector = {
+      listReleaseTracks: vi.fn(),
+      addCandidates: vi.fn(),
+    };
 
     await TestBed.configureTestingModule({
       declarations: [MembershipSectionComponent],
@@ -71,6 +75,11 @@ describe('MembershipSectionComponent', () => {
           provide: AuthenticationService,
           useValue: authenticationService,
         },
+        {
+          provide: ReleaseTracksConnectorService,
+          useValue: releaseTracksConnector,
+        },
+        { provide: MatDialog, useValue: dialog },
         { provide: Router, useValue: router },
       ],
     }).compileComponents();
@@ -111,15 +120,15 @@ describe('MembershipSectionComponent', () => {
     );
   });
 
-  it('should display the two type-based tracks', () => {
+  it('should display the object release-track memberships', () => {
     expect(component.memberships.length).toBe(2);
-    expect(component.memberships[0].name).toBe('Core Objects');
-    expect(component.memberships[0].type).toBe('STANDARD');
-    expect(component.memberships[1].name).toBe('Enterprise ATT&CK');
-    expect(component.memberships[1].type).toBe('VIRTUAL');
+    expect(component.memberships[0].name).toBe('Core Release Track');
+    expect(component.memberships[0].type).toBe('standard');
+    expect(component.memberships[1].name).toBe('Enterprise Release Track');
+    expect(component.memberships[1].type).toBe('virtual');
   });
 
-  it('should mark Enterprise ATT&CK as virtual', () => {
+  it('should mark a virtual release track as virtual', () => {
     const enterpriseTrack = component.memberships[1];
 
     expect(component.getTrackType(enterpriseTrack)).toBe('VIRTUAL');
@@ -244,5 +253,69 @@ describe('MembershipSectionComponent', () => {
     component.clearSelection();
 
     expect(component.selectedReleaseCount).toBe(0);
+  });
+
+  it('should disable View Track after clearing the selected release', () => {
+    const membership = component.memberships[0];
+
+    component.toggleReleaseSelection(
+      { id: 'release--1', version: '1.0' },
+      membership,
+      true
+    );
+    fixture.detectChanges();
+
+    const element: HTMLElement = fixture.nativeElement;
+    const viewTrackButton =
+      element.querySelector<HTMLButtonElement>('.view-track-button');
+    const clearButton = element.querySelector<HTMLButtonElement>(
+      '.membership-action-button'
+    );
+
+    expect(viewTrackButton?.disabled).toBe(false);
+
+    clearButton?.click();
+    fixture.detectChanges();
+
+    expect(component.selectedReleaseCount).toBe(0);
+    expect(viewTrackButton?.disabled).toBe(true);
+  });
+
+  it('should show an empty state when the object has no memberships', () => {
+    component.memberships = [];
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.textContent).toContain(
+      'This object is not in any release tracks yet.'
+    );
+    expect(fixture.nativeElement.textContent).toContain('Add to Release Track');
+  });
+
+  it('should add the object to the selected standard release track', () => {
+    component.memberships = [];
+    releaseTracksConnector.listReleaseTracks.mockReturnValue(
+      of({
+        data: [
+          {
+            id: 'release-track--available',
+            name: 'Available Track',
+            type: 'standard',
+          },
+        ],
+      })
+    );
+    releaseTracksConnector.addCandidates.mockReturnValue(of({}));
+    dialog.open.mockReturnValue({
+      afterClosed: () => of('release-track--available'),
+    });
+    const reload = vi.spyOn(component, 'loadMembershipData');
+
+    component.addToReleaseTrack();
+
+    expect(releaseTracksConnector.addCandidates).toHaveBeenCalledWith(
+      'release-track--available',
+      ['attack-pattern--063b5b92-5361-481a-9c3f-95492ed9a2d8']
+    );
+    expect(reload).toHaveBeenCalled();
   });
 });
