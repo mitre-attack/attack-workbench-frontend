@@ -11,12 +11,25 @@
   (keydown.space)="onViewTrack()">
   <div class="card-top">
     <span class="subheading">{{ track.name }}</span>
-    <mat-chip>{{ type | titlecase }}</mat-chip>
+    <mat-chip
+      class="release-track-type-chip"
+      [ngClass]="{
+        'standard-chip': type === 'standard',
+        'virtual-chip': type === 'virtual',
+      }">
+      {{ type | titlecase }}
+    </mat-chip>
   </div>
 
   <div class="card-body">
     <ng-container *ngIf="track.description">
-      <span class="description-text card-desc">{{ track.description }}</span>
+      <span
+        class="description-text card-desc"
+        [matTooltip]="track.description"
+        matTooltipPosition="below"
+        [matTooltipShowDelay]="600">
+        {{ track.description }}
+      </span>
     </ng-container>
 
     <div class="card-middle">

@@ -7,6 +7,7 @@ import { DataQualityComponent } from './views/dashboard-page/data-quality/data-q
 import { OrgSettingsPageComponent } from './views/dashboard-page/org-settings-page/org-settings-page.component';
 import { UserAccountsPageComponent } from './views/dashboard-page/user-accounts-page/user-accounts-page.component';
 import { DefaultMarkingDefinitionsComponent } from './views/dashboard-page/default-marking-definitions/default-marking-definitions.component';
+import { ValidationBypassesComponent } from './views/dashboard-page/validation-bypasses/validation-bypasses.component';
 import { ProfilePageComponent } from './views/profile-page/profile-page.component';
 import { AuthorizationGuard } from './services/helpers/authorization.guard';
 import { Role } from './classes/authn/role';
@@ -150,6 +151,15 @@ export const routes: Routes = [
               roles: [Role.ADMIN],
             },
             component: DefaultMarkingDefinitionsComponent,
+          },
+          {
+            path: 'validation-bypasses',
+            data: {
+              breadcrumb: 'validation bypasses',
+              title: 'ADM Validation Bypasses',
+              roles: [Role.ADMIN],
+            },
+            component: ValidationBypassesComponent,
           },
         ],
       },

@@ -173,6 +173,7 @@ describe('NavigationComponent', () => {
       'Organization Settings',
       'User Accounts',
       'Default Marking Definitions',
+      'Validation Bypasses',
     ]);
   });
 

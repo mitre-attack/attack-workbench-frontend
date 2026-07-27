@@ -32,5 +32,9 @@
       *ngIf="
         currentTab === 'search' && sidebarService.tabEnabled('search')
       "></app-search>
+    <app-notes-editor
+      *ngIf="
+        currentTab === 'notes' && sidebarService.tabEnabled('notes')
+      "></app-notes-editor>
   </div>
 </div>

@@ -110,4 +110,30 @@ describe('StixListComponent', () => {
       expect(component.tableColumns).toContain('state');
     });
   });
+  it('should ignore objects without domains when filtering local objects by domain', () => {
+    const domainlessObject = {
+      stixID: 'campaign--1',
+      name: 'Operation Triangulation',
+    };
+    const domainObject = {
+      stixID: 'attack-pattern--1',
+      name: 'Technique',
+      domains: ['enterprise-attack'],
+    };
+
+    const result = (component as any).filterLocalObjects(
+      [domainlessObject, domainObject],
+      {
+        deprecated: false,
+        revoked: false,
+        state: undefined,
+        platforms: [],
+        domains: ['enterprise-attack'],
+        exclusiveDeprecated: false,
+        exclusiveRevoked: false,
+      }
+    );
+
+    expect(result).toEqual([domainObject]);
+  });
 });
