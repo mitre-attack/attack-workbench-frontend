@@ -55,17 +55,31 @@ export interface ReleaseTrackSnapshotOptions {
   include?: 'members' | 'staged' | 'candidates' | 'all';
   releases?: 'only';
   version?: string;
-  versions?: 'all';
   [key: string]: any;
+}
+
+export interface ReleaseTrackSnapshotListOptions {
+  tagged?: boolean;
+  limit?: number;
+  offset?: number;
 }
 
 export interface ReleaseTrackSnapshotHistoryItem {
   id?: string;
   modified?: string | Date;
   version?: string | null;
+  type?: ReleaseTrackType;
   created?: string | Date;
   tagged_at?: string | Date;
   snapshot_id?: string | Date;
+  is_latest?: boolean;
+  name?: string;
+  members_count?: number;
+  staged_count?: number;
+  candidates_count?: number;
+  quarantine_count?: number;
+  added_count?: number;
+  modified_count?: number;
   members?: any[];
   staged?: any[];
   candidates?: any[];
@@ -77,6 +91,9 @@ export interface ReleaseTrackSnapshotHistoryItem {
   };
   summary?: {
     members_count?: number;
+    staged_count?: number;
+    candidates_count?: number;
+    quarantine_count?: number;
     added_count?: number;
     modified_count?: number;
     promoted_count?: number;

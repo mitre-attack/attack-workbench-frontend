@@ -70,10 +70,18 @@ interface SnapshotHistoryViewModel {
   title: string;
   created: Date | null;
   modified: string | null;
+  taggedAt: Date | null;
   isTagged: boolean;
+  stats: SnapshotHistoryStat[];
   addedCount: number;
   modifiedCount: number;
   totalObjects: number;
+}
+
+interface SnapshotHistoryStat {
+  label: string;
+  value: string | number;
+  modifier?: string;
 }
 
 interface ReleaseTrackConfigFormValue {
@@ -171,6 +179,7 @@ export class ReleaseTrackPageComponent implements OnInit {
   >();
   public virtualComponentTrackOptions: VirtualComponentTrackOption[] = [];
   public virtualConfigComponentTracks: any[] = [];
+  private createdDraftSnapshot: ReleaseTrackSnapshotHistoryItem | null = null;
 
   public candidacyOptions = Object.values(WorkflowStatus);
   public memberSyncStrategyOptions = Object.values(MemberSyncStrategy);
@@ -287,6 +296,14 @@ export class ReleaseTrackPageComponent implements OnInit {
 
   public get virtualSnapshotSchedule(): any {
     return (this.releaseTrack as any)?.snapshot_schedule || {};
+  }
+
+  public get hasCurrentDraftSnapshot(): boolean {
+    return this.snapshotHistory.some(item => !item.isTagged);
+  }
+
+  public get taggedSnapshotCount(): number {
+    return this.snapshotHistory.filter(item => item.isTagged).length;
   }
 
   public get resolvedComponentSnapshots(): any[] {
@@ -480,6 +497,12 @@ export class ReleaseTrackPageComponent implements OnInit {
             this.releaseTrack.name
           );
 
+          if (this.snapshotHistory.length) {
+            this.snapshotHistory = this.buildSnapshotHistory(
+              this.snapshotHistory.map(item => item.snapshot)
+            );
+          }
+
           if (this.isVirtualReleaseTrack) {
             this.loadVirtualComponentTrackSummaries();
           } else {
@@ -558,7 +581,9 @@ export class ReleaseTrackPageComponent implements OnInit {
       )
       .subscribe({
         next: snapshots => {
-          this.snapshotHistory = this.buildSnapshotHistory(snapshots);
+          this.snapshotHistory = this.buildSnapshotHistory(
+            this.withCreatedDraftSnapshot(snapshots)
+          );
         },
         error: err => {
           console.error('Failed to load release track snapshot history', err);
@@ -1338,13 +1363,54 @@ export class ReleaseTrackPageComponent implements OnInit {
         })
       )
       .subscribe({
-        next: () => {
+        next: snapshot => {
+          this.addCreatedDraftSnapshotToHistory(snapshot);
           this.refreshReleaseTrackState();
         },
         error: err => {
           console.error('Failed to create draft snapshot', err);
         },
       });
+  }
+
+  private addCreatedDraftSnapshotToHistory(snapshot: any): void {
+    const draftSnapshot = this.getCreatedDraftSnapshot(snapshot);
+    if (!draftSnapshot) return;
+
+    this.createdDraftSnapshot = draftSnapshot;
+    this.snapshotHistory = this.buildSnapshotHistory(
+      this.withCreatedDraftSnapshot(
+        this.snapshotHistory.map(item => item.snapshot)
+      )
+    );
+  }
+
+  private getCreatedDraftSnapshot(
+    snapshot: any
+  ): ReleaseTrackSnapshotHistoryItem | null {
+    const draftSnapshot = snapshot?.data || snapshot?.snapshot || snapshot;
+    if (!draftSnapshot || this.isTaggedSnapshot(draftSnapshot)) return null;
+    return this.getSnapshotModified(draftSnapshot) ? draftSnapshot : null;
+  }
+
+  private withCreatedDraftSnapshot(
+    snapshots: ReleaseTrackSnapshotHistoryItem[]
+  ): ReleaseTrackSnapshotHistoryItem[] {
+    if (!this.createdDraftSnapshot) return snapshots;
+
+    const createdDraftModified = this.getSnapshotModified(
+      this.createdDraftSnapshot
+    );
+    const draftAlreadyLoaded = snapshots.some(
+      snapshot => this.getSnapshotModified(snapshot) === createdDraftModified
+    );
+
+    if (draftAlreadyLoaded) {
+      this.createdDraftSnapshot = null;
+      return snapshots;
+    }
+
+    return [...snapshots, this.createdDraftSnapshot];
   }
 
   public onEditConfig(): void {
@@ -1393,6 +1459,15 @@ export class ReleaseTrackPageComponent implements OnInit {
   }
 
   public onPreviewRelease(): void {
+    this.previewRelease();
+  }
+
+  public onTagSnapshot(item: SnapshotHistoryViewModel): void {
+    if (!item || item.isTagged || !item.modified) return;
+    this.previewRelease(item);
+  }
+
+  private previewRelease(item?: SnapshotHistoryViewModel): void {
     if (!this.id || this.isReleasing) return;
 
     this.isReleasing = true;
@@ -1405,15 +1480,11 @@ export class ReleaseTrackPageComponent implements OnInit {
         })
       )
       .subscribe({
-        next: preview => this.openReleasePreviewDialog(preview),
+        next: preview => this.openReleasePreviewDialog(preview, item),
         error: err => {
           console.error('Failed to preview release track bump', err);
         },
       });
-  }
-
-  public onTagSnapshot(): void {
-    this.onPreviewRelease();
   }
 
   public onInspectSnapshot(item: SnapshotHistoryViewModel): void {
@@ -1760,7 +1831,10 @@ export class ReleaseTrackPageComponent implements OnInit {
     };
   }
 
-  private openReleasePreviewDialog(preview: any): void {
+  private openReleasePreviewDialog(
+    preview: any,
+    item?: SnapshotHistoryViewModel
+  ): void {
     const conflicts = this.getReleaseConflicts(preview);
 
     if (conflicts.length) {
@@ -1809,7 +1883,7 @@ export class ReleaseTrackPageComponent implements OnInit {
       data: {
         title: 'Preview & release',
         description:
-          'The release preview found no blocking conflicts. Choose a version bump to tag the latest draft snapshot.',
+          'The release preview found no blocking conflicts. Choose a version bump to tag the draft snapshot.',
         choices,
       },
     });
@@ -1819,7 +1893,11 @@ export class ReleaseTrackPageComponent implements OnInit {
       .pipe(take(1))
       .subscribe((type: 'major' | 'minor' | undefined) => {
         if (type !== 'major' && type !== 'minor') return;
-        this.bumpLatestRelease(type);
+        if (item) {
+          this.bumpSnapshotRelease(item, type);
+        } else {
+          this.bumpLatestRelease(type);
+        }
       });
   }
 
@@ -1837,6 +1915,32 @@ export class ReleaseTrackPageComponent implements OnInit {
       )
       .subscribe({
         next: () => this.refreshReleaseTrackState(),
+        error: err => {
+          console.error('Failed to tag release track snapshot', err);
+        },
+      });
+  }
+
+  private bumpSnapshotRelease(
+    item: SnapshotHistoryViewModel,
+    type: 'major' | 'minor'
+  ): void {
+    if (!this.id || !item.modified) return;
+
+    this.isReleasing = true;
+    this.connector
+      .bumpByModified(this.id, item.modified, { type })
+      .pipe(
+        take(1),
+        finalize(() => {
+          this.isReleasing = false;
+        })
+      )
+      .subscribe({
+        next: () => {
+          this.createdDraftSnapshot = null;
+          this.refreshReleaseTrackState();
+        },
         error: err => {
           console.error('Failed to tag release track snapshot', err);
         },
@@ -1877,24 +1981,32 @@ export class ReleaseTrackPageComponent implements OnInit {
       const previousMembers = previousSnapshot
         ? this.getSnapshotMembers(previousSnapshot)
         : [];
+      const addedCount = this.getAddedCount(
+        snapshot,
+        currentMembers,
+        previousMembers
+      );
+      const modifiedCount = this.getModifiedCount(
+        snapshot,
+        currentMembers,
+        previousMembers
+      );
+      const totalObjects = this.getSnapshotTotalObjects(
+        snapshot,
+        currentMembers
+      );
 
       return {
         snapshot,
         title: this.getSnapshotTitle(snapshot),
         created: this.getSnapshotDate(snapshot),
         modified: this.getSnapshotModified(snapshot),
+        taggedAt: this.getSnapshotTaggedAt(snapshot),
         isTagged: this.isTaggedSnapshot(snapshot),
-        addedCount: this.getAddedCount(
-          snapshot,
-          currentMembers,
-          previousMembers
-        ),
-        modifiedCount: this.getModifiedCount(
-          snapshot,
-          currentMembers,
-          previousMembers
-        ),
-        totalObjects: this.getSnapshotTotalObjects(snapshot, currentMembers),
+        stats: this.getSnapshotStats(snapshot, addedCount, modifiedCount),
+        addedCount,
+        modifiedCount,
+        totalObjects,
       };
     });
   }
@@ -1909,11 +2021,11 @@ export class ReleaseTrackPageComponent implements OnInit {
     snapshot: ReleaseTrackSnapshotHistoryItem
   ): Date | null {
     const value =
-      snapshot.created ||
       snapshot.modified ||
       snapshot.snapshot_id ||
-      snapshot.tagged_at ||
-      snapshot.stix?.modified;
+      snapshot.stix?.modified ||
+      snapshot.created ||
+      snapshot.tagged_at;
     return value ? new Date(value) : null;
   }
 
@@ -1926,12 +2038,109 @@ export class ReleaseTrackPageComponent implements OnInit {
     return value instanceof Date ? value.toISOString() : String(value);
   }
 
+  private getSnapshotTaggedAt(
+    snapshot: ReleaseTrackSnapshotHistoryItem
+  ): Date | null {
+    const value = snapshot.tagged_at;
+    return value ? new Date(value) : null;
+  }
+
   private getSnapshotTime(snapshot: ReleaseTrackSnapshotHistoryItem): number {
     return this.getSnapshotDate(snapshot)?.getTime() || 0;
   }
 
   private isTaggedSnapshot(snapshot: ReleaseTrackSnapshotHistoryItem): boolean {
     return !!(snapshot.version || snapshot.stix?.x_mitre_version);
+  }
+
+  private getSnapshotStats(
+    snapshot: ReleaseTrackSnapshotHistoryItem,
+    addedCount: number,
+    modifiedCount: number
+  ): SnapshotHistoryStat[] {
+    const stats: SnapshotHistoryStat[] = [];
+    const hasAddedCount = this.hasSnapshotCount(snapshot, 'added_count');
+    const hasModifiedCount = this.hasSnapshotCount(snapshot, 'modified_count');
+
+    if (hasAddedCount) {
+      stats.push({
+        label: 'Added',
+        value: `+${addedCount}`,
+        modifier: 'promote-color',
+      });
+    }
+
+    if (hasModifiedCount) {
+      stats.push({
+        label: 'Modified',
+        value: modifiedCount,
+        modifier: 'modified-color',
+      });
+    }
+
+    if (this.getSnapshotType(snapshot) === ReleaseTrackType.Virtual) {
+      return [
+        ...stats,
+        {
+          label: 'Members',
+          value: this.getSnapshotCount(snapshot, 'members_count') ?? 0,
+        },
+        {
+          label: 'Quarantine',
+          value:
+            this.getSnapshotCount(
+              snapshot,
+              'quarantine_count',
+              'quarantined_count'
+            ) ?? 0,
+        },
+      ];
+    }
+
+    const tierStats: SnapshotHistoryStat[] = [
+      {
+        label: 'Candidates',
+        value: this.getSnapshotCount(snapshot, 'candidates_count') ?? 0,
+        modifier: 'view-color',
+      },
+      {
+        label: 'Staged',
+        value: this.getSnapshotCount(snapshot, 'staged_count') ?? 0,
+        modifier: 'promote-color',
+      },
+      {
+        label: 'Members',
+        value: this.getSnapshotCount(snapshot, 'members_count') ?? 0,
+      },
+    ];
+
+    if (tierStats.some(stat => Number(stat.value) > 0)) {
+      return [...stats, ...tierStats];
+    }
+
+    return [
+      ...stats,
+      {
+        label: 'Total Objects',
+        value: this.getSnapshotTotalObjects(
+          snapshot,
+          this.getSnapshotMembers(snapshot)
+        ),
+      },
+    ];
+  }
+
+  private getSnapshotType(
+    snapshot: ReleaseTrackSnapshotHistoryItem
+  ): ReleaseTrackType | null {
+    const type =
+      snapshot.type ||
+      (this.isLatestHistorySnapshot(snapshot) ? this.releaseTrack?.type : null);
+    return type === ReleaseTrackType.Virtual
+      ? ReleaseTrackType.Virtual
+      : type === ReleaseTrackType.Standard
+        ? ReleaseTrackType.Standard
+        : null;
   }
 
   private getSnapshotMembers(
@@ -1980,11 +2189,13 @@ export class ReleaseTrackPageComponent implements OnInit {
     currentMembers: SnapshotMemberRef[],
     previousMembers: SnapshotMemberRef[]
   ): number {
-    if (typeof snapshot.summary?.added_count === 'number') {
-      return snapshot.summary.added_count;
-    }
-    if (typeof snapshot.summary?.promoted_count === 'number') {
-      return snapshot.summary.promoted_count;
+    const addedCount = this.getSnapshotCount(
+      snapshot,
+      'added_count',
+      'promoted_count'
+    );
+    if (addedCount !== null) {
+      return addedCount;
     }
     if (!previousMembers.length) return 0;
 
@@ -2000,8 +2211,9 @@ export class ReleaseTrackPageComponent implements OnInit {
     currentMembers: SnapshotMemberRef[],
     previousMembers: SnapshotMemberRef[]
   ): number {
-    if (typeof snapshot.summary?.modified_count === 'number') {
-      return snapshot.summary.modified_count;
+    const modifiedCount = this.getSnapshotCount(snapshot, 'modified_count');
+    if (modifiedCount !== null) {
+      return modifiedCount;
     }
     if (!previousMembers.length) return 0;
 
@@ -2023,8 +2235,27 @@ export class ReleaseTrackPageComponent implements OnInit {
     snapshot: ReleaseTrackSnapshotHistoryItem,
     members: SnapshotMemberRef[]
   ): number {
-    if (typeof snapshot.summary?.members_count === 'number') {
-      return snapshot.summary.members_count;
+    if (this.getSnapshotType(snapshot) === ReleaseTrackType.Virtual) {
+      const membersCount = this.getSnapshotCount(snapshot, 'members_count');
+      const quarantineCount = this.getSnapshotCount(
+        snapshot,
+        'quarantine_count',
+        'quarantined_count'
+      );
+      if (membersCount !== null || quarantineCount !== null) {
+        return (membersCount ?? 0) + (quarantineCount ?? 0);
+      }
+    }
+
+    const membersCount = this.getSnapshotCount(snapshot, 'members_count');
+    const stagedCount = this.getSnapshotCount(snapshot, 'staged_count');
+    const candidatesCount = this.getSnapshotCount(snapshot, 'candidates_count');
+    if (
+      membersCount !== null ||
+      stagedCount !== null ||
+      candidatesCount !== null
+    ) {
+      return (membersCount ?? 0) + (stagedCount ?? 0) + (candidatesCount ?? 0);
     }
     if (typeof snapshot.composition_resolution?.total_objects === 'number') {
       return snapshot.composition_resolution.total_objects;
@@ -2039,6 +2270,45 @@ export class ReleaseTrackPageComponent implements OnInit {
       .filter((ref): ref is string => !!ref);
 
     return new Set(allRefs).size;
+  }
+
+  private hasSnapshotCount(
+    snapshot: ReleaseTrackSnapshotHistoryItem,
+    ...keys: string[]
+  ): boolean {
+    return this.getSnapshotCount(snapshot, ...keys) !== null;
+  }
+
+  private getSnapshotCount(
+    snapshot: ReleaseTrackSnapshotHistoryItem,
+    ...keys: string[]
+  ): number | null {
+    const latestSnapshot = this.isLatestHistorySnapshot(snapshot)
+      ? this.releaseTrack
+      : null;
+
+    for (const key of keys) {
+      const value =
+        snapshot[key] ??
+        snapshot.summary?.[key] ??
+        latestSnapshot?.summary?.[key] ??
+        snapshot.statistics?.[key] ??
+        null;
+      if (typeof value === 'number') return value;
+    }
+
+    return null;
+  }
+
+  private isLatestHistorySnapshot(
+    snapshot: ReleaseTrackSnapshotHistoryItem
+  ): boolean {
+    if (snapshot.is_latest) return true;
+    if (!this.releaseTrack?.modified) return false;
+    return (
+      this.getSnapshotModified(snapshot) ===
+      this.toIsoString(this.releaseTrack.modified)
+    );
   }
 
   private getSnapshotExportFilename(

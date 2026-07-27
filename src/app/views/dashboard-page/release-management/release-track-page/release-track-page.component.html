@@ -615,7 +615,15 @@
       <div
         *ngIf="!isLoadingSnapshotHistory && !snapshotHistory.length"
         class="empty-state">
-        No snapshots
+        No tagged releases or current draft snapshot
+      </div>
+
+      <div *ngIf="snapshotHistory.length" class="snapshot-history-summary">
+        <span>Tagged releases: {{ taggedSnapshotCount }}</span>
+        <span
+          >Current draft:
+          {{ hasCurrentDraftSnapshot ? 'available' : 'none' }}</span
+        >
       </div>
 
       <div *ngIf="snapshotHistory.length" class="snapshot-history-list">
@@ -631,25 +639,45 @@
           <div class="snapshot-history-card">
             <div class="snapshot-history-card-header">
               <div class="snapshot-history-title">
-                <h3 [class.promote-color]="item.isTagged">
-                  <ng-container *ngIf="item.isTagged; else draftTitle">
-                    {{ item.title }}
+                <div class="snapshot-history-title-row">
+                  <h3 [class.promote-color]="item.isTagged">
+                    <ng-container *ngIf="item.isTagged; else draftTitle">
+                      {{ item.title }}
+                    </ng-container>
+                    <ng-template #draftTitle>
+                      <ng-container *ngIf="item.created; else unknownDate">
+                        {{ item.created | date: 'MMM d, y, h:mm:ss a' }}
+                      </ng-container>
+                    </ng-template>
+                  </h3>
+                  <span
+                    class="snapshot-history-type"
+                    [class.snapshot-history-type-tagged]="item.isTagged"
+                    [class.snapshot-history-type-draft]="!item.isTagged">
+                    {{ item.isTagged ? 'Tagged release' : 'Current draft' }}
+                  </span>
+                </div>
+                <p *ngIf="item.isTagged; else draftSubtitle">
+                  <ng-container *ngIf="item.taggedAt; else taggedSnapshotDate">
+                    Tagged:
+                    {{ item.taggedAt | date: 'MMM d, y, h:mm:ss a' }}
                   </ng-container>
-                  <ng-template #draftTitle>
-                    <ng-container *ngIf="item.created; else unknownDate">
-                      {{ item.created | date: 'MMM d, y, h:mm:ss a' }}
+                  <ng-template #taggedSnapshotDate>
+                    Snapshot:
+                    <ng-container *ngIf="item.modified; else unknownDate">
+                      {{ item.modified | date: 'MMM d, y, h:mm:ss a' }}
                     </ng-container>
                   </ng-template>
-                </h3>
-                <p *ngIf="item.isTagged; else draftSubtitle">
-                  Created:
-                  <ng-container *ngIf="item.created; else unknownDate">
-                    {{ item.created | date: 'MMM d, y, h:mm:ss a' }}
-                  </ng-container>
                 </p>
                 <ng-template #draftSubtitle>
-                  <p>Draft snapshot</p>
+                  <p>Current draft snapshot</p>
                 </ng-template>
+                <p
+                  *ngIf="item.isTagged && item.taggedAt && item.modified"
+                  class="snapshot-history-meta">
+                  Snapshot:
+                  {{ item.modified | date: 'MMM d, y, h:mm:ss a' }}
+                </p>
               </div>
 
               <div class="snapshot-history-actions small-buttons">
@@ -657,7 +685,8 @@
                   *ngIf="!item.isTagged"
                   class="view-color"
                   mat-stroked-button
-                  (click)="onTagSnapshot()">
+                  [disabled]="isReleasing || !item.modified"
+                  (click)="onTagSnapshot(item)">
                   <mat-icon>sell</mat-icon>
                   Tag
                 </button>
@@ -676,23 +705,15 @@
             </div>
 
             <div class="snapshot-history-stats">
-              <div class="snapshot-history-stat">
-                <div class="snapshot-history-stat-value promote-color">
-                  +{{ item.addedCount }}
+              <div
+                *ngFor="let stat of item.stats"
+                class="snapshot-history-stat">
+                <div
+                  class="snapshot-history-stat-value"
+                  [ngClass]="stat.modifier">
+                  {{ stat.value }}
                 </div>
-                <div class="snapshot-history-stat-label">Added</div>
-              </div>
-              <div class="snapshot-history-stat">
-                <div class="snapshot-history-stat-value modified-color">
-                  {{ item.modifiedCount }}
-                </div>
-                <div class="snapshot-history-stat-label">Modified</div>
-              </div>
-              <div class="snapshot-history-stat">
-                <div class="snapshot-history-stat-value">
-                  {{ item.totalObjects }}
-                </div>
-                <div class="snapshot-history-stat-label">Total Objects</div>
+                <div class="snapshot-history-stat-label">{{ stat.label }}</div>
               </div>
             </div>
           </div>

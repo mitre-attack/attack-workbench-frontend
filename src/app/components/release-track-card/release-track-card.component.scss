@@ -5,11 +5,13 @@ $virtual-light: #5c4fa3;
 $virtual-dark: #c7b9ff;
 $candidate-dark: colors.color(mitre-light-blue);
 $staged-dark: color.mix(white, colors.color(success), 28%);
+$description-line-height: 1.25rem;
+$description-lines: 4;
 
 .list-card {
   cursor: pointer;
   width: 22rem;
-  height: 18rem;
+  height: 19rem;
   box-sizing: border-box;
   color: colors.on-color-emphasis(light);
 }
@@ -81,16 +83,19 @@ $staged-dark: color.mix(white, colors.color(success), 28%);
   flex-direction: column;
   flex: 1 1 auto;
   min-height: 0;
+  overflow: hidden;
 }
 
 .card-desc {
   display: -webkit-box;
-  flex: 0 1 auto;
+  flex: 0 0 ($description-line-height * $description-lines);
+  min-width: 0;
+  max-height: $description-line-height * $description-lines;
   margin-bottom: 12px;
   overflow: hidden;
-  line-height: 1.25;
+  line-height: $description-line-height;
   -webkit-box-orient: vertical;
-  -webkit-line-clamp: 4;
+  -webkit-line-clamp: $description-lines;
 }
 
 .card-middle {
