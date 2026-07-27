@@ -133,15 +133,13 @@
         <strong>{{ selectedVersionLabel }}</strong>
       </div>
       <div class="save-footer-actions">
-        <button mat-stroked-button mat-dialog-close>
-          Cancel, Keep Editing
-        </button>
+        <button mat-stroked-button mat-dialog-close>Cancel</button>
         <button
           mat-raised-button
           color="primary"
           [disabled]="!saveEnabled"
           (click)="onConfirmSave()">
-          Save & Update Status
+          Save
         </button>
       </div>
     </footer>
