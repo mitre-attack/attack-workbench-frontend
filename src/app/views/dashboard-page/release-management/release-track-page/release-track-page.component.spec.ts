@@ -50,6 +50,7 @@ describe('ReleaseTrackPageComponent', () => {
       createVirtualSnapshot: vi.fn(() => createAsyncObservable({})),
       previewBump: vi.fn(() => createAsyncObservable({})),
       bumpByLatest: vi.fn(() => createAsyncObservable({})),
+      bumpByModified: vi.fn(() => createAsyncObservable({})),
       getConfig: vi.fn(() => createAsyncObservable(null)),
       updateConfig: vi.fn(() => createAsyncObservable({})),
       updateComposition: vi.fn(() => createAsyncObservable({})),
@@ -247,7 +248,7 @@ describe('ReleaseTrackPageComponent', () => {
 
     expect(mockReleaseTrackApiConnector.getLatestSnapshot).toHaveBeenCalledWith(
       'release-track--123',
-      { include: 'all' }
+      { format: 'workbench', include: 'all' }
     );
     expect(component.releaseTrack?.name).toBe('Enterprise Release');
   });
@@ -626,6 +627,46 @@ describe('ReleaseTrackPageComponent', () => {
     expect(refreshSpy).toHaveBeenCalled();
     expect(historySpy).toHaveBeenCalled();
     expect(component.isReleasing).toBe(false);
+  });
+
+  it('should preview and tag a selected draft snapshot', () => {
+    const refreshSpy = vi
+      .spyOn(component, 'getReleaseTrack')
+      .mockImplementation(() => undefined);
+    const historySpy = vi
+      .spyOn(component, 'getSnapshotHistory')
+      .mockImplementation(() => undefined);
+    mockReleaseTrackApiConnector.previewBump.mockReturnValue(
+      of({
+        next_version_minor: '1.2',
+        next_version_major: '2.0',
+        conflicts: [],
+      })
+    );
+    mockReleaseTrackApiConnector.bumpByModified.mockReturnValue(of({}));
+    mockDialog.open.mockReturnValue({
+      afterClosed: () => of('major'),
+    });
+    component.id = 'release-track--123';
+
+    component.onTagSnapshot({
+      modified: '2026-07-23T13:37:28.000Z',
+      isTagged: false,
+    } as any);
+
+    expect(mockReleaseTrackApiConnector.previewBump).toHaveBeenCalledWith(
+      'release-track--123',
+      'workbench',
+      '2026-07-23T13:37:28.000Z'
+    );
+    expect(mockReleaseTrackApiConnector.bumpByModified).toHaveBeenCalledWith(
+      'release-track--123',
+      '2026-07-23T13:37:28.000Z',
+      { type: 'major' }
+    );
+    expect(mockReleaseTrackApiConnector.bumpByLatest).not.toHaveBeenCalled();
+    expect(refreshSpy).toHaveBeenCalled();
+    expect(historySpy).toHaveBeenCalled();
   });
 
   it('should not tag a release when preview returns conflicts', () => {

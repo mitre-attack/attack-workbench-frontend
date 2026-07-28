@@ -2,7 +2,7 @@ import { Component, Inject, OnInit, ViewEncapsulation } from '@angular/core';
 import { MatDialogRef, MAT_DIALOG_DATA } from '@angular/material/dialog';
 import { forkJoin, Observable, of } from 'rxjs';
 import { catchError, map, switchMap } from 'rxjs/operators';
-import { SnapshotTier } from 'src/app/classes/release-tracks';
+import { ExportFormat, SnapshotTier } from 'src/app/classes/release-tracks';
 import type {
   ReleaseTrackObjectTier,
   StixObjectRef,
@@ -375,7 +375,10 @@ export class SaveDialogComponent implements OnInit {
               }
 
               return this.releaseTracksService
-                .getLatestSnapshot(trackId, { include: 'all' })
+                .getLatestSnapshot(trackId, {
+                  format: ExportFormat.Workbench,
+                  include: 'all',
+                })
                 .pipe(
                   map(snapshot =>
                     this.toTrackRow(track, snapshot, workspaceTrack)
