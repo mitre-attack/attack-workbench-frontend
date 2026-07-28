@@ -145,10 +145,9 @@ export class StixDialogComponent implements OnInit {
       : this.config.object;
     const save: Observable<void> =
       object instanceof Relationship
-        ? object.save(
-            this.restApiService,
-            this.releaseTracksService
-          ).pipe(map(() => undefined))
+        ? object
+            .save(this.restApiService, this.releaseTracksService)
+            .pipe(map(() => undefined))
         : object.save(this.restApiService).pipe(map(() => undefined));
     const subscription = save.subscribe({
       next: result => {
