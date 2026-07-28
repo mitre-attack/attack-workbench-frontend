@@ -126,6 +126,33 @@ describe('ReleaseTrackPageComponent', () => {
     expect(component).toBeTruthy();
   });
 
+  it('should only show a diff for the latest pin when an object is both staged and a candidate', () => {
+    const staged = {
+      object_ref: 'attack-pattern--shared',
+      object_modified: '2026-01-01T00:00:00.000Z',
+    } as any;
+    const candidate = {
+      object_ref: 'attack-pattern--shared',
+      object_modified: '2026-02-01T00:00:00.000Z',
+    } as any;
+    const unrelatedCandidate = {
+      object_ref: 'attack-pattern--candidate-only',
+      object_modified: '2026-01-01T00:00:00.000Z',
+    } as any;
+    component.releaseTrack = {
+      staged: [staged],
+      candidates: [candidate, unrelatedCandidate],
+    } as any;
+
+    expect(component.shouldShowDiff(staged)).toBe(false);
+    expect(component.shouldShowDiff(candidate)).toBe(true);
+    expect(component.shouldShowDiff(unrelatedCandidate)).toBe(true);
+    expect(component.getDiffUnavailableMessage(staged)).toBe(
+      'A newer revision of this object is available in the release track. View its diff instead.'
+    );
+    expect(component.getDiffUnavailableMessage(candidate)).toBeNull();
+  });
+
   it('should delete the release track after confirmation', () => {
     mockDialog.open.mockReturnValue({
       afterClosed: () => of(true),

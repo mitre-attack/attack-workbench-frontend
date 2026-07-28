@@ -47,6 +47,8 @@ export class ReleaseTrackObjectCardComponent {
   @Input() laneStatus: WorkflowStatusType | null = null;
   @Input() showDescription = true;
   @Input() showDiff = true;
+  @Input() diffDisabled = false;
+  @Input() diffDisabledMessage = '';
   @Input() showModifiedMeta = true;
 
   @Output() viewObject = new EventEmitter<ReleaseTrackObjectItem>();

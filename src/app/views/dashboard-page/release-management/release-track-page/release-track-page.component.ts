@@ -843,8 +843,50 @@ export class ReleaseTrackPageComponent implements OnInit {
     return this.autoPromotionEnabled && !lane.isReleasedMembers;
   }
 
+  /**
+   * When different revisions of an object occupy both workflow tiers, only the
+   * newest pin can present a non-misleading relationship diff.
+   */
+  public shouldShowDiff(item: ReleaseTrackObjectItem): boolean {
+    if (!item?.object_ref) return true;
+
+    const staged = (this.releaseTrack?.staged || []).filter(
+      entry => entry.object_ref === item.object_ref
+    );
+    const candidates = (this.releaseTrack?.candidates || []).filter(
+      entry => entry.object_ref === item.object_ref
+    );
+
+    if (!staged.length || !candidates.length) return true;
+
+    const itemModified = this.getModifiedTimestamp(item.object_modified);
+    const pins = [...staged, ...candidates].map(entry =>
+      this.getModifiedTimestamp(entry.object_modified)
+    );
+    if (
+      !Number.isFinite(itemModified) ||
+      pins.some(time => !Number.isFinite(time))
+    ) {
+      return true;
+    }
+
+    return itemModified === Math.max(...pins);
+  }
+
+  public getDiffUnavailableMessage(
+    item: ReleaseTrackObjectItem
+  ): string | null {
+    return this.shouldShowDiff(item)
+      ? null
+      : 'A newer revision of this object is available in the release track. View its diff instead.';
+  }
+
   public toggleReleasedMembers(): void {
     this.showReleasedMembers = !this.showReleasedMembers;
+  }
+
+  private getModifiedTimestamp(value?: Date | string): number {
+    return value ? new Date(value).getTime() : Number.NaN;
   }
 
   public onEditDescription(): void {

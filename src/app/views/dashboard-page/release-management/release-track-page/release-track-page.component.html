@@ -558,6 +558,8 @@
       [laneStatus]="getLaneStatus(item, lane)"
       [showDescription]="shouldShowLaneDescription(lane)"
       [showDiff]="!canReviewAndApprove(item, lane)"
+      [diffDisabled]="!shouldShowDiff(item)"
+      [diffDisabledMessage]="getDiffUnavailableMessage(item) || ''"
       [showModifiedMeta]="true"
       (viewObject)="onView($event.object_ref)"
       (diffObject)="onDiff($event)">
