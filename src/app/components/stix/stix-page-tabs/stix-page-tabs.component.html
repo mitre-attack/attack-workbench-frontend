@@ -21,6 +21,15 @@
     </mat-tab>
   </ng-container>
 
+  <mat-tab *ngIf="showMembership">
+    <ng-template mat-tab-label>
+      <span class="nav-tab-label">MEMBERSHIP</span>
+    </ng-template>
+    <ng-template matTabContent>
+      <app-membership-section [config]="config"></app-membership-section>
+    </ng-template>
+  </mat-tab>
+
   <mat-tab *ngIf="showHistory">
     <ng-template mat-tab-label>
       <span class="nav-tab-label">HISTORY</span>

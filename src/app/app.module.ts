@@ -76,6 +76,7 @@ import { MultipleChoiceDialogComponent } from './components/multiple-choice-dial
 import { NavigationComponent } from './components/navigation/navigation.component';
 import { ReferenceEditDialogComponent } from './components/reference-edit-dialog/reference-edit-dialog.component';
 import { HistoryTimelineComponent } from './components/stix/stix-page-tabs/history-timeline/history-timeline.component';
+import { MembershipSectionComponent } from './components/stix/stix-page-tabs/membership-section/membership-section.component';
 import { ReferenceSidebarComponent } from './components/resources-drawer/reference-sidebar/reference-sidebar.component';
 import { ResourcesDrawerComponent } from './components/resources-drawer/resources-drawer.component';
 import { SearchComponent } from './components/resources-drawer/search/search.component';
@@ -264,6 +265,7 @@ export function initConfig(appConfigService: AppConfigService) {
     AddDialogComponent,
     DeleteDialogComponent,
     HistoryTimelineComponent,
+    MembershipSectionComponent,
     ReferenceSidebarComponent,
     ReferenceEditDialogComponent,
     MultipleChoiceDialogComponent,

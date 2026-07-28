@@ -19,4 +19,6 @@ export class StixPageTabsComponent {
   @Input() detailsTemplate!: TemplateRef<any>;
   @Input() customTabs: CustomTab[] = [];
   @Input() showHistory = true;
+  @Input() showNotes = true;
+  @Input() showMembership = true;
 }
