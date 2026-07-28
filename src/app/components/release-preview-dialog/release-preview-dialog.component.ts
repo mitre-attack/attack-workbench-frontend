@@ -5,6 +5,7 @@ import { VersionNumber } from 'src/app/classes/version-number';
 
 export interface ReleasePreviewDialogData {
   track: any;
+  conflicts?: any[];
 }
 
 interface ReleaseTrackObject {
@@ -127,7 +128,10 @@ export class ReleasePreviewDialogComponent {
   }
 
   public get hasInvalidVersionBumps(): boolean {
-    return this.includedObjects.some(item => item.invalidVersionBump);
+    return (
+      !!this.data.conflicts?.length ||
+      this.includedObjects.some(item => item.invalidVersionBump)
+    );
   }
 
   public close(): void {

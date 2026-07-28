@@ -110,7 +110,6 @@ describe('StixListComponent', () => {
       expect(component.tableColumns).toContain('state');
     });
   });
-
   it('should ignore objects without domains when filtering local objects by domain', () => {
     const domainlessObject = {
       stixID: 'campaign--1',

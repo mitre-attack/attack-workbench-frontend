@@ -1,0 +1,777 @@
+@use 'sass:color';
+@use '../../../../../style/globals';
+@use '../../../../../style/colors' as colors;
+
+$membership-accent: colors.color(mitre-light-blue);
+$membership-accent-dark: #62c9ff;
+$membership-success: colors.color(secondary);
+$membership-release: colors.color(active);
+
+// Explicit purple values for the virtual release-track badge.
+$membership-virtual: #8c5bd6;
+$membership-virtual-light: #6f3db8;
+$membership-virtual-dark: #c3a0f4;
+
+:host {
+  display: block;
+  width: 100%;
+}
+
+.membership-section {
+  box-sizing: border-box;
+  width: 100%;
+  padding-top: 32px;
+}
+
+.membership-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  box-sizing: border-box;
+  width: 100%;
+  gap: 24px;
+  margin-bottom: 22px;
+
+  h2 {
+    margin: 0;
+    color: $membership-accent;
+    font-size: 18px;
+    font-weight: 700;
+    letter-spacing: 0.2px;
+    line-height: 24px;
+    text-align: left;
+  }
+}
+
+.membership-header-actions {
+  display: flex;
+  align-items: center;
+  flex: 0 0 auto;
+  gap: 10px;
+  margin-left: auto;
+}
+
+button.membership-action-button {
+  display: inline-flex;
+  box-sizing: border-box;
+  min-width: 68px;
+  height: 34px;
+  align-items: center;
+  justify-content: center;
+  padding: 0 14px;
+  border: 1px solid;
+  border-radius: 4px;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 650;
+  line-height: 32px;
+  visibility: visible;
+  opacity: 1;
+  transition:
+    background-color 120ms ease,
+    border-color 120ms ease,
+    color 120ms ease;
+
+  &:disabled,
+  &[disabled] {
+    display: inline-flex;
+    cursor: default;
+    visibility: visible;
+    opacity: 1;
+  }
+}
+
+.loading-state {
+  display: flex;
+  box-sizing: border-box;
+  min-height: 150px;
+  align-items: center;
+  justify-content: center;
+  padding: 28px;
+  border: 1px solid;
+  border-radius: 4px;
+  text-align: center;
+}
+
+.empty-membership-state {
+  padding: 28px;
+  border: 1px solid;
+  border-radius: 4px;
+  text-align: center;
+
+  h3 {
+    margin: 0 0 6px;
+    font-size: 16px;
+  }
+
+  p {
+    margin: 0;
+    font-size: 13px;
+  }
+}
+
+.add-track-button {
+  min-height: 34px;
+  margin-top: 18px;
+  padding: 0 14px;
+  border: 1px solid;
+  border-radius: 4px;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 650;
+
+  &:disabled {
+    cursor: default;
+    opacity: 0.65;
+  }
+}
+
+.membership-error {
+  margin: 12px 0 0;
+  color: colors.color(error);
+  font-size: 13px;
+  text-align: center;
+}
+
+.release-track-list {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.release-track-card {
+  overflow: hidden;
+  border: 1px solid;
+  border-radius: 4px;
+  transition:
+    border-color 120ms ease,
+    box-shadow 120ms ease,
+    background-color 120ms ease;
+}
+
+.release-track-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 16px;
+  border-bottom: 1px solid;
+}
+
+.release-track-heading {
+  min-width: 0;
+
+  h3 {
+    margin: 0 0 4px;
+    font-size: 17px;
+    font-weight: 700;
+    line-height: 23px;
+    text-align: left;
+  }
+
+  p {
+    margin: 0;
+    font-size: 13px;
+    line-height: 18px;
+  }
+}
+
+.release-track-actions {
+  display: flex;
+  align-items: center;
+  flex: 0 0 auto;
+  gap: 10px;
+}
+
+.view-track-button {
+  display: inline-flex;
+  box-sizing: border-box;
+  min-height: 30px;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 0 12px;
+  border: 1px solid;
+  border-radius: 4px;
+  background: transparent;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 650;
+  transition:
+    background-color 120ms ease,
+    border-color 120ms ease,
+    color 120ms ease;
+
+  &:disabled {
+    cursor: default;
+  }
+}
+
+.external-link-icon {
+  color: inherit;
+  font-size: 13px;
+  line-height: 1;
+}
+
+.track-type-badge {
+  display: inline-flex;
+  box-sizing: border-box;
+  min-height: 22px;
+  align-items: center;
+  justify-content: center;
+  padding: 0 10px;
+  border: 1px solid;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 750;
+  line-height: 20px;
+  white-space: nowrap;
+  text-transform: uppercase;
+}
+
+.track-type-badge--virtual {
+  border-color: rgba($membership-virtual, 0.9);
+  background: rgba($membership-virtual, 0.18);
+  color: $membership-virtual;
+}
+
+.release-track-content {
+  display: grid;
+  grid-template-columns: minmax(280px, 1fr) minmax(420px, 2fr);
+  gap: 20px;
+  padding: 18px 16px;
+}
+
+.draft-column,
+.releases-column {
+  min-width: 0;
+
+  h4 {
+    margin: 0 0 10px;
+    color: $membership-accent;
+    font-size: 13px;
+    font-weight: 700;
+    line-height: 18px;
+    text-align: left;
+  }
+}
+
+.no-current-draft,
+.no-production-releases {
+  margin: 0;
+  font-size: 13px;
+  font-style: italic;
+  line-height: 18px;
+}
+
+.draft-card,
+.production-release {
+  border: 1px solid;
+  border-radius: 4px;
+}
+
+.draft-card {
+  padding: 12px;
+}
+
+.release-selection,
+.production-release {
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+}
+
+.release-selection {
+  cursor: pointer;
+}
+
+.production-release-list {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.production-release {
+  box-sizing: border-box;
+  min-height: 52px;
+  padding: 10px 12px;
+  cursor: pointer;
+  transition:
+    background-color 120ms ease,
+    border-color 120ms ease;
+
+  .release-information strong {
+    color: $membership-release;
+  }
+
+  .release-tag-icon {
+    border-color: $membership-release;
+
+    &::after {
+      background: $membership-release;
+    }
+  }
+}
+
+.release-information {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 3px;
+
+  strong {
+    color: $membership-success;
+    font-size: 14px;
+    font-weight: 700;
+    line-height: 18px;
+  }
+
+  small {
+    overflow: hidden;
+    font-size: 11px;
+    line-height: 15px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
+.draft-status {
+  text-transform: capitalize;
+}
+
+.draft-status--in-review {
+  color: colors.color(pending) !important;
+}
+
+.draft-status--staged {
+  color: colors.color(active) !important;
+}
+
+.release-tag-icon {
+  position: relative;
+  width: 13px;
+  height: 9px;
+  margin-top: 4px;
+  border: 1.5px solid $membership-success;
+  border-radius: 2px 4px 4px 2px;
+  flex: 0 0 auto;
+  transform: rotate(45deg);
+
+  &::after {
+    position: absolute;
+    top: 2px;
+    left: 1px;
+    width: 2px;
+    height: 2px;
+    border-radius: 50%;
+    background: $membership-success;
+    content: '';
+  }
+}
+
+input[type='checkbox'] {
+  width: 14px;
+  height: 14px;
+  margin: 3px 0 0;
+  accent-color: $membership-success;
+  cursor: pointer;
+
+  &:disabled {
+    cursor: default;
+  }
+}
+
+.status-progress {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+  margin-top: 16px;
+}
+
+.status-step {
+  display: flex;
+  min-height: 22px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid;
+  border-radius: 4px;
+  font-size: 9px;
+  font-weight: 750;
+  line-height: 20px;
+  text-transform: uppercase;
+}
+
+.status-step--active {
+  border-color: rgba($membership-success, 0.65) !important;
+  background: rgba($membership-success, 0.18) !important;
+  color: $membership-success !important;
+}
+
+.status-step--review-active {
+  border-color: rgba(colors.color(pending), 0.8) !important;
+  background: rgba(colors.color(pending), 0.16) !important;
+  color: colors.color(pending) !important;
+}
+
+.status-step--staged-active {
+  border-color: rgba(colors.color(active), 0.8) !important;
+  background: rgba(colors.color(active), 0.16) !important;
+  color: colors.color(active) !important;
+}
+
+/*
+ * Light mode
+ *
+ * Mirrors the dashboard's white cards, subtle inner surfaces,
+ * standard borders and dark text.
+ */
+:host-context(.light) {
+  .membership-section {
+    color: colors.color(dark);
+  }
+
+  .membership-header {
+    h2 {
+      color: colors.color(primary);
+    }
+  }
+
+  button.membership-action-button {
+    border-color: colors.border-color(light);
+    background: #ffffff;
+    color: colors.color(dark);
+
+    &:hover:not(:disabled) {
+      border-color: rgba(colors.color(primary), 0.45);
+      background: color.mix(colors.color(mitre-light-blue), #ffffff, 18%);
+    }
+
+    &:disabled,
+    &[disabled] {
+      border-color: colors.border-color(light);
+      background: #ffffff;
+      color: colors.on-color-deemphasis(light);
+    }
+  }
+
+  button.membership-action-button--primary {
+    border-color: rgba(colors.color(dark), 0.3);
+    background: rgba(colors.color(dark), 0.62);
+    color: colors.color(light);
+
+    &:hover:not(:disabled) {
+      border-color: rgba(colors.color(dark), 0.75);
+      background: rgba(colors.color(dark), 0.75);
+    }
+
+    &:disabled,
+    &[disabled] {
+      border-color: rgba(colors.color(dark), 0.18);
+      background: rgba(colors.color(dark), 0.28);
+      color: rgba(colors.color(light), 0.9);
+    }
+  }
+
+  .loading-state,
+  .empty-membership-state,
+  .release-track-card {
+    border-color: colors.border-color(light);
+    background: #ffffff;
+  }
+
+  .loading-state {
+    color: colors.on-color-deemphasis(light);
+  }
+
+  .draft-column,
+  .releases-column {
+    h4 {
+      color: colors.color(primary-dark);
+    }
+  }
+
+  .empty-membership-state {
+    h3 {
+      color: colors.color(dark);
+    }
+
+    p {
+      color: colors.on-color-deemphasis(light);
+    }
+  }
+
+  .add-track-button {
+    border-color: colors.color(primary);
+    background: colors.color(primary);
+    color: colors.on-color(primary);
+  }
+
+  .release-track-header {
+    border-bottom-color: colors.border-color(light);
+  }
+
+  .release-track-heading {
+    h3 {
+      color: colors.color(dark);
+    }
+
+    p {
+      color: colors.on-color-deemphasis(light);
+    }
+  }
+
+  .view-track-button {
+    border-color: rgba(colors.color(primary), 0.45);
+    color: colors.color(primary);
+
+    &:hover:not(:disabled) {
+      border-color: colors.color(primary);
+      background: color.mix(colors.color(mitre-light-blue), #ffffff, 20%);
+    }
+
+    &:disabled {
+      border-color: colors.border-color(light);
+      background: transparent;
+      color: colors.on-color-deemphasis(light);
+      opacity: 0.65;
+    }
+  }
+
+  .track-type-badge {
+    border-color: rgba(colors.color(primary), 0.55);
+    background: color.mix(colors.color(mitre-light-blue), #ffffff, 24%);
+    color: colors.color(primary);
+  }
+
+  .track-type-badge--virtual {
+    border-color: rgba($membership-virtual-light, 0.8);
+    background: rgba($membership-virtual, 0.14);
+    color: $membership-virtual-light;
+  }
+
+  .no-current-draft,
+  .no-production-releases,
+  .release-information small {
+    color: colors.on-color-deemphasis(light);
+  }
+
+  .draft-card,
+  .production-release {
+    border-color: colors.border-color(light);
+    background: rgba(colors.color(mitre-black), 0.025);
+  }
+
+  .production-release {
+    &:hover {
+      border-color: rgba(colors.color(primary), 0.3);
+      background: color.mix(colors.color(mitre-light-blue), #ffffff, 14%);
+    }
+  }
+
+  .status-step {
+    border-color: colors.border-color(light);
+    background: #ffffff;
+    color: colors.on-color-deemphasis(light);
+  }
+}
+
+/*
+ * Dark mode
+ */
+:host-context(.dark) {
+  .membership-section {
+    color: colors.color(light);
+  }
+
+  .membership-header {
+    h2 {
+      color: colors.color(mitre-light-blue);
+    }
+  }
+
+  button.membership-action-button {
+    border-color: colors.border-color(dark);
+    background: transparent;
+    color: colors.color(light);
+
+    &:hover:not(:disabled) {
+      border-color: rgba(colors.color(mitre-silver), 0.5);
+      background: rgba(colors.color(mitre-silver), 0.08);
+    }
+
+    &:disabled,
+    &[disabled] {
+      border-color: colors.border-color(dark);
+      background: transparent;
+      color: colors.on-color-deemphasis(dark);
+    }
+  }
+
+  button.membership-action-button--primary {
+    border-color: rgba(colors.color(mitre-silver), 0.28);
+    background: rgba(colors.color(mitre-silver), 0.2);
+    color: colors.color(mitre-silver);
+
+    &:hover:not(:disabled) {
+      background: rgba(colors.color(mitre-silver), 0.28);
+    }
+
+    &:disabled,
+    &[disabled] {
+      border-color: rgba(colors.color(mitre-silver), 0.2);
+      background: rgba(colors.color(mitre-silver), 0.1);
+      color: rgba(colors.color(mitre-silver), 0.45);
+    }
+  }
+
+  .loading-state,
+  .empty-membership-state,
+  .release-track-card {
+    border-color: colors.border-color(dark);
+    background: color.mix(colors.color(dark), #ffffff, 94%);
+  }
+
+  .loading-state {
+    color: colors.on-color-deemphasis(dark);
+  }
+
+  .empty-membership-state {
+    h3 {
+      color: colors.color(light);
+    }
+
+    p {
+      color: colors.on-color-deemphasis(dark);
+    }
+  }
+
+  .add-track-button {
+    border-color: $membership-accent;
+    background: transparent;
+    color: $membership-accent;
+  }
+
+  .release-track-header {
+    border-bottom-color: colors.border-color(dark);
+  }
+
+  .release-track-heading {
+    h3 {
+      color: colors.color(light);
+    }
+
+    p {
+      color: colors.on-color-deemphasis(dark);
+    }
+  }
+
+  .view-track-button {
+    border-color: rgba($membership-accent, 0.45);
+    color: $membership-accent;
+
+    &:hover:not(:disabled) {
+      border-color: $membership-accent;
+      background: rgba($membership-accent, 0.08);
+    }
+
+    &:disabled {
+      border-color: colors.border-color(dark);
+      background: transparent;
+      color: colors.on-color-deemphasis(dark);
+      opacity: 0.65;
+    }
+  }
+
+  .track-type-badge {
+    border-color: rgba($membership-accent, 0.65);
+    background: rgba($membership-accent, 0.12);
+    color: $membership-accent;
+  }
+
+  .track-type-badge--virtual {
+    border-color: rgba($membership-virtual-dark, 0.9);
+    background: rgba($membership-virtual, 0.26);
+    color: $membership-virtual-dark;
+  }
+
+  .no-current-draft,
+  .no-production-releases,
+  .release-information small {
+    color: colors.on-color-deemphasis(dark);
+  }
+
+  .draft-status {
+    color: $membership-accent-dark;
+  }
+
+  .draft-card,
+  .production-release {
+    border-color: colors.border-color(dark);
+    background: rgba(colors.color(mitre-silver), 0.06);
+  }
+
+  .production-release {
+    &:hover {
+      border-color: rgba(colors.color(mitre-silver), 0.36);
+      background: rgba(colors.color(mitre-silver), 0.1);
+    }
+  }
+
+  .status-step {
+    border-color: colors.border-color(dark);
+    background: rgba(colors.color(mitre-silver), 0.04);
+    color: colors.on-color-deemphasis(dark);
+  }
+
+  .status-step--active {
+    border-color: rgba($membership-accent-dark, 0.9) !important;
+    background: rgba($membership-accent-dark, 0.2) !important;
+    color: $membership-accent-dark !important;
+  }
+
+  .status-step--review-active {
+    border-color: rgba(colors.color(pending), 0.9) !important;
+    background: rgba(colors.color(pending), 0.2) !important;
+    color: colors.color(pending) !important;
+  }
+
+  .status-step--staged-active {
+    border-color: rgba(colors.color(active), 0.9) !important;
+    background: rgba(colors.color(active), 0.2) !important;
+    color: colors.color(active) !important;
+  }
+}
+
+@media (max-width: 900px) {
+  .release-track-content {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 650px) {
+  .membership-section {
+    padding-top: 24px;
+  }
+
+  .membership-header,
+  .release-track-header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .membership-header-actions,
+  .release-track-actions {
+    flex-wrap: wrap;
+  }
+
+  .membership-header-actions {
+    margin-left: 0;
+  }
+
+  .membership-action-button {
+    flex: 1;
+  }
+}

@@ -51,6 +51,7 @@ describe('ReleaseTrackPageComponent', () => {
       createVirtualSnapshot: vi.fn(() => createAsyncObservable({})),
       previewBump: vi.fn(() => createAsyncObservable({})),
       bumpByLatest: vi.fn(() => createAsyncObservable({})),
+      bumpByModified: vi.fn(() => createAsyncObservable({})),
       getConfig: vi.fn(() => createAsyncObservable(null)),
       updateConfig: vi.fn(() => createAsyncObservable({})),
       updateComposition: vi.fn(() => createAsyncObservable({})),
@@ -248,7 +249,7 @@ describe('ReleaseTrackPageComponent', () => {
 
     expect(mockReleaseTrackApiConnector.getLatestSnapshot).toHaveBeenCalledWith(
       'release-track--123',
-      { include: 'all' }
+      { format: 'workbench', include: 'all' }
     );
     expect(component.releaseTrack?.name).toBe('Enterprise Release');
   });
@@ -591,36 +592,36 @@ describe('ReleaseTrackPageComponent', () => {
     const historySpy = vi
       .spyOn(component, 'getSnapshotHistory')
       .mockImplementation(() => undefined);
-    mockReleaseTrackApiConnector.bumpByLatest.mockReturnValue(of({}));
-    mockRestApiConnector.getAllObjects.mockReturnValue(
+    mockReleaseTrackApiConnector.previewBump.mockReturnValue(
       of({
-        data: [
+        id: 'release-track--123',
+        name: 'Core Objects',
+        members: [],
+        staged: [],
+        candidates: [
           {
-            stixID: 'attack-pattern--candidate',
-            attackID: 'T0001',
+            object_ref: 'attack-pattern--candidate',
             name: 'Canonical Candidate',
-            attackType: 'technique',
-            type: 'attack-pattern',
-            version: { toString: () => '2.1' },
-            workflow: { state: 'awaiting-review' },
+            attack_type: 'technique',
+            x_mitre_version: '2.1',
+            object_status: 'awaiting-review',
           },
         ],
+        conflicts: [],
       })
     );
+    mockReleaseTrackApiConnector.bumpByLatest.mockReturnValue(of({}));
     mockDialog.open.mockReturnValue({
       afterClosed: () => of('minor'),
     });
     component.id = 'release-track--123';
-    component.releaseTrack = {
-      id: 'release-track--123',
-      name: 'Core Objects',
-      members: [],
-      staged: [],
-      candidates: [{ object_ref: 'attack-pattern--candidate' }],
-    } as any;
 
     component.onPreviewRelease();
 
+    expect(mockReleaseTrackApiConnector.previewBump).toHaveBeenCalledWith(
+      'release-track--123',
+      'workbench'
+    );
     expect(mockDialog.open).toHaveBeenCalledWith(
       ReleasePreviewDialogComponent,
       expect.objectContaining({
@@ -631,7 +632,6 @@ describe('ReleaseTrackPageComponent', () => {
               expect.objectContaining({
                 name: 'Canonical Candidate',
                 attack_type: 'technique',
-                type: 'attack-pattern',
                 x_mitre_version: '2.1',
                 object_status: 'awaiting-review',
               }),
@@ -649,39 +649,100 @@ describe('ReleaseTrackPageComponent', () => {
     expect(component.isReleasing).toBe(false);
   });
 
-  it('should tag a major release when selected from the preview', () => {
-    mockRestApiConnector.getAllObjects.mockReturnValue(of({ data: [] }));
+  it('should preview and tag a selected draft snapshot', () => {
+    const refreshSpy = vi
+      .spyOn(component, 'getReleaseTrack')
+      .mockImplementation(() => undefined);
+    const historySpy = vi
+      .spyOn(component, 'getSnapshotHistory')
+      .mockImplementation(() => undefined);
+    mockReleaseTrackApiConnector.previewBump.mockReturnValue(
+      of({
+        id: 'release-track--123',
+        members: [],
+        staged: [],
+        candidates: [],
+        conflicts: [],
+      })
+    );
+    mockReleaseTrackApiConnector.bumpByModified.mockReturnValue(of({}));
     mockDialog.open.mockReturnValue({
       afterClosed: () => of('major'),
     });
     component.id = 'release-track--123';
-    component.releaseTrack = {
-      id: 'release-track--123',
-      members: [],
-      staged: [],
-      candidates: [],
-    } as any;
 
-    component.onPreviewRelease();
+    component.onTagSnapshot({
+      modified: '2026-07-23T13:37:28.000Z',
+      isTagged: false,
+    } as any);
 
-    expect(mockReleaseTrackApiConnector.bumpByLatest).toHaveBeenCalledWith(
+    expect(mockReleaseTrackApiConnector.previewBump).toHaveBeenCalledWith(
       'release-track--123',
+      'workbench',
+      '2026-07-23T13:37:28.000Z'
+    );
+    expect(mockReleaseTrackApiConnector.bumpByModified).toHaveBeenCalledWith(
+      'release-track--123',
+      '2026-07-23T13:37:28.000Z',
       { type: 'major' }
     );
+    expect(mockReleaseTrackApiConnector.bumpByLatest).not.toHaveBeenCalled();
+    expect(refreshSpy).toHaveBeenCalled();
+    expect(historySpy).toHaveBeenCalled();
   });
 
-  it('should not create a snapshot when the preview is cancelled', () => {
-    mockRestApiConnector.getAllObjects.mockReturnValue(of({ data: [] }));
+  it('should not tag a release when preview returns conflicts', () => {
+    mockReleaseTrackApiConnector.previewBump.mockReturnValue(
+      of({
+        id: 'release-track--123',
+        members: [],
+        staged: [],
+        candidates: [],
+        conflicts: [
+          {
+            object_ref: 'attack-pattern--123',
+            incumbent_version: '2024-01-15T10:00:00Z',
+            incoming_version: '2024-02-20T10:00:00Z',
+          },
+        ],
+      })
+    );
     mockDialog.open.mockReturnValue({
       afterClosed: () => of(undefined),
     });
     component.id = 'release-track--123';
-    component.releaseTrack = {
-      id: 'release-track--123',
-      members: [],
-      staged: [],
-      candidates: [],
-    } as any;
+
+    component.onPreviewRelease();
+
+    expect(mockDialog.open).toHaveBeenCalledWith(
+      ReleasePreviewDialogComponent,
+      expect.objectContaining({
+        data: expect.objectContaining({
+          conflicts: expect.arrayContaining([
+            expect.objectContaining({
+              object_ref: 'attack-pattern--123',
+            }),
+          ]),
+        }),
+      })
+    );
+    expect(mockReleaseTrackApiConnector.bumpByLatest).not.toHaveBeenCalled();
+  });
+
+  it('should not create a snapshot when the preview is cancelled', () => {
+    mockReleaseTrackApiConnector.previewBump.mockReturnValue(
+      of({
+        id: 'release-track--123',
+        members: [],
+        staged: [],
+        candidates: [],
+        conflicts: [],
+      })
+    );
+    mockDialog.open.mockReturnValue({
+      afterClosed: () => of(undefined),
+    });
+    component.id = 'release-track--123';
 
     component.onPreviewRelease();
 

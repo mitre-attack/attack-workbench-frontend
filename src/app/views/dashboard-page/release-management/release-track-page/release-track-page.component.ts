@@ -20,6 +20,7 @@ import {
   ReleaseTrackConfig,
   ReleaseTrackSnapshot,
   ReleaseTrackSnapshotHistoryItem,
+  ReleaseTrackSnapshotOptions,
   ReleaseTrackType,
   ResolutionStrategy,
   SnapshotScheduleMode,
@@ -469,7 +470,10 @@ export class ReleaseTrackPageComponent implements OnInit {
 
   public getReleaseTrack(): void {
     this.connector
-      .getLatestSnapshot(this.id, { include: 'all' })
+      .getLatestSnapshot(this.id, {
+        format: ExportFormat.Workbench,
+        include: 'all',
+      })
       .pipe(take(1))
       .subscribe({
         next: res => {
@@ -1394,15 +1398,26 @@ export class ReleaseTrackPageComponent implements OnInit {
   }
 
   public onPreviewRelease(): void {
-    if (!this.id || !this.releaseTrack || this.isReleasing) return;
+    this.previewRelease();
+  }
+
+  public onTagSnapshot(item: SnapshotHistoryViewModel): void {
+    this.previewRelease(item);
+  }
+
+  private previewRelease(item?: SnapshotHistoryViewModel): void {
+    if (!this.id || this.isReleasing) return;
 
     this.isReleasing = true;
-    this.restApiConnectorService
-      .getAllObjects({
-        revoked: true,
-        deprecated: true,
-        deserialize: true,
-      })
+    const preview = item?.modified
+      ? this.connector.previewBump(
+          this.id,
+          ExportFormat.Workbench,
+          item.modified
+        )
+      : this.connector.previewBump(this.id, ExportFormat.Workbench);
+
+    preview
       .pipe(
         take(1),
         finalize(() => {
@@ -1410,27 +1425,21 @@ export class ReleaseTrackPageComponent implements OnInit {
         })
       )
       .subscribe({
-        next: response => {
-          this.openReleasePreviewDialog(
-            this.enrichReleaseTrackObjects(response)
-          );
-        },
+        next: preview => this.openReleasePreviewDialog(preview, item),
         error: err => {
           console.error('Failed to load objects for release preview', err);
-          this.openReleasePreviewDialog(this.releaseTrack);
         },
       });
-  }
-
-  public onTagSnapshot(): void {
-    this.onPreviewRelease();
   }
 
   public onInspectSnapshot(item: SnapshotHistoryViewModel): void {
     if (!this.id || !item.modified) return;
 
     this.connector
-      .retrieveSnapshotByModified(this.id, item.modified)
+      .retrieveSnapshotByModified(this.id, item.modified, {
+        format: ExportFormat.Workbench,
+        include: 'all',
+      })
       .pipe(take(1))
       .subscribe({
         next: snapshot => {
@@ -1454,9 +1463,12 @@ export class ReleaseTrackPageComponent implements OnInit {
     if (!this.id || !item.modified) return;
 
     this.connector
-      .exportSnapshotByModified(this.id, item.modified, ExportFormat.Bundle, {
-        include: 'all',
-      })
+      .exportSnapshotByModified(
+        this.id,
+        item.modified,
+        ExportFormat.Bundle,
+        this.getSnapshotExportOptions(item)
+      )
       .pipe(take(1))
       .subscribe({
         next: result => {
@@ -1770,7 +1782,15 @@ export class ReleaseTrackPageComponent implements OnInit {
     };
   }
 
-  private openReleasePreviewDialog(track: any): void {
+  private openReleasePreviewDialog(
+    preview: any,
+    item?: SnapshotHistoryViewModel
+  ): void {
+    const track =
+      preview?.snapshot ??
+      preview?.release_preview?.snapshot ??
+      preview?.release_preview ??
+      preview;
     const releaseRef = this.dialog.open(ReleasePreviewDialogComponent, {
       maxWidth: 'none',
       autoFocus: false,
@@ -1780,73 +1800,31 @@ export class ReleaseTrackPageComponent implements OnInit {
       backdropClass: 'release-preview-dialog-backdrop',
       data: {
         track,
+        conflicts: this.getReleaseConflicts(preview),
       },
     });
 
     releaseRef
       .afterClosed()
       .pipe(take(1))
-      .subscribe((action: 'minor' | 'major' | undefined) => {
-        if (!action) return;
-        this.bumpLatestRelease(action);
+      .subscribe((type: 'major' | 'minor' | undefined) => {
+        if (type !== 'major' && type !== 'minor') return;
+        this.bumpRelease(type, item);
       });
   }
 
-  private enrichReleaseTrackObjects(response: any): any {
-    const objects = Array.isArray(response)
-      ? response
-      : Array.isArray(response?.data)
-        ? response.data
-        : [];
-    const objectsByRef = new Map<string, any>();
-    objects.forEach((object: any) => {
-      const objectRef = object?.stixID ?? object?.id ?? object?.stix?.id;
-      if (objectRef) objectsByRef.set(objectRef, object);
-    });
-    const enrich = (entry: any) => {
-      const object = objectsByRef.get(entry?.object_ref);
-
-      if (!object) {
-        return entry;
-      }
-
-      const version =
-        object?.version?.toString?.() ??
-        object?.version ??
-        object?.x_mitre_version ??
-        object?.stix?.x_mitre_version;
-
-      return {
-        ...entry,
-        name: object?.name ?? entry?.name,
-        attack_id: object?.attackID ?? object?.attack_id ?? entry?.attack_id,
-        attack_type:
-          object?.attackType ??
-          StixTypeToAttackType[object?.type as StixType] ??
-          entry?.attack_type,
-        type: object?.type ?? object?.stix?.type ?? entry?.type,
-        x_mitre_version: version ?? entry?.x_mitre_version,
-        object_status:
-          object?.workflow?.state ??
-          object?.workspace?.workflow?.state ??
-          entry?.object_status,
-      };
-    };
-
-    return {
-      ...this.releaseTrack,
-      members: (this.releaseTrack?.members ?? []).map(enrich),
-      staged: (this.releaseTrack?.staged ?? []).map(enrich),
-      candidates: (this.releaseTrack?.candidates ?? []).map(enrich),
-    };
-  }
-
-  private bumpLatestRelease(type: 'major' | 'minor'): void {
+  private bumpRelease(
+    type: 'major' | 'minor',
+    item?: SnapshotHistoryViewModel
+  ): void {
     if (!this.id) return;
 
     this.isReleasing = true;
-    this.connector
-      .bumpByLatest(this.id, { type })
+    const release = item?.modified
+      ? this.connector.bumpByModified(this.id, item.modified, { type })
+      : this.connector.bumpByLatest(this.id, { type });
+
+    release
       .pipe(
         take(1),
         finalize(() => {
@@ -1859,6 +1837,10 @@ export class ReleaseTrackPageComponent implements OnInit {
           console.error('Failed to tag release track snapshot', err);
         },
       });
+  }
+
+  private getReleaseConflicts(preview: any): any[] {
+    return Array.isArray(preview?.conflicts) ? preview.conflicts : [];
   }
 
   private buildSnapshotHistory(
@@ -2053,6 +2035,16 @@ export class ReleaseTrackPageComponent implements OnInit {
       ? item.title.replace(/^v/, 'v')
       : 'draft';
     return `${safeName}-${snapshotName}-${format}.json`;
+  }
+
+  private getSnapshotExportOptions(
+    item: SnapshotHistoryViewModel
+  ): Omit<ReleaseTrackSnapshotOptions, 'format'> | undefined {
+    if (item.isTagged || this.releaseTrack?.type === ReleaseTrackType.Virtual) {
+      return undefined;
+    }
+
+    return { include: 'staged' };
   }
 
   private toIsoString(value: Date | string | undefined): string | undefined {
