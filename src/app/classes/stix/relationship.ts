@@ -641,16 +641,10 @@ export class Relationship extends StixObject {
         );
         return concat(
           defer(() =>
-            this.updateSourceTargetObject(
-              restAPIService,
-              source_object
-            )
+            this.updateSourceTargetObject(restAPIService, source_object)
           ),
           defer(() =>
-            this.updateSourceTargetObject(
-              restAPIService,
-              target_object
-            )
+            this.updateSourceTargetObject(restAPIService, target_object)
           )
         ).pipe(
           last(),

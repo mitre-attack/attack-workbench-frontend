@@ -255,9 +255,7 @@ export class NamePropertyComponent implements OnChanges, OnInit {
           map(result =>
             (result?.data || [])
               .map(track => this.toWorkspaceTrack(track))
-              .filter(
-                (track): track is ReleaseTrackStatus => track !== null
-              )
+              .filter((track): track is ReleaseTrackStatus => track !== null)
           ),
           catchError(err => {
             logger.error(
