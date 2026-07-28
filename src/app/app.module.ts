@@ -75,6 +75,7 @@ import { MarkdownViewDialogComponent } from './components/markdown-view-dialog/m
 import { MultipleChoiceDialogComponent } from './components/multiple-choice-dialog/multiple-choice-dialog.component';
 import { NavigationComponent } from './components/navigation/navigation.component';
 import { ReferenceEditDialogComponent } from './components/reference-edit-dialog/reference-edit-dialog.component';
+import { ReleasePreviewDialogComponent } from './components/release-preview-dialog/release-preview-dialog.component';
 import { HistoryTimelineComponent } from './components/stix/stix-page-tabs/history-timeline/history-timeline.component';
 import { ReferenceSidebarComponent } from './components/resources-drawer/reference-sidebar/reference-sidebar.component';
 import { ResourcesDrawerComponent } from './components/resources-drawer/resources-drawer.component';
@@ -266,6 +267,7 @@ export function initConfig(appConfigService: AppConfigService) {
     HistoryTimelineComponent,
     ReferenceSidebarComponent,
     ReferenceEditDialogComponent,
+    ReleasePreviewDialogComponent,
     MultipleChoiceDialogComponent,
     ValidationResultsComponent,
     AddRelationshipButtonComponent,

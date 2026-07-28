@@ -31,6 +31,7 @@ import {
 import { AddDialogComponent } from 'src/app/components/add-dialog/add-dialog.component';
 import { DeleteDialogComponent } from 'src/app/components/delete-dialog/delete-dialog.component';
 import { MultipleChoiceDialogComponent } from 'src/app/components/multiple-choice-dialog/multiple-choice-dialog.component';
+import { ReleasePreviewDialogComponent } from 'src/app/components/release-preview-dialog/release-preview-dialog.component';
 import { ReleaseTrackObjectItem } from 'src/app/components/release-track-object-card/release-track-object-card.component';
 import { AuthenticationService } from 'src/app/services/connectors/authentication/authentication.service';
 import { ReleaseTracksConnectorService } from 'src/app/services/connectors/rest-api/release-tracks.service';
@@ -1393,11 +1394,15 @@ export class ReleaseTrackPageComponent implements OnInit {
   }
 
   public onPreviewRelease(): void {
-    if (!this.id || this.isReleasing) return;
+    if (!this.id || !this.releaseTrack || this.isReleasing) return;
 
     this.isReleasing = true;
-    this.connector
-      .previewBump(this.id, ExportFormat.Workbench)
+    this.restApiConnectorService
+      .getAllObjects({
+        revoked: true,
+        deprecated: true,
+        deserialize: true,
+      })
       .pipe(
         take(1),
         finalize(() => {
@@ -1405,9 +1410,14 @@ export class ReleaseTrackPageComponent implements OnInit {
         })
       )
       .subscribe({
-        next: preview => this.openReleasePreviewDialog(preview),
+        next: response => {
+          this.openReleasePreviewDialog(
+            this.enrichReleaseTrackObjects(response)
+          );
+        },
         error: err => {
-          console.error('Failed to preview release track bump', err);
+          console.error('Failed to load objects for release preview', err);
+          this.openReleasePreviewDialog(this.releaseTrack);
         },
       });
   }
@@ -1760,67 +1770,75 @@ export class ReleaseTrackPageComponent implements OnInit {
     };
   }
 
-  private openReleasePreviewDialog(preview: any): void {
-    const conflicts = this.getReleaseConflicts(preview);
-
-    if (conflicts.length) {
-      this.dialog.open(MultipleChoiceDialogComponent, {
-        width: '34em',
-        autoFocus: false,
-        data: {
-          title: 'Release conflicts detected',
-          description: `${conflicts.length} conflict${
-            conflicts.length === 1 ? '' : 's'
-          } must be resolved before this release can be tagged.`,
-          choices: [
-            {
-              label: 'Close',
-              value: 'close',
-              description:
-                'Review the staged and member object versions before retrying the release.',
-            },
-          ],
-        },
-      });
-      return;
-    }
-
-    const minorVersion = preview?.next_version_minor || preview?.next_version;
-    const majorVersion = preview?.next_version_major;
-    const choices = [
-      {
-        label: `Minor Release${minorVersion ? ` (${minorVersion})` : ''}`,
-        value: 'minor',
-        description: this.getReleasePreviewDescription(preview),
-      },
-    ];
-
-    if (majorVersion) {
-      choices.push({
-        label: `Major Release (${majorVersion})`,
-        value: 'major',
-        description: this.getReleasePreviewDescription(preview),
-      });
-    }
-
-    const releaseRef = this.dialog.open(MultipleChoiceDialogComponent, {
-      width: '34em',
+  private openReleasePreviewDialog(track: any): void {
+    const releaseRef = this.dialog.open(ReleasePreviewDialogComponent, {
+      maxWidth: 'none',
       autoFocus: false,
+      restoreFocus: true,
+      ariaLabelledBy: 'release-preview-dialog-title',
+      panelClass: 'release-preview-dialog-panel',
+      backdropClass: 'release-preview-dialog-backdrop',
       data: {
-        title: 'Preview & release',
-        description:
-          'The release preview found no blocking conflicts. Choose a version bump to tag the latest draft snapshot.',
-        choices,
+        track,
       },
     });
 
     releaseRef
       .afterClosed()
       .pipe(take(1))
-      .subscribe((type: 'major' | 'minor' | undefined) => {
-        if (type !== 'major' && type !== 'minor') return;
-        this.bumpLatestRelease(type);
+      .subscribe((action: 'minor' | 'major' | undefined) => {
+        if (!action) return;
+        this.bumpLatestRelease(action);
       });
+  }
+
+  private enrichReleaseTrackObjects(response: any): any {
+    const objects = Array.isArray(response)
+      ? response
+      : Array.isArray(response?.data)
+        ? response.data
+        : [];
+    const objectsByRef = new Map<string, any>();
+    objects.forEach((object: any) => {
+      const objectRef = object?.stixID ?? object?.id ?? object?.stix?.id;
+      if (objectRef) objectsByRef.set(objectRef, object);
+    });
+    const enrich = (entry: any) => {
+      const object = objectsByRef.get(entry?.object_ref);
+
+      if (!object) {
+        return entry;
+      }
+
+      const version =
+        object?.version?.toString?.() ??
+        object?.version ??
+        object?.x_mitre_version ??
+        object?.stix?.x_mitre_version;
+
+      return {
+        ...entry,
+        name: object?.name ?? entry?.name,
+        attack_id: object?.attackID ?? object?.attack_id ?? entry?.attack_id,
+        attack_type:
+          object?.attackType ??
+          StixTypeToAttackType[object?.type as StixType] ??
+          entry?.attack_type,
+        type: object?.type ?? object?.stix?.type ?? entry?.type,
+        x_mitre_version: version ?? entry?.x_mitre_version,
+        object_status:
+          object?.workflow?.state ??
+          object?.workspace?.workflow?.state ??
+          entry?.object_status,
+      };
+    };
+
+    return {
+      ...this.releaseTrack,
+      members: (this.releaseTrack?.members ?? []).map(enrich),
+      staged: (this.releaseTrack?.staged ?? []).map(enrich),
+      candidates: (this.releaseTrack?.candidates ?? []).map(enrich),
+    };
   }
 
   private bumpLatestRelease(type: 'major' | 'minor'): void {
@@ -1841,27 +1859,6 @@ export class ReleaseTrackPageComponent implements OnInit {
           console.error('Failed to tag release track snapshot', err);
         },
       });
-  }
-
-  private getReleaseConflicts(preview: any): any[] {
-    return Array.isArray(preview?.conflicts) ? preview.conflicts : [];
-  }
-
-  private getReleasePreviewDescription(preview: any): string {
-    const included =
-      preview?.statistics?.included_objects ??
-      preview?.release_preview?.will_include?.length ??
-      preview?.staged_count ??
-      0;
-    const excluded =
-      preview?.statistics?.excluded_objects ??
-      preview?.release_preview?.will_exclude?.length ??
-      preview?.candidates_count ??
-      0;
-
-    return `${included} object${included === 1 ? '' : 's'} will be included. ${
-      excluded || 0
-    } object${excluded === 1 ? '' : 's'} will remain out of this release.`;
   }
 
   private buildSnapshotHistory(

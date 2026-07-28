@@ -28,7 +28,7 @@
       <button
         mat-raised-button
         color="primary"
-        [disabled]="!id || isReleasing"
+        [disabled]="!id || !releaseTrack || isReleasing"
         (click)="onPreviewRelease()">
         Preview & Release
         <mat-icon>preview</mat-icon>

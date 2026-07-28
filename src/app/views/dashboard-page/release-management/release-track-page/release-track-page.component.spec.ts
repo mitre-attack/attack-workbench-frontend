@@ -16,6 +16,7 @@ import { RestApiConnectorService } from 'src/app/services/connectors/rest-api/re
 import { MultipleChoiceDialogComponent } from 'src/app/components/multiple-choice-dialog/multiple-choice-dialog.component';
 import { AddDialogComponent } from 'src/app/components/add-dialog/add-dialog.component';
 import { DeleteDialogComponent } from 'src/app/components/delete-dialog/delete-dialog.component';
+import { ReleasePreviewDialogComponent } from 'src/app/components/release-preview-dialog/release-preview-dialog.component';
 import { AuthenticationService } from 'src/app/services/connectors/authentication/authentication.service';
 import { FormsModule, ReactiveFormsModule } from '@angular/forms';
 import {
@@ -590,32 +591,52 @@ describe('ReleaseTrackPageComponent', () => {
     const historySpy = vi
       .spyOn(component, 'getSnapshotHistory')
       .mockImplementation(() => undefined);
-    mockReleaseTrackApiConnector.previewBump.mockReturnValue(
+    mockReleaseTrackApiConnector.bumpByLatest.mockReturnValue(of({}));
+    mockRestApiConnector.getAllObjects.mockReturnValue(
       of({
-        next_version_minor: '1.2',
-        next_version_major: '2.0',
-        staged_count: 3,
-        candidates_count: 1,
-        conflicts: [],
+        data: [
+          {
+            stixID: 'attack-pattern--candidate',
+            attackID: 'T0001',
+            name: 'Canonical Candidate',
+            attackType: 'technique',
+            type: 'attack-pattern',
+            version: { toString: () => '2.1' },
+            workflow: { state: 'awaiting-review' },
+          },
+        ],
       })
     );
-    mockReleaseTrackApiConnector.bumpByLatest.mockReturnValue(of({}));
     mockDialog.open.mockReturnValue({
       afterClosed: () => of('minor'),
     });
     component.id = 'release-track--123';
+    component.releaseTrack = {
+      id: 'release-track--123',
+      name: 'Core Objects',
+      members: [],
+      staged: [],
+      candidates: [{ object_ref: 'attack-pattern--candidate' }],
+    } as any;
 
     component.onPreviewRelease();
 
-    expect(mockReleaseTrackApiConnector.previewBump).toHaveBeenCalledWith(
-      'release-track--123',
-      'workbench'
-    );
     expect(mockDialog.open).toHaveBeenCalledWith(
-      MultipleChoiceDialogComponent,
+      ReleasePreviewDialogComponent,
       expect.objectContaining({
         data: expect.objectContaining({
-          title: 'Preview & release',
+          track: expect.objectContaining({
+            id: 'release-track--123',
+            candidates: [
+              expect.objectContaining({
+                name: 'Canonical Candidate',
+                attack_type: 'technique',
+                type: 'attack-pattern',
+                x_mitre_version: '2.1',
+                object_status: 'awaiting-review',
+              }),
+            ],
+          }),
         }),
       })
     );
@@ -628,30 +649,49 @@ describe('ReleaseTrackPageComponent', () => {
     expect(component.isReleasing).toBe(false);
   });
 
-  it('should not tag a release when preview returns conflicts', () => {
-    mockReleaseTrackApiConnector.previewBump.mockReturnValue(
-      of({
-        conflicts: [
-          {
-            object_ref: 'attack-pattern--123',
-            incumbent_version: '2024-01-15T10:00:00Z',
-            incoming_version: '2024-02-20T10:00:00Z',
-          },
-        ],
-      })
-    );
+  it('should tag a major release when selected from the preview', () => {
+    mockRestApiConnector.getAllObjects.mockReturnValue(of({ data: [] }));
     mockDialog.open.mockReturnValue({
-      afterClosed: () => of('close'),
+      afterClosed: () => of('major'),
     });
     component.id = 'release-track--123';
+    component.releaseTrack = {
+      id: 'release-track--123',
+      members: [],
+      staged: [],
+      candidates: [],
+    } as any;
+
+    component.onPreviewRelease();
+
+    expect(mockReleaseTrackApiConnector.bumpByLatest).toHaveBeenCalledWith(
+      'release-track--123',
+      { type: 'major' }
+    );
+  });
+
+  it('should not create a snapshot when the preview is cancelled', () => {
+    mockRestApiConnector.getAllObjects.mockReturnValue(of({ data: [] }));
+    mockDialog.open.mockReturnValue({
+      afterClosed: () => of(undefined),
+    });
+    component.id = 'release-track--123';
+    component.releaseTrack = {
+      id: 'release-track--123',
+      members: [],
+      staged: [],
+      candidates: [],
+    } as any;
 
     component.onPreviewRelease();
 
     expect(mockDialog.open).toHaveBeenCalledWith(
-      MultipleChoiceDialogComponent,
+      ReleasePreviewDialogComponent,
       expect.objectContaining({
         data: expect.objectContaining({
-          title: 'Release conflicts detected',
+          track: expect.objectContaining({
+            id: 'release-track--123',
+          }),
         }),
       })
     );
