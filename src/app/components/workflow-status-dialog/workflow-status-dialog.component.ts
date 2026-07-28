@@ -8,7 +8,7 @@ import {
 import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 import { Observable, of } from 'rxjs';
 import { catchError, concatMap, map, switchMap } from 'rxjs/operators';
-import { SnapshotTier } from 'src/app/classes/release-tracks';
+import { ExportFormat, SnapshotTier } from 'src/app/classes/release-tracks';
 import type {
   ReleaseTrackObjectTier,
   StixObjectRef,
@@ -185,7 +185,10 @@ export class WorkflowStatusDialogComponent implements OnInit, OnDestroy {
     }
 
     this.releaseTracksService
-      .getLatestSnapshot(track.trackId, { include: 'all' })
+      .getLatestSnapshot(track.trackId, {
+        format: ExportFormat.Workbench,
+        include: 'all',
+      })
       .pipe(
         map(snapshot => this.toTrackStatus(track, snapshot)),
         catchError(err => {
