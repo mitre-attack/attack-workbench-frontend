@@ -95,7 +95,7 @@ describe('Release Tracks API integration (real server)', () => {
     }
   });
 
-  it('GET /release-tracks/:id -> getLatestSnapshot should return snapshot when tracks exist', async () => {
+  it('GET /release-tracks/:id/snapshots/latest should return a snapshot when tracks exist', async () => {
     if (!serverAvailable) {
       console.warn(
         'Skipping getLatestSnapshot test because server is unreachable'
@@ -109,7 +109,7 @@ describe('Release Tracks API integration (real server)', () => {
       return;
     }
     const res = await fetch(
-      `${apiUrl}/release-tracks/${encodeURIComponent(discoveredTrackId)}`,
+      `${apiUrl}/release-tracks/${encodeURIComponent(discoveredTrackId)}/snapshots/latest`,
       { headers: commonHeaders }
     );
     expect(res.ok).toBe(true);

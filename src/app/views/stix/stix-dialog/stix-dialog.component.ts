@@ -17,6 +17,7 @@ import { ConfirmationDialogComponent } from 'src/app/components/confirmation-dia
 import { DeleteDialogComponent } from 'src/app/components/delete-dialog/delete-dialog.component';
 import { AuthenticationService } from 'src/app/services/connectors/authentication/authentication.service';
 import { RestApiConnectorService } from 'src/app/services/connectors/rest-api/rest-api-connector.service';
+import { ReleaseTracksConnectorService } from 'src/app/services/connectors/rest-api/release-tracks.service';
 import { EditorService } from 'src/app/services/editor/editor.service';
 import { StixViewConfig } from '../stix-view-page';
 import { StixTypeToClass } from 'src/app/utils/class-mappings';
@@ -33,6 +34,7 @@ export class StixDialogComponent implements OnInit {
     public dialogRef: MatDialogRef<StixDialogComponent>,
     @Inject(MAT_DIALOG_DATA) public _config: StixViewConfig,
     public restApiService: RestApiConnectorService,
+    private releaseTracksService: ReleaseTracksConnectorService,
     public editorService: EditorService,
     private authenticationService: AuthenticationService,
     private dialog: MatDialog
@@ -141,12 +143,19 @@ export class StixDialogComponent implements OnInit {
     const object = Array.isArray(this.config.object)
       ? this.config.object[0]
       : this.config.object;
-    const subscription = object.save(this.restApiService).subscribe({
+    const save: Observable<void> =
+      object instanceof Relationship
+        ? object.save(
+            this.restApiService,
+            this.releaseTracksService
+          ).pipe(map(() => undefined))
+        : object.save(this.restApiService).pipe(map(() => undefined));
+    const subscription = save.subscribe({
       next: result => {
         this.editorService.onEditingStopped.emit();
         this._config.is_new = false;
-        if (object.attackType == 'relationship')
-          this.updateRelationshipObjects(object as Relationship); // update source/target object versions
+        if (object instanceof Relationship)
+          this.updateRelationshipObjects(object); // update source/target object versions
         if (this.prevObject) this.revertToPreviousObject();
         else if (object.attackType == 'data-component') {
           // view data component on save

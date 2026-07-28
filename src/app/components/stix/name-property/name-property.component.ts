@@ -13,7 +13,7 @@ import { MatDialog } from '@angular/material/dialog';
 import { MatMenuTrigger } from '@angular/material/menu';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { forkJoin, of } from 'rxjs';
-import { catchError, map } from 'rxjs/operators';
+import { catchError, map, switchMap } from 'rxjs/operators';
 import { SnapshotTier } from 'src/app/classes/release-tracks';
 import type {
   ReleaseTrackObjectTier,
@@ -247,30 +247,50 @@ export class NamePropertyComponent implements OnChanges, OnInit {
     }
 
     this.loadingTracks = true;
-    const releaseTracks = this.getWorkspaceTracks();
-    if (!releaseTracks.length) {
-      this.trackStatuses = [];
-      this.loadingTracks = false;
-      return;
-    }
+    // If object track data is missing, look through the latest track snapshots to find where this object appears.
+    const workspaceTracks = this.getWorkspaceTracks();
+    const tracks_all = workspaceTracks.length
+      ? of(workspaceTracks)
+      : this.releaseTracksService.listReleaseTracks().pipe(
+          map(result =>
+            (result?.data || [])
+              .map(track => this.toWorkspaceTrack(track))
+              .filter(
+                (track): track is ReleaseTrackStatus => track !== null
+              )
+          ),
+          catchError(err => {
+            logger.error(
+              'Failed to list release tracks for workflow status menu',
+              err
+            );
+            return of([] as ReleaseTrackStatus[]);
+          })
+        );
 
-    forkJoin(
-      releaseTracks.map(track =>
-        this.releaseTracksService
-          .getLatestSnapshot(track.trackId, { include: 'all' })
-          .pipe(
-            map(snapshot => this.toTrackStatus(track, snapshot)),
-            catchError(err => {
-              logger.error(
-                'Failed to load release track snapshot for workflow status menu',
-                err
-              );
-              return of(this.toTrackStatus(track, null));
-            })
-          )
-      )
-    )
+    tracks_all
       .pipe(
+        // Read each latest snapshot, then retain only tracks containing this object.
+        switchMap(tracks =>
+          tracks.length
+            ? forkJoin(
+                tracks.map(track =>
+                  this.releaseTracksService
+                    .getLatestSnapshot(track.trackId, { include: 'all' })
+                    .pipe(
+                      map(snapshot => this.toTrackStatus(track, snapshot)),
+                      catchError(err => {
+                        logger.error(
+                          'Failed to load release track snapshot for workflow status menu',
+                          err
+                        );
+                        return of(this.toTrackStatus(track, null));
+                      })
+                    )
+                )
+              )
+            : of([])
+        ),
         map(rows =>
           rows.filter((row): row is ReleaseTrackStatus => row !== null)
         )

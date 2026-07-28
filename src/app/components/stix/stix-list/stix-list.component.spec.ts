@@ -137,4 +137,24 @@ describe('StixListComponent', () => {
 
     expect(result).toEqual([domainObject]);
   });
+
+  it('identifies an existing relationship modified after the candidate baseline', () => {
+    component.config = {
+      type: 'relationship',
+      relationshipAddedAfter: '2026-07-02T00:00:00.000Z',
+    } as any;
+
+    expect(
+      (component as any).isChangedRelationship({
+        created: new Date('2026-07-01T00:00:00.000Z'),
+        modified: new Date('2026-07-03T00:00:00.000Z'),
+      })
+    ).toBe(true);
+    expect(
+      (component as any).isChangedRelationship({
+        created: new Date('2026-07-03T00:00:00.000Z'),
+        modified: new Date('2026-07-03T00:00:00.000Z'),
+      })
+    ).toBe(false);
+  });
 });
