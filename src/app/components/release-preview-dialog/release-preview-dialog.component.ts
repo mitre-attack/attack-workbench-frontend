@@ -219,13 +219,9 @@ export class ReleasePreviewDialogComponent {
       return false;
     }
 
-    try {
-      return new VersionNumber(incomingVersion).isDoubleIncrement(
-        new VersionNumber(currentVersion)
-      );
-    } catch {
-      return false;
-    }
+    return new VersionNumber(incomingVersion).isDoubleIncrement(
+      new VersionNumber(currentVersion)
+    );
   }
 
   private getRawVersion(item: ReleaseTrackObject | null): string | null {

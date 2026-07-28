@@ -98,6 +98,40 @@ describe('ReleasePreviewDialogComponent', () => {
     expect(dialogRef.close).toHaveBeenCalledWith('major');
   });
 
+  it('should close without selecting a release version', () => {
+    component.close();
+
+    expect(dialogRef.close).toHaveBeenCalledWith();
+  });
+
+  it('should block tagging when the backend reports release conflicts', () => {
+    data.conflicts = [{ object_ref: 'attack-pattern--member' }];
+
+    expect(component.hasInvalidVersionBumps).toBe(true);
+    component.tagVersion('minor');
+
+    expect(dialogRef.close).not.toHaveBeenCalled();
+  });
+
+  it('should provide fallbacks for incomplete object metadata', () => {
+    expect(component.getObjectName({})).toBe('ATT&CK object');
+    expect(component.getObjectVersion(null)).toBe('Not available');
+    expect(component.getObjectType({})).toBe('STIX Object');
+    expect(
+      component.getObjectType({ object_ref: 'course-of-action--123' })
+    ).toBe('Course Of Action');
+    expect(component.getWorkflowState({})).toBe('work-in-progress');
+  });
+
+  it('should allow tagging when an object has an invalid version string', () => {
+    data.track.staged[0].x_mitre_version = 'invalid';
+
+    expect(component.hasInvalidVersionBumps).toBe(false);
+    component.tagVersion('minor');
+
+    expect(dialogRef.close).toHaveBeenCalledWith('minor');
+  });
+
   it('should render the objects represented by the Included and Excluded counts', () => {
     const element: HTMLElement = fixture.nativeElement;
     const tabs = Array.from(

@@ -9,7 +9,7 @@ import {
   createPaginatedResponse,
 } from 'src/app/testing/mocks/rest-api-connector.mock';
 import { ActivatedRoute, Router } from '@angular/router';
-import { of } from 'rxjs';
+import { of, throwError } from 'rxjs';
 import { MatDialog } from '@angular/material/dialog';
 import { BreadcrumbService } from 'src/app/services/helpers/breadcrumb.service';
 import { RestApiConnectorService } from 'src/app/services/connectors/rest-api/rest-api-connector.service';
@@ -757,6 +757,25 @@ describe('ReleaseTrackPageComponent', () => {
       })
     );
     expect(mockReleaseTrackApiConnector.bumpByLatest).not.toHaveBeenCalled();
+  });
+
+  it('should stop releasing when the preview request fails', () => {
+    const consoleSpy = vi
+      .spyOn(console, 'error')
+      .mockImplementation(() => undefined);
+    mockReleaseTrackApiConnector.previewBump.mockReturnValue(
+      throwError(() => new Error('preview failed'))
+    );
+    component.id = 'release-track--123';
+
+    component.onPreviewRelease();
+
+    expect(component.isReleasing).toBe(false);
+    expect(consoleSpy).toHaveBeenCalledWith(
+      'Failed to load objects for release preview',
+      expect.any(Error)
+    );
+    expect(mockDialog.open).not.toHaveBeenCalled();
   });
 
   it('should load release track config into the config form', () => {
