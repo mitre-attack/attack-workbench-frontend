@@ -204,7 +204,7 @@ describe('NamePropertyComponent', () => {
 
     expect(mockReleaseTracksService.getLatestSnapshot).toHaveBeenCalledWith(
       'release-track--core',
-      { include: 'all' }
+      { format: 'workbench', include: 'all' }
     );
     expect(component.trackStatuses).toEqual([
       expect.objectContaining({
