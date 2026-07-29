@@ -396,8 +396,8 @@ export class ReleaseTrackPageComponent implements OnInit {
           title: 'Candidates WIP',
           type: 'candidate',
           modifier: 'candidates',
-          items: this.candidates.filter(
-            item => this.isWorkInProgressCandidate(item)
+          items: this.candidates.filter(item =>
+            this.isWorkInProgressCandidate(item)
           ),
           emptyLabel: 'No work in progress candidates',
           statusFallback: WorkflowStatus.WorkInProgress,
