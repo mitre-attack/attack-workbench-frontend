@@ -397,7 +397,7 @@ export class ReleaseTrackPageComponent implements OnInit {
           type: 'candidate',
           modifier: 'candidates',
           items: this.candidates.filter(
-            item => this.getObjectStatus(item) === WorkflowStatus.WorkInProgress
+            item => this.isWorkInProgressCandidate(item)
           ),
           emptyLabel: 'No work in progress candidates',
           statusFallback: WorkflowStatus.WorkInProgress,
@@ -1817,6 +1817,13 @@ export class ReleaseTrackPageComponent implements OnInit {
 
   private getObjectStatus(item: ReleaseTrackObjectItem): WorkflowStatusType {
     return item.object_status || WorkflowStatus.WorkInProgress;
+  }
+
+  private isWorkInProgressCandidate(item: ReleaseTrackObjectItem): boolean {
+    return (
+      this.getObjectStatus(item) === WorkflowStatus.WorkInProgress ||
+      String(item.object_status) === 'modified-in-place'
+    );
   }
 
   public formatConfigOption(value: any): string {
