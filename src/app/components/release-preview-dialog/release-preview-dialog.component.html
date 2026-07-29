@@ -38,7 +38,7 @@
 
       <section class="release-summary" aria-label="Draft snapshot summary">
         <article class="release-stat release-stat--included">
-          <strong>{{ includedObjects.length }}</strong>
+          <strong>{{ totalIncludedCount }}</strong>
           <span>Total objects included</span>
         </article>
         <article class="release-stat release-stat--new">
@@ -53,9 +53,23 @@
           <strong>{{ unchangedObjectCount }}</strong>
           <span>Unchanged objects</span>
         </article>
-        <article class="release-stat release-stat--excluded">
+        <article
+          *ngIf="!isVirtualTrack"
+          class="release-stat release-stat--excluded">
           <strong>{{ excludedCandidates.length }}</strong>
           <span>Candidates not included</span>
+        </article>
+        <article
+          *ngIf="isVirtualTrack"
+          class="release-stat release-stat--excluded">
+          <strong>{{ removedObjectCount }}</strong>
+          <span>Removed objects</span>
+        </article>
+        <article
+          *ngIf="isVirtualTrack"
+          class="release-stat release-stat--excluded">
+          <strong>{{ quarantinedObjectCount }}</strong>
+          <span>Quarantined objects</span>
         </article>
       </section>
     </mat-tab>

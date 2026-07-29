@@ -368,17 +368,18 @@ export class ReleaseTracksConnectorService extends ApiConnector {
    */
   public previewBump(
     id: string,
-    format: ExportFormatType = ExportFormat.Workbench,
-    modified?: string
+    format: ExportFormatType | 'summary' = 'summary',
+    modified?: string,
+    increment: 'major' | 'minor' = 'minor'
   ): Observable<any> {
-    const params = this.buildHttpParams({ format });
+    const params = this.buildHttpParams({ format, increment });
     const snapshotPath = modified
       ? `snapshots/${modified}`
       : 'snapshots/latest';
     const url = `${this.apiUrl}/release-tracks/${id}/${snapshotPath}/release/preview`;
     return this.http.get(url, { params }).pipe(
       tap(result =>
-        logger.log(`generated bump preview for track ${id}`, result)
+        logger.log(`generated release preview for track ${id}`, result)
       ),
       catchError(this.handleError_continue<any>(null)),
       share()
@@ -387,15 +388,15 @@ export class ReleaseTracksConnectorService extends ApiConnector {
 
   /**
    * POST /api/release-tracks/:id/snapshots/latest/release
-   * Bump/tag the latest snapshot.
+   * Release/tag the latest snapshot.
    * @param id Release track id
-   * @param body Bump options (type, version, dry_run)
+   * @param body Release options (increment or explicit version)
    * @returns Observable<any>
    */
   public bumpByLatest(id: string, body: BumpPayload): Observable<any> {
     const url = `${this.apiUrl}/release-tracks/${id}/snapshots/latest/release`;
     return this.http.post(url, body).pipe(
-      tap(result => logger.log(`bumped version for track ${id}`, result)),
+      tap(result => logger.log(`released snapshot for track ${id}`, result)),
       catchError(this.handleError_raise()),
       share()
     );
@@ -522,7 +523,7 @@ export class ReleaseTracksConnectorService extends ApiConnector {
    * Tag/release a specific snapshot.
    * @param id Release track id
    * @param modified Snapshot modified timestamp
-   * @param body Bump options
+   * @param body Release options
    * @returns Observable<any>
    */
   public bumpByModified(
@@ -532,9 +533,7 @@ export class ReleaseTracksConnectorService extends ApiConnector {
   ): Observable<any> {
     const url = `${this.apiUrl}/release-tracks/${id}/snapshots/${modified}/release`;
     return this.http.post(url, body).pipe(
-      tap(result =>
-        logger.log(`bumped version for snapshot ${modified}`, result)
-      ),
+      tap(result => logger.log(`released snapshot ${modified}`, result)),
       catchError(this.handleError_raise()),
       share()
     );
@@ -581,7 +580,7 @@ export class ReleaseTracksConnectorService extends ApiConnector {
   }
 
   /**
-   * POST /api/release-tracks/:id/snapshots/create
+   * POST /api/release-tracks/:id/virtual/snapshots/create
    * Resolve component tracks and create a new draft snapshot for a virtual track.
    * @param id Release track id
    * @param body Optional snapshot creation options
@@ -591,7 +590,7 @@ export class ReleaseTracksConnectorService extends ApiConnector {
     id: string,
     body?: { description?: string }
   ): Observable<any> {
-    const url = `${this.apiUrl}/release-tracks/${id}/snapshots/create`;
+    const url = `${this.apiUrl}/release-tracks/${id}/virtual/snapshots/create`;
     return this.http.post(url, body || {}).pipe(
       tap(result =>
         logger.log(`created virtual snapshot for track ${id}`, result)
@@ -602,24 +601,7 @@ export class ReleaseTracksConnectorService extends ApiConnector {
   }
 
   /**
-   * GET /api/release-tracks/:id/snapshots/preview
-   * Preview the resolved contents of a virtual snapshot without creating it.
-   * @param id Release track id
-   * @returns Observable<any>
-   */
-  public previewVirtualSnapshot(id: string): Observable<any> {
-    const url = `${this.apiUrl}/release-tracks/${id}/snapshots/preview`;
-    return this.http.get(url).pipe(
-      tap(result =>
-        logger.log(`previewed virtual snapshot for track ${id}`, result)
-      ),
-      catchError(this.handleError_continue<any>(null)),
-      share()
-    );
-  }
-
-  /**
-   * PUT /api/release-tracks/:id/composition
+   * PUT /api/release-tracks/:id/virtual/composition
    * Update the composition rules for a virtual release track.
    * @param id Release track id
    * @param body Composition payload
@@ -630,7 +612,7 @@ export class ReleaseTracksConnectorService extends ApiConnector {
     body: Composition,
     userAccountId?: string
   ): Observable<any> {
-    const url = `${this.apiUrl}/release-tracks/${id}/composition`;
+    const url = `${this.apiUrl}/release-tracks/${id}/virtual/composition`;
     const payload = userAccountId ? { ...body, userAccountId } : body;
     return this.http.put(url, payload).pipe(
       tap(result =>

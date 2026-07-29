@@ -464,6 +464,15 @@ export class ReleaseTrackPageComponent implements OnInit {
     return !!this.id && this.isVirtualReleaseTrack && !this.isCreatingDraft;
   }
 
+  public get canPreviewRelease(): boolean {
+    return (
+      !!this.id &&
+      !!this.releaseTrack &&
+      this.releaseTrack.version == null &&
+      !this.isReleasing
+    );
+  }
+
   public get canEditReleaseTrack(): boolean {
     return this.authenticationService.canEdit();
   }
@@ -1244,67 +1253,20 @@ export class ReleaseTrackPageComponent implements OnInit {
     return `${safeName}-latest-${format}.json`;
   }
 
-  private getVirtualSnapshotPreviewDescription(preview: any): string {
-    const resolved =
-      preview?.preview?.would_resolve_to ||
-      preview?.would_resolve_to ||
-      preview?.composition_resolution ||
-      preview;
-    const components = resolved?.component_snapshots || [];
-    const totalObjects =
-      resolved?.total_objects ||
-      resolved?.summary?.total_objects ||
-      preview?.total_objects ||
-      preview?.summary?.total_objects;
-
-    const componentText = components.length
-      ? `Components: ${components
-          .map((component: any) => {
-            const name =
-              component.track_name || component.track_id || 'component track';
-            const version =
-              component.resolved_version ||
-              component.version ||
-              component.resolved_snapshot;
-            return version ? `${name} (${version})` : name;
-          })
-          .join(', ')}.`
-      : 'No component details were returned.';
-    const objectText =
-      totalObjects === undefined || totalObjects === null
-        ? 'Object count was not returned.'
-        : `${totalObjects} objects will be resolved.`;
-
-    return `${objectText} ${componentText}`;
-  }
-
   public onDraft(): void {
     if (!this.canCreateDraft) return;
 
-    this.isCreatingDraft = true;
-    this.connector
-      .previewVirtualSnapshot(this.id)
-      .pipe(take(1))
-      .subscribe({
-        next: preview => {
-          this.isCreatingDraft = false;
-          if (!preview) return;
-          this.openVirtualSnapshotPreview(preview);
-        },
-        error: err => {
-          this.isCreatingDraft = false;
-          console.error('Failed to preview draft snapshot', err);
-        },
-      });
+    this.openVirtualSnapshotConfirmation();
   }
 
-  private openVirtualSnapshotPreview(preview: any): void {
+  private openVirtualSnapshotConfirmation(): void {
     const dialogRef = this.dialog.open(MultipleChoiceDialogComponent, {
       width: '30em',
       autoFocus: false,
       data: {
         title: 'Create draft snapshot?',
-        description: this.getVirtualSnapshotPreviewDescription(preview),
+        description:
+          'Resolve the configured component tracks into a new virtual draft snapshot.',
         choices: [
           {
             label: 'Create Draft',
@@ -1398,6 +1360,7 @@ export class ReleaseTrackPageComponent implements OnInit {
   }
 
   public onPreviewRelease(): void {
+    if (!this.canPreviewRelease) return;
     this.previewRelease();
   }
 
@@ -1410,12 +1373,8 @@ export class ReleaseTrackPageComponent implements OnInit {
 
     this.isReleasing = true;
     const preview = item?.modified
-      ? this.connector.previewBump(
-          this.id,
-          ExportFormat.Workbench,
-          item.modified
-        )
-      : this.connector.previewBump(this.id, ExportFormat.Workbench);
+      ? this.connector.previewBump(this.id, 'summary', item.modified, 'minor')
+      : this.connector.previewBump(this.id, 'summary', undefined, 'minor');
 
     preview
       .pipe(
@@ -1425,7 +1384,10 @@ export class ReleaseTrackPageComponent implements OnInit {
         })
       )
       .subscribe({
-        next: preview => this.openReleasePreviewDialog(preview, item),
+        next: preview => {
+          if (!preview) return;
+          this.openReleasePreviewDialog(preview, item);
+        },
         error: err => {
           console.error('Failed to load objects for release preview', err);
         },
@@ -1786,11 +1748,9 @@ export class ReleaseTrackPageComponent implements OnInit {
     preview: any,
     item?: SnapshotHistoryViewModel
   ): void {
-    const track =
-      preview?.snapshot ??
-      preview?.release_preview?.snapshot ??
-      preview?.release_preview ??
-      preview;
+    const track = item?.snapshot ?? this.releaseTrack;
+    if (!track) return;
+
     const releaseRef = this.dialog.open(ReleasePreviewDialogComponent, {
       maxWidth: 'none',
       autoFocus: false,
@@ -1801,6 +1761,8 @@ export class ReleaseTrackPageComponent implements OnInit {
       data: {
         track,
         conflicts: this.getReleaseConflicts(preview),
+        proposedMinorVersion: preview?.version,
+        previewSummary: preview,
       },
     });
 
@@ -1821,8 +1783,10 @@ export class ReleaseTrackPageComponent implements OnInit {
 
     this.isReleasing = true;
     const release = item?.modified
-      ? this.connector.bumpByModified(this.id, item.modified, { type })
-      : this.connector.bumpByLatest(this.id, { type });
+      ? this.connector.bumpByModified(this.id, item.modified, {
+          increment: type,
+        })
+      : this.connector.bumpByLatest(this.id, { increment: type });
 
     release
       .pipe(

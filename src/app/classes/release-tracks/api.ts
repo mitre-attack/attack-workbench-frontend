@@ -35,9 +35,8 @@ export interface UpdateContentsPayload {
 }
 
 export interface BumpPayload {
-  type?: 'major' | 'minor';
+  increment?: 'major' | 'minor';
   version?: string;
-  dry_run?: boolean;
 }
 
 export interface ClonePayload {

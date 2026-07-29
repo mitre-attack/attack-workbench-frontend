@@ -6,6 +6,8 @@ import { VersionNumber } from 'src/app/classes/version-number';
 export interface ReleasePreviewDialogData {
   track: any;
   conflicts?: any[];
+  proposedMinorVersion?: string;
+  previewSummary?: any;
 }
 
 interface ReleaseTrackObject {
@@ -54,6 +56,10 @@ export class ReleasePreviewDialogComponent {
   }
 
   public get minorVersion(): string {
+    if (this.data.proposedMinorVersion) {
+      return this.formatVersion(this.data.proposedMinorVersion);
+    }
+
     return this.formatVersion(
       new VersionNumber(this.currentVersion.replace(/^v/i, ''))
         .nextMinorVersion()
@@ -81,6 +87,16 @@ export class ReleasePreviewDialogComponent {
     return this.asArray(this.data.track?.candidates);
   }
 
+  public get isVirtualTrack(): boolean {
+    return this.data.previewSummary?.type === 'virtual';
+  }
+
+  public get totalIncludedCount(): number {
+    return this.isVirtualTrack
+      ? (this.data.previewSummary?.after?.members_count ?? this.members.length)
+      : this.includedObjects.length;
+  }
+
   public get includedObjects(): IncludedReleaseObject[] {
     const stagedByRef = new Map(
       this.staged.map(item => [this.getObjectRef(item), item])
@@ -102,6 +118,10 @@ export class ReleasePreviewDialogComponent {
   }
 
   public get newObjectCount(): number {
+    if (this.isVirtualTrack) {
+      return this.data.previewSummary?.changes?.new_count ?? 0;
+    }
+
     const memberRefs = new Set(
       this.members.map(item => this.getObjectRef(item))
     );
@@ -110,6 +130,10 @@ export class ReleasePreviewDialogComponent {
   }
 
   public get updatedMemberCount(): number {
+    if (this.isVirtualTrack) {
+      return this.data.previewSummary?.changes?.updated_count ?? 0;
+    }
+
     const memberRefs = new Set(
       this.members.map(item => this.getObjectRef(item))
     );
@@ -118,7 +142,22 @@ export class ReleasePreviewDialogComponent {
   }
 
   public get unchangedObjectCount(): number {
+    if (this.isVirtualTrack) {
+      return Math.max(
+        this.totalIncludedCount - this.newObjectCount - this.updatedMemberCount,
+        0
+      );
+    }
+
     return Math.max(this.members.length - this.updatedMemberCount, 0);
+  }
+
+  public get removedObjectCount(): number {
+    return this.data.previewSummary?.changes?.removed_count ?? 0;
+  }
+
+  public get quarantinedObjectCount(): number {
+    return this.data.previewSummary?.changes?.quarantined_count ?? 0;
   }
 
   public get replacements(): IncludedReleaseObject[] {

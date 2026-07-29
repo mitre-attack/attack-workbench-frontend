@@ -28,7 +28,12 @@
       <button
         mat-raised-button
         color="primary"
-        [disabled]="!id || !releaseTrack || isReleasing"
+        [disabled]="!canPreviewRelease"
+        [attr.title]="
+          releaseTrack?.version
+            ? 'The latest snapshot is already tagged. Modify the track to create a new draft.'
+            : null
+        "
         (click)="onPreviewRelease()">
         Preview & Release
         <mat-icon>preview</mat-icon>

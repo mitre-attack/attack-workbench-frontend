@@ -84,6 +84,27 @@ describe('ReleasePreviewDialogComponent', () => {
     expect(component.excludedCandidates).toHaveLength(1);
   });
 
+  it('should use the backend diff when previewing a virtual release', () => {
+    data.previewSummary = {
+      type: 'virtual',
+      after: { members_count: 870, quarantine_count: 0 },
+      changes: {
+        new_count: 30,
+        updated_count: 12,
+        removed_count: 10,
+        quarantined_count: 0,
+      },
+    };
+
+    expect(component.isVirtualTrack).toBe(true);
+    expect(component.totalIncludedCount).toBe(870);
+    expect(component.newObjectCount).toBe(30);
+    expect(component.updatedMemberCount).toBe(12);
+    expect(component.unchangedObjectCount).toBe(828);
+    expect(component.removedObjectCount).toBe(10);
+    expect(component.quarantinedObjectCount).toBe(0);
+  });
+
   it('should display the canonical ATT&CK object type', () => {
     data.track.staged[0].attack_type = 'technique';
 
