@@ -39,6 +39,8 @@
   <app-stix-page-tabs
     [detailsTemplate]="detailsTpl"
     [showHistory]="false"
+    [showNotes]="false"
+    [showMembership]="false"
     [customTabs]="[
       { label: 'History', template: historyTpl },
       { label: 'Config', template: configTpl },
@@ -659,7 +661,7 @@
                   *ngIf="!item.isTagged"
                   class="view-color"
                   mat-stroked-button
-                  (click)="onTagSnapshot()">
+                  (click)="onTagSnapshot(item)">
                   <mat-icon>sell</mat-icon>
                   Tag
                 </button>
