@@ -13,7 +13,7 @@ import { MatDialog } from '@angular/material/dialog';
 import { MatMenuTrigger } from '@angular/material/menu';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { forkJoin, of } from 'rxjs';
-import { catchError, map, switchMap } from 'rxjs/operators';
+import { catchError, map } from 'rxjs/operators';
 import { ExportFormat, SnapshotTier } from 'src/app/classes/release-tracks';
 import type {
   ReleaseTrackObjectTier,

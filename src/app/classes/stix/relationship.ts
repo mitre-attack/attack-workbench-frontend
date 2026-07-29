@@ -697,7 +697,7 @@ export class Relationship extends StixObject {
   public updateSourceTargetObject(
     restAPIService: RestApiConnectorService,
     object: StixObject
-  ): Observable<unknown> {
+  ) {
     // Check if the workflow object exists
     if (!object.workflow) {
       // Initialize the workflow object if it doesn't exist
