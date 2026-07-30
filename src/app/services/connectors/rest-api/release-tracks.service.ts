@@ -25,7 +25,6 @@ import type {
   SnapshotHistoryOptions,
   StixBundlePayload,
   StixObjectRef,
-  UpdateContentsPayload,
   UpdateMetadataPayload,
 } from 'src/app/classes/release-tracks';
 import { Paginated } from './rest-api-connector.service';
@@ -43,7 +42,6 @@ export type {
   SnapshotHistoryOptions,
   StixBundlePayload,
   StixObjectRef,
-  UpdateContentsPayload,
   UpdateMetadataPayload,
 } from 'src/app/classes/release-tracks';
 
@@ -318,26 +316,6 @@ export class ReleaseTracksConnectorService extends ApiConnector {
   }
 
   /**
-   * POST /api/release-tracks/:id/contents
-   * Update member contents for latest snapshot.
-   * @param id Release track id
-   * @param body Contents payload
-   * @returns Observable<any>
-   */
-  public updateContentsByLatest(
-    id: string,
-    body: UpdateContentsPayload
-  ): Observable<any> {
-    const params = this.buildHttpParams({ confirm_track_id: id });
-    const url = `${this.apiUrl}/release-tracks/${id}/contents`;
-    return this.http.post(url, body, { params }).pipe(
-      tap(result => logger.log(`updated contents for track ${id}`, result)),
-      catchError(this.handleError_raise()),
-      share()
-    );
-  }
-
-  /**
    * GET /api/release-tracks/:id/snapshots/latest/release/preview
    * GET /api/release-tracks/:id/snapshots/:modified/release/preview
    * Preview a release for a track snapshot.
@@ -448,56 +426,6 @@ export class ReleaseTracksConnectorService extends ApiConnector {
   }
 
   /**
-   * POST /api/release-tracks/:id/snapshots/:modified/meta
-   * Update metadata for a specific snapshot.
-   * @param id Release track id
-   * @param modified Snapshot modified timestamp
-   * @param body Metadata payload
-   * @param userAccountId Optional user
-   * @returns Observable<any>
-   */
-  public updateMetadataByModified(
-    id: string,
-    modified: string,
-    body: UpdateMetadataPayload,
-    userAccountId?: string
-  ): Observable<any> {
-    const url = `${this.apiUrl}/release-tracks/${id}/snapshots/${encodeURIComponent(modified)}/meta`;
-    const payload = userAccountId ? { ...body, userAccountId } : body;
-    return this.http.post(url, payload).pipe(
-      tap(result =>
-        logger.log(`updated metadata for snapshot ${modified}`, result)
-      ),
-      catchError(this.handleError_raise()),
-      share()
-    );
-  }
-
-  /**
-   * POST /api/release-tracks/:id/snapshots/:modified/contents
-   * Update contents for a specific snapshot.
-   * @param id Release track id
-   * @param modified Snapshot modified timestamp
-   * @param body Contents payload
-   * @returns Observable<any>
-   */
-  public updateContentsByModified(
-    id: string,
-    modified: string,
-    body: UpdateContentsPayload
-  ): Observable<any> {
-    const url = `${this.apiUrl}/release-tracks/${id}/snapshots/${encodeURIComponent(modified)}/contents`;
-    const params = this.buildHttpParams({ confirm_track_id: id });
-    return this.http.post(url, body, { params }).pipe(
-      tap(result =>
-        logger.log(`updated contents for snapshot ${modified}`, result)
-      ),
-      catchError(this.handleError_raise()),
-      share()
-    );
-  }
-
-  /**
    * POST /api/release-tracks/:id/snapshots/:modified/release
    * Tag/release a specific snapshot.
    * @param id Release track id
@@ -541,7 +469,7 @@ export class ReleaseTracksConnectorService extends ApiConnector {
 
   /**
    * DELETE /api/release-tracks/:id/snapshots/:modified
-   * Delete a specific snapshot.
+   * Delete the latest untagged draft snapshot.
    * @param id Release track id
    * @param modified Snapshot modified timestamp
    * @returns Observable<unknown>

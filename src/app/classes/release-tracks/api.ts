@@ -34,13 +34,6 @@ export interface UpdateMetadataPayload {
   object_marking_refs?: string[];
 }
 
-export interface UpdateContentsPayload {
-  x_mitre_contents: {
-    obj_ref: string;
-    obj_modified: string;
-  }[];
-}
-
 export type ReleasePayload =
   | { increment: 'major' | 'minor'; version?: never }
   | { increment?: never; version: string }
@@ -128,8 +121,7 @@ export interface VirtualReleasePreviewSummary extends ReleasePreviewSummaryBase 
 }
 
 export type ReleasePreviewSummary =
-  | StandardReleasePreviewSummary
-  | VirtualReleasePreviewSummary;
+  StandardReleasePreviewSummary | VirtualReleasePreviewSummary;
 
 interface ReleaseTrackSnapshotHistoryBase {
   id: string;
