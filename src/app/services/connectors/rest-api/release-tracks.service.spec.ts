@@ -107,11 +107,9 @@ describe('ReleaseTracksConnectorService', () => {
 
   it('should release a selected snapshot with an exact version', () => {
     service
-      .releaseSnapshot(
-        'release-track--standard',
-        '2026-07-23T13:37:28.000Z',
-        { version: '14.1' }
-      )
+      .releaseSnapshot('release-track--standard', '2026-07-23T13:37:28.000Z', {
+        version: '14.1',
+      })
       .subscribe();
 
     expect(http.post).toHaveBeenCalledWith(
@@ -155,9 +153,7 @@ describe('ReleaseTracksConnectorService', () => {
       .subscribe();
 
     const [url, options] = http.get.mock.calls[0];
-    expect(url).toBe(
-      `${environment.integrations.rest_api.url}/release-tracks`
-    );
+    expect(url).toBe(`${environment.integrations.rest_api.url}/release-tracks`);
     expect(options.params.get('type')).toBe('virtual');
     expect(options.params.get('limit')).toBe('25');
     expect(options.params.get('offset')).toBe('0');

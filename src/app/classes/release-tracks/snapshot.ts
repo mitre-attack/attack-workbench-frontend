@@ -120,9 +120,7 @@ export class ReleaseTrackSnapshot {
       this.staged = raw.staged.map((s: any) => ({
         ...s,
         object_ref: s.object_ref,
-        object_modified: this.deserializeWorkflowRevision(
-          s.object_modified
-        ),
+        object_modified: this.deserializeWorkflowRevision(s.object_modified),
         object_status: s.object_status,
         object_staged_at: s.object_staged_at
           ? new Date(s.object_staged_at)
@@ -135,9 +133,7 @@ export class ReleaseTrackSnapshot {
       this.candidates = raw.candidates.map((c: any) => ({
         ...c,
         object_ref: c.object_ref,
-        object_modified: this.deserializeWorkflowRevision(
-          c.object_modified
-        ),
+        object_modified: this.deserializeWorkflowRevision(c.object_modified),
         object_status: c.object_status,
         object_added_at: c.object_added_at
           ? new Date(c.object_added_at)

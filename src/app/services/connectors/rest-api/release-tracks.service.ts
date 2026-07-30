@@ -224,15 +224,19 @@ export class ReleaseTracksConnectorService extends ApiConnector {
   ): Observable<Paginated<ReleaseTrackSnapshotHistoryItem>> {
     const params = this.buildHttpParams(options);
     const url = `${this.apiUrl}/release-tracks/${id}/snapshots`;
-    return this.http.get<Paginated<ReleaseTrackSnapshotHistoryItem>>(url, {
-      params,
-    }).pipe(
-      tap(result => logger.log(`retrieved snapshots for track ${id}`, result)),
-      catchError(
-        this.handleError_raise<Paginated<ReleaseTrackSnapshotHistoryItem>>()
-      ),
-      share()
-    );
+    return this.http
+      .get<Paginated<ReleaseTrackSnapshotHistoryItem>>(url, {
+        params,
+      })
+      .pipe(
+        tap(result =>
+          logger.log(`retrieved snapshots for track ${id}`, result)
+        ),
+        catchError(
+          this.handleError_raise<Paginated<ReleaseTrackSnapshotHistoryItem>>()
+        ),
+        share()
+      );
   }
 
   /**
@@ -404,9 +408,7 @@ export class ReleaseTracksConnectorService extends ApiConnector {
    * @param id Release track id
    * @returns Observable<unknown>
    */
-  public deleteReleaseTrack(
-    id: string
-  ): Observable<unknown> {
+  public deleteReleaseTrack(id: string): Observable<unknown> {
     const params = this.buildHttpParams({ confirm_track_id: id });
     const url = `${this.apiUrl}/release-tracks/${id}`;
     return this.http.delete(url, { params }).pipe(

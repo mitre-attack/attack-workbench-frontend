@@ -35,10 +35,10 @@ export interface UpdateMetadataPayload {
 }
 
 export interface UpdateContentsPayload {
-  x_mitre_contents: Array<{
+  x_mitre_contents: {
     obj_ref: string;
     obj_modified: string;
-  }>;
+  }[];
 }
 
 export type ReleasePayload =
@@ -88,8 +88,7 @@ export interface ReleasePreviewSummaryBase {
   conflicts: any[];
 }
 
-export interface StandardReleasePreviewSummary
-  extends ReleasePreviewSummaryBase {
+export interface StandardReleasePreviewSummary extends ReleasePreviewSummaryBase {
   type: ReleaseTrackType.Standard;
   before: {
     members_count: number;
@@ -141,15 +140,13 @@ interface ReleaseTrackSnapshotHistoryBase {
   members_count: number;
 }
 
-export interface StandardReleaseTrackSnapshotHistoryItem
-  extends ReleaseTrackSnapshotHistoryBase {
+export interface StandardReleaseTrackSnapshotHistoryItem extends ReleaseTrackSnapshotHistoryBase {
   type: ReleaseTrackType.Standard;
   staged_count: number;
   candidates_count: number;
 }
 
-export interface VirtualReleaseTrackSnapshotHistoryItem
-  extends ReleaseTrackSnapshotHistoryBase {
+export interface VirtualReleaseTrackSnapshotHistoryItem extends ReleaseTrackSnapshotHistoryBase {
   type: ReleaseTrackType.Virtual;
   quarantine_count: number;
 }
