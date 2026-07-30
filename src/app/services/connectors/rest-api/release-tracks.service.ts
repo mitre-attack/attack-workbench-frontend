@@ -581,7 +581,7 @@ export class ReleaseTracksConnectorService extends ApiConnector {
   }
 
   /**
-   * POST /api/release-tracks/:id/snapshots/create
+   * POST /api/release-tracks/:id/virtual/snapshots/create
    * Resolve component tracks and create a new draft snapshot for a virtual track.
    * @param id Release track id
    * @param body Optional snapshot creation options
@@ -591,7 +591,7 @@ export class ReleaseTracksConnectorService extends ApiConnector {
     id: string,
     body?: { description?: string }
   ): Observable<any> {
-    const url = `${this.apiUrl}/release-tracks/${id}/snapshots/create`;
+    const url = `${this.apiUrl}/release-tracks/${id}/virtual/snapshots/create`;
     return this.http.post(url, body || {}).pipe(
       tap(result =>
         logger.log(`created virtual snapshot for track ${id}`, result)
@@ -602,24 +602,7 @@ export class ReleaseTracksConnectorService extends ApiConnector {
   }
 
   /**
-   * GET /api/release-tracks/:id/snapshots/preview
-   * Preview the resolved contents of a virtual snapshot without creating it.
-   * @param id Release track id
-   * @returns Observable<any>
-   */
-  public previewVirtualSnapshot(id: string): Observable<any> {
-    const url = `${this.apiUrl}/release-tracks/${id}/snapshots/preview`;
-    return this.http.get(url).pipe(
-      tap(result =>
-        logger.log(`previewed virtual snapshot for track ${id}`, result)
-      ),
-      catchError(this.handleError_continue<any>(null)),
-      share()
-    );
-  }
-
-  /**
-   * PUT /api/release-tracks/:id/composition
+   * PUT /api/release-tracks/:id/virtual/composition
    * Update the composition rules for a virtual release track.
    * @param id Release track id
    * @param body Composition payload
@@ -630,7 +613,7 @@ export class ReleaseTracksConnectorService extends ApiConnector {
     body: Composition,
     userAccountId?: string
   ): Observable<any> {
-    const url = `${this.apiUrl}/release-tracks/${id}/composition`;
+    const url = `${this.apiUrl}/release-tracks/${id}/virtual/composition`;
     const payload = userAccountId ? { ...body, userAccountId } : body;
     return this.http.put(url, payload).pipe(
       tap(result =>
