@@ -11,6 +11,7 @@ import {
 import { ActivatedRoute, Router } from '@angular/router';
 import { of, throwError } from 'rxjs';
 import { MatDialog } from '@angular/material/dialog';
+import { MatSnackBar } from '@angular/material/snack-bar';
 import { BreadcrumbService } from 'src/app/services/helpers/breadcrumb.service';
 import { RestApiConnectorService } from 'src/app/services/connectors/rest-api/rest-api-connector.service';
 import { MultipleChoiceDialogComponent } from 'src/app/components/multiple-choice-dialog/multiple-choice-dialog.component';
@@ -38,6 +39,7 @@ describe('ReleaseTrackPageComponent', () => {
   let mockRestApiConnector: any;
   let mockRouter: any;
   let mockAuthenticationService: any;
+  let mockSnackbar: any;
 
   beforeEach(async () => {
     mockReleaseTrackApiConnector = createMockReleaseTrackApiConnector({
@@ -60,6 +62,9 @@ describe('ReleaseTrackPageComponent', () => {
       deleteReleaseTrack: vi.fn(() => createAsyncObservable({})),
     });
     mockDialog = {
+      open: vi.fn(),
+    };
+    mockSnackbar = {
       open: vi.fn(),
     };
     mockRestApiConnector = {
@@ -95,6 +100,10 @@ describe('ReleaseTrackPageComponent', () => {
         {
           provide: MatDialog,
           useValue: mockDialog,
+        },
+        {
+          provide: MatSnackBar,
+          useValue: mockSnackbar,
         },
         {
           provide: BreadcrumbService,
@@ -889,6 +898,28 @@ describe('ReleaseTrackPageComponent', () => {
       expect.any(Error)
     );
     expect(mockDialog.open).not.toHaveBeenCalled();
+  });
+
+  it('should notify the user when the preview response is empty', () => {
+    mockReleaseTrackApiConnector.previewBump.mockReturnValue(of(null));
+    component.id = 'release-track--123';
+    component.releaseTrack = {
+      id: 'release-track--123',
+      version: null,
+    } as any;
+
+    component.onPreviewRelease();
+
+    expect(mockSnackbar.open).toHaveBeenCalledWith(
+      'Unable to load the release preview. Please try again.',
+      null,
+      {
+        duration: 5000,
+        panelClass: 'error',
+      }
+    );
+    expect(mockDialog.open).not.toHaveBeenCalled();
+    expect(component.isReleasing).toBe(false);
   });
 
   it('should keep Preview & Release enabled for a tagged snapshot', () => {

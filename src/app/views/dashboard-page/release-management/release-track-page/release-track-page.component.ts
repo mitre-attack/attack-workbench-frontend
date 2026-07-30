@@ -2,6 +2,7 @@ import { SelectionModel } from '@angular/cdk/collections';
 import { Component, OnInit } from '@angular/core';
 import { FormBuilder, FormGroup } from '@angular/forms';
 import { MatDialog } from '@angular/material/dialog';
+import { MatSnackBar } from '@angular/material/snack-bar';
 import { ActivatedRoute, Router } from '@angular/router';
 import { forkJoin, of } from 'rxjs';
 import { finalize, take } from 'rxjs/operators';
@@ -199,6 +200,7 @@ export class ReleaseTrackPageComponent implements OnInit {
     private route: ActivatedRoute,
     private router: Router,
     private dialog: MatDialog,
+    private snackbar: MatSnackBar,
     private restApiConnectorService: RestApiConnectorService,
     private authenticationService: AuthenticationService,
     private fb: FormBuilder
@@ -1420,7 +1422,17 @@ export class ReleaseTrackPageComponent implements OnInit {
       )
       .subscribe({
         next: result => {
-          if (!result.preview || !result.track) return;
+          if (!result.preview || !result.track) {
+            this.snackbar.open(
+              'Unable to load the release preview. Please try again.',
+              null,
+              {
+                duration: 5000,
+                panelClass: 'error',
+              }
+            );
+            return;
+          }
           this.openReleasePreviewDialog(
             result.preview,
             this.enrichReleasePreviewTrack(result.track, result.objects),
