@@ -73,7 +73,9 @@ export class ReleaseTrackObjectCardComponent {
   }
 
   public get modified(): Date | string | null {
-    return this.item?.object_modified || null;
+    return (
+      this.item?.resolved_object_modified || this.item?.object_modified || null
+    );
   }
 
   public get modifiedHumanized(): string {
