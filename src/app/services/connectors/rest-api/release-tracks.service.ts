@@ -317,17 +317,15 @@ export class ReleaseTracksConnectorService extends ApiConnector {
    * Update member contents for latest snapshot.
    * @param id Release track id
    * @param body Contents payload
-   * @param userAccountId Optional user
    * @returns Observable<any>
    */
   public updateContentsByLatest(
     id: string,
-    body: UpdateContentsPayload,
-    userAccountId?: string
+    body: UpdateContentsPayload
   ): Observable<any> {
+    const params = this.buildHttpParams({ confirm_track_id: id });
     const url = `${this.apiUrl}/release-tracks/${id}/contents`;
-    const payload = userAccountId ? { ...body, userAccountId } : body;
-    return this.http.post(url, payload).pipe(
+    return this.http.post(url, body, { params }).pipe(
       tap(result => logger.log(`updated contents for track ${id}`, result)),
       catchError(this.handleError_raise()),
       share()
@@ -406,10 +404,9 @@ export class ReleaseTracksConnectorService extends ApiConnector {
    * @returns Observable<unknown>
    */
   public deleteReleaseTrack(
-    id: string,
-    options?: { versions?: 'latest' }
+    id: string
   ): Observable<unknown> {
-    const params = this.buildHttpParams(options);
+    const params = this.buildHttpParams({ confirm_track_id: id });
     const url = `${this.apiUrl}/release-tracks/${id}`;
     return this.http.delete(url, { params }).pipe(
       tap(() => logger.log(`deleted track ${id}`)),
@@ -479,18 +476,16 @@ export class ReleaseTracksConnectorService extends ApiConnector {
    * @param id Release track id
    * @param modified Snapshot modified timestamp
    * @param body Contents payload
-   * @param userAccountId Optional user
    * @returns Observable<any>
    */
   public updateContentsByModified(
     id: string,
     modified: string,
-    body: UpdateContentsPayload,
-    userAccountId?: string
+    body: UpdateContentsPayload
   ): Observable<any> {
     const url = `${this.apiUrl}/release-tracks/${id}/snapshots/${modified}/contents`;
-    const payload = userAccountId ? { ...body, userAccountId } : body;
-    return this.http.post(url, payload).pipe(
+    const params = this.buildHttpParams({ confirm_track_id: id });
+    return this.http.post(url, body, { params }).pipe(
       tap(result =>
         logger.log(`updated contents for snapshot ${modified}`, result)
       ),

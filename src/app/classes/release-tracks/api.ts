@@ -35,7 +35,10 @@ export interface UpdateMetadataPayload {
 }
 
 export interface UpdateContentsPayload {
-  x_mitre_contents: string[];
+  x_mitre_contents: Array<{
+    obj_ref: string;
+    obj_modified: string;
+  }>;
 }
 
 export type ReleasePayload =

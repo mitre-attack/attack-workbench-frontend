@@ -127,4 +127,63 @@ describe('ReleaseTracksConnectorService', () => {
     expect(options.params.get('limit')).toBe('25');
     expect(options.params.get('offset')).toBe('50');
   });
+
+  it('should confirm the target ID when deleting a release track', () => {
+    service.deleteReleaseTrack('release-track--standard').subscribe();
+
+    const [url, options] = http.delete.mock.calls[0];
+    expect(url).toBe(
+      `${environment.integrations.rest_api.url}/release-tracks/release-track--standard`
+    );
+    expect(options.params.get('confirm_track_id')).toBe(
+      'release-track--standard'
+    );
+  });
+
+  it('should send exact revision references when replacing latest contents', () => {
+    const body = {
+      x_mitre_contents: [
+        {
+          obj_ref: 'attack-pattern--one',
+          obj_modified: '2026-07-23T13:37:28.000Z',
+        },
+      ],
+    };
+
+    service.updateContentsByLatest('release-track--standard', body).subscribe();
+
+    const [url, payload, options] = http.post.mock.calls[0];
+    expect(url).toBe(
+      `${environment.integrations.rest_api.url}/release-tracks/release-track--standard/contents`
+    );
+    expect(payload).toEqual(body);
+    expect(options.params.get('confirm_track_id')).toBe(
+      'release-track--standard'
+    );
+  });
+
+  it('should confirm the target ID when replacing snapshot contents', () => {
+    const body = {
+      x_mitre_contents: [
+        {
+          obj_ref: 'attack-pattern--one',
+          obj_modified: 'latest',
+        },
+      ],
+    };
+
+    service
+      .updateContentsByModified(
+        'release-track--standard',
+        '2026-07-23T13:37:28.000Z',
+        body
+      )
+      .subscribe();
+
+    const [, payload, options] = http.post.mock.calls[0];
+    expect(payload).toEqual(body);
+    expect(options.params.get('confirm_track_id')).toBe(
+      'release-track--standard'
+    );
+  });
 });
