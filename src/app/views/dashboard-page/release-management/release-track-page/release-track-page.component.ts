@@ -63,20 +63,17 @@ interface ReleaseTrackWorkspaceLane {
   isReleasedMembers?: boolean;
 }
 
-interface SnapshotMemberRef {
-  object_ref: string;
-  object_modified?: string;
-}
-
 interface SnapshotHistoryViewModel {
   snapshot: ReleaseTrackSnapshotHistoryItem;
   title: string;
   created: Date | null;
   modified: string | null;
   isTagged: boolean;
-  addedCount: number;
-  modifiedCount: number;
-  totalObjects: number;
+  isVirtual: boolean;
+  membersCount: number;
+  stagedCount?: number;
+  candidatesCount?: number;
+  quarantineCount?: number;
 }
 
 interface ReleaseTrackConfigFormValue {
@@ -563,8 +560,8 @@ export class ReleaseTrackPageComponent implements OnInit {
         })
       )
       .subscribe({
-        next: snapshots => {
-          this.snapshotHistory = this.buildSnapshotHistory(snapshots);
+        next: result => {
+          this.snapshotHistory = this.buildSnapshotHistory(result.data);
         },
         error: err => {
           console.error('Failed to load release track snapshot history', err);
@@ -1882,36 +1879,31 @@ export class ReleaseTrackPageComponent implements OnInit {
       (a, b) => this.getSnapshotTime(b) - this.getSnapshotTime(a)
     );
 
-    return sorted.map((snapshot, index) => {
-      const previousSnapshot = sorted[index + 1];
-      const currentMembers = this.getSnapshotMembers(snapshot);
-      const previousMembers = previousSnapshot
-        ? this.getSnapshotMembers(previousSnapshot)
-        : [];
-
-      return {
-        snapshot,
-        title: this.getSnapshotTitle(snapshot),
-        created: this.getSnapshotDate(snapshot),
-        modified: this.getSnapshotModified(snapshot),
-        isTagged: this.isTaggedSnapshot(snapshot),
-        addedCount: this.getAddedCount(
-          snapshot,
-          currentMembers,
-          previousMembers
-        ),
-        modifiedCount: this.getModifiedCount(
-          snapshot,
-          currentMembers,
-          previousMembers
-        ),
-        totalObjects: this.getSnapshotTotalObjects(snapshot, currentMembers),
-      };
-    });
+    return sorted.map(snapshot => ({
+      snapshot,
+      title: this.getSnapshotTitle(snapshot),
+      created: this.getSnapshotDate(snapshot),
+      modified: snapshot.modified,
+      isTagged: !!snapshot.version,
+      isVirtual: snapshot.type === ReleaseTrackType.Virtual,
+      membersCount: snapshot.members_count,
+      stagedCount:
+        snapshot.type === ReleaseTrackType.Standard
+          ? snapshot.staged_count
+          : undefined,
+      candidatesCount:
+        snapshot.type === ReleaseTrackType.Standard
+          ? snapshot.candidates_count
+          : undefined,
+      quarantineCount:
+        snapshot.type === ReleaseTrackType.Virtual
+          ? snapshot.quarantine_count
+          : undefined,
+    }));
   }
 
   private getSnapshotTitle(snapshot: ReleaseTrackSnapshotHistoryItem): string {
-    const version = snapshot.version || snapshot.stix?.x_mitre_version;
+    const version = snapshot.version;
     if (!version) return 'Draft Snapshot';
     return String(version).startsWith('v') ? String(version) : `v${version}`;
   }
@@ -1919,137 +1911,11 @@ export class ReleaseTrackPageComponent implements OnInit {
   private getSnapshotDate(
     snapshot: ReleaseTrackSnapshotHistoryItem
   ): Date | null {
-    const value =
-      snapshot.created ||
-      snapshot.modified ||
-      snapshot.snapshot_id ||
-      snapshot.tagged_at ||
-      snapshot.stix?.modified;
-    return value ? new Date(value) : null;
-  }
-
-  private getSnapshotModified(
-    snapshot: ReleaseTrackSnapshotHistoryItem
-  ): string | null {
-    const value =
-      snapshot.modified || snapshot.snapshot_id || snapshot.stix?.modified;
-    if (!value) return null;
-    return value instanceof Date ? value.toISOString() : String(value);
+    return snapshot.modified ? new Date(snapshot.modified) : null;
   }
 
   private getSnapshotTime(snapshot: ReleaseTrackSnapshotHistoryItem): number {
     return this.getSnapshotDate(snapshot)?.getTime() || 0;
-  }
-
-  private isTaggedSnapshot(snapshot: ReleaseTrackSnapshotHistoryItem): boolean {
-    return !!(snapshot.version || snapshot.stix?.x_mitre_version);
-  }
-
-  private getSnapshotMembers(
-    snapshot: ReleaseTrackSnapshotHistoryItem
-  ): SnapshotMemberRef[] {
-    const members =
-      snapshot.members ||
-      snapshot.contents?.members ||
-      snapshot.stix?.x_mitre_contents ||
-      [];
-
-    return members
-      .map((member: any) => this.getSnapshotMemberRef(member))
-      .filter((member): member is SnapshotMemberRef => !!member);
-  }
-
-  private getSnapshotMemberRef(member: any): SnapshotMemberRef | null {
-    if (!member) return null;
-
-    if (typeof member === 'string') {
-      return { object_ref: member };
-    }
-
-    const objectRef =
-      member.object_ref ||
-      member.id ||
-      member.object_id ||
-      member.stixID ||
-      member.stix?.id;
-
-    if (!objectRef) return null;
-
-    const objectModified =
-      member.object_modified || member.modified || member.stix?.modified;
-
-    return {
-      object_ref: objectRef,
-      object_modified: objectModified
-        ? this.toIsoString(objectModified)
-        : undefined,
-    };
-  }
-
-  private getAddedCount(
-    snapshot: ReleaseTrackSnapshotHistoryItem,
-    currentMembers: SnapshotMemberRef[],
-    previousMembers: SnapshotMemberRef[]
-  ): number {
-    if (typeof snapshot.summary?.added_count === 'number') {
-      return snapshot.summary.added_count;
-    }
-    if (typeof snapshot.summary?.promoted_count === 'number') {
-      return snapshot.summary.promoted_count;
-    }
-    if (!previousMembers.length) return 0;
-
-    const previousRefs = new Set(
-      previousMembers.map(member => member.object_ref)
-    );
-    return currentMembers.filter(member => !previousRefs.has(member.object_ref))
-      .length;
-  }
-
-  private getModifiedCount(
-    snapshot: ReleaseTrackSnapshotHistoryItem,
-    currentMembers: SnapshotMemberRef[],
-    previousMembers: SnapshotMemberRef[]
-  ): number {
-    if (typeof snapshot.summary?.modified_count === 'number') {
-      return snapshot.summary.modified_count;
-    }
-    if (!previousMembers.length) return 0;
-
-    const previousByRef = new Map(
-      previousMembers.map(member => [member.object_ref, member.object_modified])
-    );
-
-    return currentMembers.filter(member => {
-      const previousModified = previousByRef.get(member.object_ref);
-      return (
-        !!member.object_modified &&
-        !!previousModified &&
-        member.object_modified !== previousModified
-      );
-    }).length;
-  }
-
-  private getSnapshotTotalObjects(
-    snapshot: ReleaseTrackSnapshotHistoryItem,
-    members: SnapshotMemberRef[]
-  ): number {
-    if (typeof snapshot.summary?.members_count === 'number') {
-      return snapshot.summary.members_count;
-    }
-    if (typeof snapshot.composition_resolution?.total_objects === 'number') {
-      return snapshot.composition_resolution.total_objects;
-    }
-    if (members.length) return members.length;
-
-    const allRefs = [
-      ...(snapshot.candidates || snapshot.contents?.candidates || []),
-      ...(snapshot.staged || snapshot.contents?.staged || []),
-    ]
-      .map(item => this.getSnapshotMemberRef(item)?.object_ref)
-      .filter((ref): ref is string => !!ref);
-
-    return new Set(allRefs).size;
   }
 
   private getSnapshotExportFilename(

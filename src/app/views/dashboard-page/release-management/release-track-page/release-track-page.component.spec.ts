@@ -42,7 +42,12 @@ describe('ReleaseTrackPageComponent', () => {
     mockReleaseTrackApiConnector = createMockReleaseTrackApiConnector({
       getLatestSnapshot: vi.fn(() => createAsyncObservable(null)),
       listReleaseTracks: vi.fn(() => createAsyncObservable({ data: [] })),
-      listSnapshots: vi.fn(() => createAsyncObservable([])),
+      listSnapshots: vi.fn(() =>
+        createAsyncObservable({
+          data: [],
+          pagination: { total: 0, limit: 50, offset: 0 },
+        })
+      ),
       exportLatestSnapshot: vi.fn(() => createAsyncObservable({})),
       exportSnapshotByModified: vi.fn(() => createAsyncObservable({})),
       retrieveSnapshotByModified: vi.fn(() => createAsyncObservable(null)),
@@ -422,33 +427,32 @@ describe('ReleaseTrackPageComponent', () => {
     ]);
   });
 
-  it('should load snapshot history and compute timeline counts', () => {
+  it('should load the type-oriented counts from snapshot summaries', () => {
     mockReleaseTrackApiConnector.listSnapshots.mockReturnValue(
-      of([
-        {
-          modified: '2024-05-21T07:00:00.000Z',
-          members: [
-            {
-              object_ref: 'attack-pattern--one',
-              object_modified: '2024-05-20T00:00:00.000Z',
-            },
-            {
-              object_ref: 'attack-pattern--two',
-              object_modified: '2024-05-20T00:00:00.000Z',
-            },
-          ],
-        },
-        {
-          version: '1.3',
-          modified: '2024-04-15T06:00:00.000Z',
-          members: [
-            {
-              object_ref: 'attack-pattern--one',
-              object_modified: '2024-04-01T00:00:00.000Z',
-            },
-          ],
-        },
-      ])
+      of({
+        data: [
+          {
+            id: 'release-track--123',
+            type: 'standard',
+            modified: '2024-05-21T07:00:00.000Z',
+            version: null,
+            name: 'Enterprise',
+            members_count: 2,
+            staged_count: 3,
+            candidates_count: 4,
+          },
+          {
+            id: 'release-track--456',
+            type: 'virtual',
+            version: '1.3',
+            modified: '2024-04-15T06:00:00.000Z',
+            name: 'Combined',
+            members_count: 5,
+            quarantine_count: 1,
+          },
+        ],
+        pagination: { total: 2, limit: 50, offset: 0 },
+      })
     );
     component.id = 'release-track--123';
 
@@ -460,17 +464,18 @@ describe('ReleaseTrackPageComponent', () => {
     expect(component.snapshotHistory[0]).toEqual(
       expect.objectContaining({
         title: 'Draft Snapshot',
-        addedCount: 1,
-        modifiedCount: 1,
-        totalObjects: 2,
+        isVirtual: false,
+        membersCount: 2,
+        stagedCount: 3,
+        candidatesCount: 4,
       })
     );
     expect(component.snapshotHistory[1]).toEqual(
       expect.objectContaining({
         title: 'v1.3',
-        addedCount: 0,
-        modifiedCount: 0,
-        totalObjects: 1,
+        isVirtual: true,
+        membersCount: 5,
+        quarantineCount: 1,
       })
     );
   });

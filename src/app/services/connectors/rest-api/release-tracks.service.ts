@@ -21,6 +21,7 @@ import type {
   ReleaseTrackSnapshotHistoryItem,
   ReleaseTrackSnapshotOptions,
   ReviewPayload,
+  SnapshotHistoryOptions,
   StixBundlePayload,
   StixObjectRef,
   UpdateContentsPayload,
@@ -37,6 +38,7 @@ export type {
   ReleaseTrackSnapshotHistoryItem,
   ReleaseTrackSnapshotOptions,
   ReviewPayload,
+  SnapshotHistoryOptions,
   StixBundlePayload,
   StixObjectRef,
   UpdateContentsPayload,
@@ -71,36 +73,6 @@ export class ReleaseTracksConnectorService extends ApiConnector {
       });
     }
     return params;
-  }
-
-  private normalizeSnapshotHistory(
-    result: any
-  ): ReleaseTrackSnapshotHistoryItem[] {
-    if (!result) return [];
-    if (Array.isArray(result)) return result;
-
-    const snapshots =
-      result.snapshots ||
-      result.data ||
-      result.versions ||
-      result.release_track_snapshots ||
-      result.history ||
-      [];
-
-    if (Array.isArray(snapshots) && snapshots.length) return snapshots;
-
-    const historyItems = Array.isArray(result.version_history)
-      ? result.version_history.map((entry: any) => ({
-          ...entry,
-          modified: entry.snapshot_id,
-        }))
-      : [];
-
-    if (!result.version) {
-      return [result, ...historyItems];
-    }
-
-    return historyItems.length ? historyItems : [result];
   }
 
   // -----------------------------------------------------------------------------
@@ -243,17 +215,20 @@ export class ReleaseTracksConnectorService extends ApiConnector {
    * GET /api/release-tracks/:id/snapshots
    * List snapshot history summaries.
    * @param id Release track id
-   * @returns Observable<ReleaseTrackSnapshotHistoryItem[]>
+   * @returns Observable paginated snapshot summaries
    */
   public listSnapshots(
-    id: string
-  ): Observable<ReleaseTrackSnapshotHistoryItem[]> {
+    id: string,
+    options?: SnapshotHistoryOptions
+  ): Observable<Paginated<ReleaseTrackSnapshotHistoryItem>> {
+    const params = this.buildHttpParams(options);
     const url = `${this.apiUrl}/release-tracks/${id}/snapshots`;
-    return this.http.get(url).pipe(
+    return this.http.get<Paginated<ReleaseTrackSnapshotHistoryItem>>(url, {
+      params,
+    }).pipe(
       tap(result => logger.log(`retrieved snapshots for track ${id}`, result)),
-      map(result => this.normalizeSnapshotHistory(result)),
       catchError(
-        this.handleError_continue<ReleaseTrackSnapshotHistoryItem[]>([])
+        this.handleError_raise<Paginated<ReleaseTrackSnapshotHistoryItem>>()
       ),
       share()
     );

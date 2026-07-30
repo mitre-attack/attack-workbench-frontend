@@ -61,6 +61,12 @@ export interface ReleaseTrackSnapshotOptions {
   includeToc?: boolean;
 }
 
+export interface SnapshotHistoryOptions {
+  tagged?: boolean;
+  limit?: number;
+  offset?: number;
+}
+
 export type ReleasePreviewOptions = ReleasePayload & {
   format?: ReleasePreviewFormatType;
 };
@@ -118,35 +124,28 @@ export type ReleasePreviewSummary =
   | StandardReleasePreviewSummary
   | VirtualReleasePreviewSummary;
 
-export interface ReleaseTrackSnapshotHistoryItem {
-  id?: string;
-  modified?: string | Date;
-  version?: string | null;
-  created?: string | Date;
-  tagged_at?: string | Date;
-  snapshot_id?: string | Date;
-  members?: any[];
-  staged?: any[];
-  candidates?: any[];
-  contents?: {
-    members?: any[];
-    staged?: any[];
-    candidates?: any[];
-    [key: string]: any;
-  };
-  summary?: {
-    members_count?: number;
-    added_count?: number;
-    modified_count?: number;
-    promoted_count?: number;
-    [key: string]: any;
-  };
-  stix?: {
-    id?: string;
-    modified?: string | Date;
-    x_mitre_version?: string | null;
-    x_mitre_contents?: any[];
-    [key: string]: any;
-  };
-  [key: string]: any;
+interface ReleaseTrackSnapshotHistoryBase {
+  id: string;
+  modified: string;
+  version: string | null;
+  name: string;
+  description?: string;
+  members_count: number;
 }
+
+export interface StandardReleaseTrackSnapshotHistoryItem
+  extends ReleaseTrackSnapshotHistoryBase {
+  type: ReleaseTrackType.Standard;
+  staged_count: number;
+  candidates_count: number;
+}
+
+export interface VirtualReleaseTrackSnapshotHistoryItem
+  extends ReleaseTrackSnapshotHistoryBase {
+  type: ReleaseTrackType.Virtual;
+  quarantine_count: number;
+}
+
+export type ReleaseTrackSnapshotHistoryItem =
+  | StandardReleaseTrackSnapshotHistoryItem
+  | VirtualReleaseTrackSnapshotHistoryItem;

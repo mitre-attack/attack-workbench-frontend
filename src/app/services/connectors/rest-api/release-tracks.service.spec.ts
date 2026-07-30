@@ -109,4 +109,22 @@ describe('ReleaseTracksConnectorService', () => {
     expect((service as any).bumpByLatest).toBeUndefined();
     expect((service as any).bumpByModified).toBeUndefined();
   });
+
+  it('should preserve snapshot-history pagination and filtering', () => {
+    service
+      .listSnapshots('release-track--standard', {
+        tagged: false,
+        limit: 25,
+        offset: 50,
+      })
+      .subscribe();
+
+    const [url, options] = http.get.mock.calls[0];
+    expect(url).toBe(
+      `${environment.integrations.rest_api.url}/release-tracks/release-track--standard/snapshots`
+    );
+    expect(options.params.get('tagged')).toBe('false');
+    expect(options.params.get('limit')).toBe('25');
+    expect(options.params.get('offset')).toBe('50');
+  });
 });
