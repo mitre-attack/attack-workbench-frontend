@@ -143,9 +143,7 @@ const VIRTUAL_OBJECT_TYPE_OPTIONS: StixType[] = [
   'x-mitre-matrix',
   'x-mitre-tactic',
 ];
-import { map } from 'rxjs/operators';
 import { MatSnackBar } from '@angular/material/snack-bar';
-import { forkJoin, Observable, of } from 'rxjs';
 import { StixObject } from 'src/app/classes/stix';
 import { StixDialogComponent } from 'src/app/views/stix/stix-dialog/stix-dialog.component';
 
