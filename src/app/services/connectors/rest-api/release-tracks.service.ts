@@ -277,7 +277,7 @@ export class ReleaseTracksConnectorService extends ApiConnector {
     options?: Omit<ReleaseTrackSnapshotOptions, 'format'>
   ): Observable<any> {
     const params = this.buildHttpParams({ ...options, format });
-    const url = `${this.apiUrl}/release-tracks/${id}/snapshots/${modified}`;
+    const url = `${this.apiUrl}/release-tracks/${id}/snapshots/${encodeURIComponent(modified)}`;
     return this.http.get(url, { params }).pipe(
       tap(result =>
         logger.log(
@@ -433,7 +433,7 @@ export class ReleaseTracksConnectorService extends ApiConnector {
     options?: ReleaseTrackSnapshotOptions
   ): Observable<ReleaseTrackSnapshot | null> {
     const params = this.buildHttpParams(options);
-    const url = `${this.apiUrl}/release-tracks/${id}/snapshots/${modified}`;
+    const url = `${this.apiUrl}/release-tracks/${id}/snapshots/${encodeURIComponent(modified)}`;
     return this.http.get(url, { params }).pipe(
       tap(result =>
         logger.log(`retrieved snapshot ${modified} for track ${id}`, result)
@@ -459,7 +459,7 @@ export class ReleaseTracksConnectorService extends ApiConnector {
     body: UpdateMetadataPayload,
     userAccountId?: string
   ): Observable<any> {
-    const url = `${this.apiUrl}/release-tracks/${id}/snapshots/${modified}/meta`;
+    const url = `${this.apiUrl}/release-tracks/${id}/snapshots/${encodeURIComponent(modified)}/meta`;
     const payload = userAccountId ? { ...body, userAccountId } : body;
     return this.http.post(url, payload).pipe(
       tap(result =>
@@ -483,7 +483,7 @@ export class ReleaseTracksConnectorService extends ApiConnector {
     modified: string,
     body: UpdateContentsPayload
   ): Observable<any> {
-    const url = `${this.apiUrl}/release-tracks/${id}/snapshots/${modified}/contents`;
+    const url = `${this.apiUrl}/release-tracks/${id}/snapshots/${encodeURIComponent(modified)}/contents`;
     const params = this.buildHttpParams({ confirm_track_id: id });
     return this.http.post(url, body, { params }).pipe(
       tap(result =>
@@ -528,7 +528,7 @@ export class ReleaseTracksConnectorService extends ApiConnector {
     modified: string,
     body?: ClonePayload
   ): Observable<any> {
-    const url = `${this.apiUrl}/release-tracks/${id}/snapshots/${modified}/clone`;
+    const url = `${this.apiUrl}/release-tracks/${id}/snapshots/${encodeURIComponent(modified)}/clone`;
     return this.http.post(url, body || {}).pipe(
       tap(result => logger.log(`cloned from snapshot ${modified}`, result)),
       catchError(this.handleError_raise()),
@@ -547,7 +547,7 @@ export class ReleaseTracksConnectorService extends ApiConnector {
     id: string,
     modified: string
   ): Observable<unknown> {
-    const url = `${this.apiUrl}/release-tracks/${id}/snapshots/${modified}`;
+    const url = `${this.apiUrl}/release-tracks/${id}/snapshots/${encodeURIComponent(modified)}`;
     return this.http.delete(url).pipe(
       tap(() => logger.log(`deleted snapshot ${modified} from track ${id}`)),
       catchError(this.handleError_raise()),

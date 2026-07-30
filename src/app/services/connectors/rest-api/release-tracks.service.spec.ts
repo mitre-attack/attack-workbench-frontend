@@ -180,10 +180,27 @@ describe('ReleaseTracksConnectorService', () => {
       )
       .subscribe();
 
-    const [, payload, options] = http.post.mock.calls[0];
+    const [url, payload, options] = http.post.mock.calls[0];
+    expect(url).toBe(
+      `${environment.integrations.rest_api.url}/release-tracks/release-track--standard/snapshots/2026-07-23T13%3A37%3A28.000Z/contents`
+    );
     expect(payload).toEqual(body);
     expect(options.params.get('confirm_track_id')).toBe(
       'release-track--standard'
+    );
+  });
+
+  it('should encode timestamps used as snapshot path parameters', () => {
+    service
+      .retrieveSnapshotByModified(
+        'release-track--standard',
+        '2026-07-23T13:37:28.000Z'
+      )
+      .subscribe();
+
+    const [url] = http.get.mock.calls[0];
+    expect(url).toBe(
+      `${environment.integrations.rest_api.url}/release-tracks/release-track--standard/snapshots/2026-07-23T13%3A37%3A28.000Z`
     );
   });
 });
