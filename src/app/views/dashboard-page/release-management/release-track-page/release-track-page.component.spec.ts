@@ -63,9 +63,7 @@ describe('ReleaseTrackPageComponent', () => {
       open: vi.fn(),
     };
     mockRestApiConnector = {
-      getAllObjects: vi.fn(() =>
-        createAsyncObservable(createPaginatedResponse([]))
-      ),
+      getAllObjects: vi.fn(() => of(createPaginatedResponse([]))),
       triggerBrowserDownload: vi.fn(),
     };
     const mockBreadcrumbService = {
@@ -646,6 +644,50 @@ describe('ReleaseTrackPageComponent', () => {
         conflicts: [],
       })
     );
+    mockReleaseTrackApiConnector.retrieveSnapshotByModified.mockReturnValue(
+      of({
+        id: 'release-track--123',
+        members: [
+          {
+            object_ref: 'malware--replacement',
+            object_modified: '2026-07-01T12:00:00.000Z',
+          },
+        ],
+        staged: [
+          {
+            object_ref: 'malware--replacement',
+            object_modified: '2026-07-23T12:00:00.000Z',
+          },
+        ],
+        candidates: [],
+      })
+    );
+    mockRestApiConnector.getAllObjects.mockReturnValue(
+      of(
+        createPaginatedResponse([
+          {
+            workspace: { attack_id: 'S0001' },
+            stix: {
+              id: 'malware--replacement',
+              modified: '2026-07-01T12:00:00.000Z',
+              name: 'Replacement Example',
+              type: 'malware',
+              x_mitre_version: '1.0',
+            },
+          },
+          {
+            workspace: { attack_id: 'S0001' },
+            stix: {
+              id: 'malware--replacement',
+              modified: '2026-07-23T12:00:00.000Z',
+              name: 'Replacement Example',
+              type: 'malware',
+              x_mitre_version: '1.1',
+            },
+          },
+        ])
+      )
+    );
     mockReleaseTrackApiConnector.bumpByModified.mockReturnValue(of({}));
     mockDialog.open.mockReturnValue({
       afterClosed: () => of('major'),
@@ -655,12 +697,7 @@ describe('ReleaseTrackPageComponent', () => {
     component.onTagSnapshot({
       modified: '2026-07-23T13:37:28.000Z',
       isTagged: false,
-      snapshot: {
-        id: 'release-track--123',
-        members: [],
-        staged: [],
-        candidates: [],
-      },
+      snapshot: {},
     } as any);
 
     expect(mockReleaseTrackApiConnector.previewBump).toHaveBeenCalledWith(
@@ -668,6 +705,36 @@ describe('ReleaseTrackPageComponent', () => {
       'summary',
       '2026-07-23T13:37:28.000Z',
       'minor'
+    );
+    expect(
+      mockReleaseTrackApiConnector.retrieveSnapshotByModified
+    ).toHaveBeenCalledWith('release-track--123', '2026-07-23T13:37:28.000Z', {
+      format: 'workbench',
+      include: 'all',
+    });
+    expect(mockRestApiConnector.getAllObjects).toHaveBeenCalledWith({
+      revoked: true,
+      deprecated: true,
+      versions: 'all',
+    });
+    expect(mockDialog.open).toHaveBeenCalledWith(
+      ReleasePreviewDialogComponent,
+      expect.objectContaining({
+        data: expect.objectContaining({
+          track: expect.objectContaining({
+            members: [
+              expect.objectContaining({
+                x_mitre_version: '1.0',
+              }),
+            ],
+            staged: [
+              expect.objectContaining({
+                x_mitre_version: '1.1',
+              }),
+            ],
+          }),
+        }),
+      })
     );
     expect(mockReleaseTrackApiConnector.bumpByModified).toHaveBeenCalledWith(
       'release-track--123',
@@ -677,6 +744,54 @@ describe('ReleaseTrackPageComponent', () => {
     expect(mockReleaseTrackApiConnector.bumpByLatest).not.toHaveBeenCalled();
     expect(refreshSpy).toHaveBeenCalled();
     expect(historySpy).toHaveBeenCalled();
+  });
+
+  it('should preview the newest draft when multiple drafts exist', () => {
+    mockReleaseTrackApiConnector.previewBump.mockReturnValue(
+      of({ version: '1.1', conflicts: [] })
+    );
+    mockReleaseTrackApiConnector.retrieveSnapshotByModified.mockReturnValue(
+      of({
+        id: 'release-track--123',
+        modified: '2026-07-30T14:00:00.000Z',
+        members: [],
+        staged: [],
+        candidates: [],
+      })
+    );
+    mockDialog.open.mockReturnValue({
+      afterClosed: () => of(undefined),
+    });
+    component.id = 'release-track--123';
+    component.releaseTrack = {
+      id: 'release-track--123',
+      version: null,
+    } as any;
+    component.snapshotHistory = [
+      {
+        modified: '2026-07-30T14:00:00.000Z',
+        isTagged: false,
+      },
+      {
+        modified: '2026-07-29T14:00:00.000Z',
+        isTagged: false,
+      },
+    ] as any;
+
+    component.onPreviewRelease();
+
+    expect(mockReleaseTrackApiConnector.previewBump).toHaveBeenCalledWith(
+      'release-track--123',
+      'summary',
+      '2026-07-30T14:00:00.000Z',
+      'minor'
+    );
+    expect(
+      mockReleaseTrackApiConnector.retrieveSnapshotByModified
+    ).toHaveBeenCalledWith('release-track--123', '2026-07-30T14:00:00.000Z', {
+      format: 'workbench',
+      include: 'all',
+    });
   });
 
   it('should not tag a release when preview returns conflicts', () => {
@@ -776,17 +891,34 @@ describe('ReleaseTrackPageComponent', () => {
     expect(mockDialog.open).not.toHaveBeenCalled();
   });
 
-  it('should not preview an already tagged latest snapshot', () => {
+  it('should keep Preview & Release enabled for a tagged snapshot', () => {
     component.id = 'release-track--123';
     component.releaseTrack = {
       id: 'release-track--123',
       version: '1.0',
     } as any;
+    fixture.detectChanges();
+
+    const previewButton = Array.from(
+      fixture.nativeElement.querySelectorAll('button')
+    ).find((button: Element) =>
+      button.textContent?.includes('Preview & Release')
+    ) as HTMLButtonElement;
+
+    expect(previewButton).toBeTruthy();
+    expect(previewButton.disabled).toBe(false);
 
     component.onPreviewRelease();
 
     expect(mockReleaseTrackApiConnector.previewBump).not.toHaveBeenCalled();
-    expect(component.canPreviewRelease).toBe(false);
+    expect(mockDialog.open).toHaveBeenCalledWith(
+      MultipleChoiceDialogComponent,
+      expect.objectContaining({
+        data: expect.objectContaining({
+          title: 'No draft snapshot available',
+        }),
+      })
+    );
   });
 
   it('should load release track config into the config form', () => {

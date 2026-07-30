@@ -25,16 +25,7 @@
         Create Draft
         <mat-icon>local_see</mat-icon>
       </button>
-      <button
-        mat-raised-button
-        color="primary"
-        [disabled]="!canPreviewRelease"
-        [attr.title]="
-          releaseTrack?.version
-            ? 'The latest snapshot is already tagged. Modify the track to create a new draft.'
-            : null
-        "
-        (click)="onPreviewRelease()">
+      <button mat-raised-button color="primary" (click)="onPreviewRelease()">
         Preview & Release
         <mat-icon>preview</mat-icon>
       </button>

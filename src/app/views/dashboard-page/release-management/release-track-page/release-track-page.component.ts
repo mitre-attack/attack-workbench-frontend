@@ -3,6 +3,7 @@ import { Component, OnInit } from '@angular/core';
 import { FormBuilder, FormGroup } from '@angular/forms';
 import { MatDialog } from '@angular/material/dialog';
 import { ActivatedRoute, Router } from '@angular/router';
+import { forkJoin, of } from 'rxjs';
 import { finalize, take } from 'rxjs/operators';
 import {
   ConflictPolicy,
@@ -464,13 +465,8 @@ export class ReleaseTrackPageComponent implements OnInit {
     return !!this.id && this.isVirtualReleaseTrack && !this.isCreatingDraft;
   }
 
-  public get canPreviewRelease(): boolean {
-    return (
-      !!this.id &&
-      !!this.releaseTrack &&
-      this.releaseTrack.version == null &&
-      !this.isReleasing
-    );
+  private get latestDraftSnapshot(): SnapshotHistoryViewModel | undefined {
+    return this.snapshotHistory.find(snapshot => !snapshot.isTagged);
   }
 
   public get canEditReleaseTrack(): boolean {
@@ -1360,8 +1356,31 @@ export class ReleaseTrackPageComponent implements OnInit {
   }
 
   public onPreviewRelease(): void {
-    if (!this.canPreviewRelease) return;
-    this.previewRelease();
+    if (!this.latestDraftSnapshot && this.releaseTrack?.version != null) {
+      this.openNoDraftSnapshotDialog();
+      return;
+    }
+
+    this.previewRelease(this.latestDraftSnapshot);
+  }
+
+  private openNoDraftSnapshotDialog(): void {
+    this.dialog.open(MultipleChoiceDialogComponent, {
+      width: '30em',
+      autoFocus: false,
+      restoreFocus: true,
+      data: {
+        title: 'No draft snapshot available',
+        description:
+          'The latest snapshot has already been released. Modify the release track to create a new draft before previewing another release.',
+        choices: [
+          {
+            label: 'Close',
+            value: 'close',
+          },
+        ],
+      },
+    });
   }
 
   public onTagSnapshot(item: SnapshotHistoryViewModel): void {
@@ -1372,9 +1391,25 @@ export class ReleaseTrackPageComponent implements OnInit {
     if (!this.id || this.isReleasing) return;
 
     this.isReleasing = true;
-    const preview = item?.modified
-      ? this.connector.previewBump(this.id, 'summary', item.modified, 'minor')
-      : this.connector.previewBump(this.id, 'summary', undefined, 'minor');
+    const preview = forkJoin({
+      preview: this.connector.previewBump(
+        this.id,
+        'summary',
+        item?.modified ?? undefined,
+        'minor'
+      ),
+      track: item?.modified
+        ? this.connector.retrieveSnapshotByModified(this.id, item.modified, {
+            format: ExportFormat.Workbench,
+            include: 'all',
+          })
+        : of(this.releaseTrack),
+      objects: this.restApiConnectorService.getAllObjects({
+        revoked: true,
+        deprecated: true,
+        versions: 'all',
+      }),
+    });
 
     preview
       .pipe(
@@ -1384,9 +1419,13 @@ export class ReleaseTrackPageComponent implements OnInit {
         })
       )
       .subscribe({
-        next: preview => {
-          if (!preview) return;
-          this.openReleasePreviewDialog(preview, item);
+        next: result => {
+          if (!result.preview || !result.track) return;
+          this.openReleasePreviewDialog(
+            result.preview,
+            this.enrichReleasePreviewTrack(result.track, result.objects),
+            item
+          );
         },
         error: err => {
           console.error('Failed to load objects for release preview', err);
@@ -1746,11 +1785,9 @@ export class ReleaseTrackPageComponent implements OnInit {
 
   private openReleasePreviewDialog(
     preview: any,
+    track: ReleaseTrackSnapshot,
     item?: SnapshotHistoryViewModel
   ): void {
-    const track = item?.snapshot ?? this.releaseTrack;
-    if (!track) return;
-
     const releaseRef = this.dialog.open(ReleasePreviewDialogComponent, {
       maxWidth: 'none',
       autoFocus: false,
@@ -1773,6 +1810,76 @@ export class ReleaseTrackPageComponent implements OnInit {
         if (type !== 'major' && type !== 'minor') return;
         this.bumpRelease(type, item);
       });
+  }
+
+  private enrichReleasePreviewTrack(
+    track: ReleaseTrackSnapshot,
+    response: any
+  ) {
+    const objects = Array.isArray(response)
+      ? response
+      : Array.isArray(response?.data)
+        ? response.data
+        : [];
+    const objectsByRevision = new Map<string, any>();
+
+    objects.forEach((object: any) => {
+      const objectRef = object?.stix?.id ?? object?.stixID ?? object?.id;
+      const modified =
+        object?.stix?.modified ?? object?.modified ?? object?.object_modified;
+      if (objectRef && modified) {
+        objectsByRevision.set(
+          this.getReleasePreviewRevisionKey(objectRef, modified),
+          object
+        );
+      }
+    });
+
+    const enrich = (entry: any) => {
+      const object = objectsByRevision.get(
+        this.getReleasePreviewRevisionKey(
+          entry?.object_ref,
+          entry?.object_modified
+        )
+      );
+      if (!object) return entry;
+
+      const stix = object?.stix ?? object;
+      return {
+        ...entry,
+        name: object?.name ?? stix?.name ?? entry?.name,
+        attack_id:
+          object?.attackID ??
+          object?.attack_id ??
+          object?.workspace?.attack_id ??
+          entry?.attack_id,
+        attack_type:
+          object?.attackType ??
+          StixTypeToAttackType[stix?.type as StixType] ??
+          entry?.attack_type,
+        type: stix?.type ?? entry?.type,
+        x_mitre_version:
+          object?.version?.toString?.() ??
+          object?.version ??
+          stix?.x_mitre_version ??
+          entry?.x_mitre_version,
+      };
+    };
+
+    return {
+      ...track,
+      members: (track.members ?? []).map(enrich),
+      staged: (track.staged ?? []).map(enrich),
+      candidates: (track.candidates ?? []).map(enrich),
+    } as ReleaseTrackSnapshot;
+  }
+
+  private getReleasePreviewRevisionKey(
+    objectRef: unknown,
+    modified: unknown
+  ): string {
+    const timestamp = new Date(modified as any).getTime();
+    return `${String(objectRef ?? '')}::${timestamp}`;
   }
 
   private bumpRelease(
