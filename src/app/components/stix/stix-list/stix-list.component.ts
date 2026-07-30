@@ -713,6 +713,21 @@ export class StixListComponent implements OnInit, AfterViewInit, OnDestroy {
     }
   }
 
+  public toggleSelection(element: StixObject): void {
+    this.selection.toggle(element.stixID);
+    const selectedObjectRefs = this.config.selectedObjectRefs;
+    if (!selectedObjectRefs) return;
+
+    if (this.selection.isSelected(element.stixID)) {
+      selectedObjectRefs.set(element.stixID, {
+        id: element.stixID,
+        modified: element.modified.toISOString(),
+      });
+    } else {
+      selectedObjectRefs.delete(element.stixID);
+    }
+  }
+
   public isCollectionType(): boolean {
     return ['collection', 'collection-created', 'collection-imported'].includes(
       this.config.type
@@ -1255,6 +1270,7 @@ export interface StixListConfig {
    * Only relevant if 'select' is also enabled. Also, will cause problems if multiple constructor pram is set according to 'select'.
    */
   selectionModel?: SelectionModel<string>;
+  selectedObjectRefs?: Map<string, { id: string; modified: string }>;
   /** show links to view/edit pages for relevant objects? */
   showLinks?: boolean;
   /** default true, if false hides the filter dropdown menu */

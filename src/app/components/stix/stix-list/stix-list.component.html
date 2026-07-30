@@ -185,14 +185,14 @@
               *ngIf="config.select && config.select === 'many'"
               color="primary"
               (click)="onSelect.emit(element); $event.stopPropagation()"
-              (change)="$event ? selection.toggle(element.stixID) : null"
+              (change)="$event ? toggleSelection(element) : null"
               [checked]="selection.isSelected(element.stixID)">
             </mat-checkbox>
             <mat-radio-button
               *ngIf="config.select && config.select === 'one'"
               color="primary"
               (click)="onSelect.emit(element); $event.stopPropagation()"
-              (change)="$event ? selection.toggle(element.stixID) : null"
+              (change)="$event ? toggleSelection(element) : null"
               [checked]="selection.isSelected(element.stixID)">
             </mat-radio-button>
           </td>

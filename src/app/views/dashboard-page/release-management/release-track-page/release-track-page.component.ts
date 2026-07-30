@@ -3,7 +3,8 @@ import { Component, OnInit } from '@angular/core';
 import { FormBuilder, FormGroup } from '@angular/forms';
 import { MatDialog } from '@angular/material/dialog';
 import { ActivatedRoute, Router } from '@angular/router';
-import { finalize, take } from 'rxjs/operators';
+import { forkJoin, Observable, of } from 'rxjs';
+import { finalize, map, take } from 'rxjs/operators';
 import {
   ConflictPolicy,
   ConflictPolicyType,
@@ -477,6 +478,7 @@ export class ReleaseTrackPageComponent implements OnInit {
         next: res => {
           this.releaseTrack = res;
           if (!this.releaseTrack) return;
+          this.hydrateDynamicEntryDates();
 
           this.breadcrumbService.changeBreadcrumb(
             this.route.snapshot,
@@ -505,6 +507,56 @@ export class ReleaseTrackPageComponent implements OnInit {
   private refreshReleaseTrackState(): void {
     this.getReleaseTrack();
     this.getSnapshotHistory();
+  }
+
+  private hydrateDynamicEntryDates(): void {
+    const entries = ([] as ReleaseTrackObjectItem[]).concat(
+      ...['candidates', 'staged', 'members'].map(
+        tier =>
+          (this.releaseTrack?.[tier] || []).filter(
+            (entry: ReleaseTrackObjectItem) => entry.object_modified === 'latest'
+          )
+      )
+    );
+    if (!entries.length) return;
+
+    forkJoin(
+      entries.map(entry =>
+        this.fetchLatestObject(entry.object_ref).pipe(
+          map(object => ({ entry, modified: object?.modified }))
+        )
+      )
+    )
+      .pipe(take(1))
+      .subscribe(results => {
+        results.forEach(({ entry, modified }) => {
+          if (modified) {
+            entry.resolved_object_modified =
+              modified instanceof Date ? modified.toISOString() : modified;
+          }
+        });
+      });
+  }
+
+  private fetchLatestObject(objectRef: string): Observable<any | null> {
+    const attackType = StixTypeToAttackType[objectRef.split('--')[0] as StixType];
+    const getters: Partial<Record<string, () => Observable<any[]>>> = {
+      technique: () => this.restApiConnectorService.getTechnique(objectRef),
+      tactic: () => this.restApiConnectorService.getTactic(objectRef),
+      group: () => this.restApiConnectorService.getGroup(objectRef),
+      campaign: () => this.restApiConnectorService.getCampaign(objectRef),
+      asset: () => this.restApiConnectorService.getAsset(objectRef),
+      software: () => this.restApiConnectorService.getSoftware(objectRef),
+      mitigation: () => this.restApiConnectorService.getMitigation(objectRef),
+      matrix: () => this.restApiConnectorService.getMatrix(objectRef),
+      'data-source': () => this.restApiConnectorService.getDataSource(objectRef),
+      'data-component': () => this.restApiConnectorService.getDataComponent(objectRef),
+      'detection-strategy': () =>
+        this.restApiConnectorService.getDetectionStrategy(objectRef),
+      analytic: () => this.restApiConnectorService.getAnalytic(objectRef),
+    };
+    const getObject = getters[attackType];
+    return getObject ? getObject().pipe(map(objects => objects[0] || null)) : of(null);
   }
 
   public onDeleteReleaseTrack(): void {
@@ -621,6 +673,10 @@ export class ReleaseTrackPageComponent implements OnInit {
     if (!this.releaseTrack) return;
 
     const selection = new SelectionModel<string>(true);
+    const selectedObjectRefs = new Map<string, {
+      id: string;
+      modified: string;
+    }>();
     const dialogRef = this.dialog.open(AddDialogComponent, {
       data: {
         select: selection,
@@ -633,6 +689,7 @@ export class ReleaseTrackPageComponent implements OnInit {
           ...ALL_OBJECTS_STIX_LIST_CONFIG,
           select: 'many',
           selectionModel: selection,
+          selectedObjectRefs,
           clickBehavior: 'expand',
         },
       },
@@ -645,7 +702,12 @@ export class ReleaseTrackPageComponent implements OnInit {
       next: result => {
         if (!result || !selection.selected.length) return;
 
-        this.connector.addCandidates(this.id, selection.selected).subscribe({
+        const objectRefs = selection.selected
+          .map(id => selectedObjectRefs.get(id))
+          .filter((ref): ref is { id: string; modified: string } => !!ref);
+        if (!objectRefs.length) return;
+
+        this.connector.addCandidates(this.id, objectRefs).subscribe({
           next: () => {
             this.refreshReleaseTrackState();
           },
