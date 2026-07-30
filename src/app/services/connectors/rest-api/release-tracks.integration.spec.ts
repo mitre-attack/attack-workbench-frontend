@@ -24,23 +24,13 @@ async function probe(url: string, timeoutMs = 3000): Promise<Response> {
 
 beforeAll(async () => {
   try {
-    const res = await probe(`${apiUrl}/release-tracks`);
+    const res = await probe(`${apiUrl}/release-tracks?type=standard&limit=1`);
     if (res && res.ok) {
       serverAvailable = true;
-      // try to read and pick an id if available
       try {
         const body = await res.json().catch(() => null);
-        // server may return paginated object or array
-        if (Array.isArray(body) && body.length > 0 && body[0].id) {
-          discoveredTrackId = body[0].id;
-        } else if (
-          body &&
-          body.items &&
-          Array.isArray(body.items) &&
-          body.items.length > 0 &&
-          body.items[0].id
-        ) {
-          discoveredTrackId = body.items[0].id;
+        if (Array.isArray(body?.data) && body.data[0]?.id) {
+          discoveredTrackId = body.data[0].id;
         }
       } catch (e) {
         console.error(e);
@@ -95,7 +85,7 @@ describe('Release Tracks API integration (real server)', () => {
     }
   });
 
-  it('GET /release-tracks/:id/snapshots/latest should return a snapshot when tracks exist', async () => {
+  it('GET /release-tracks/:id/snapshots/latest should return the latest snapshot', async () => {
     if (!serverAvailable) {
       console.warn(
         'Skipping getLatestSnapshot test because server is unreachable'
