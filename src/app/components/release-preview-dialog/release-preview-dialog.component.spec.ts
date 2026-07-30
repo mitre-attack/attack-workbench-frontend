@@ -84,6 +84,13 @@ describe('ReleasePreviewDialogComponent', () => {
     expect(component.excludedCandidates).toHaveLength(1);
   });
 
+  it('should default an unversioned track to version 0.1', () => {
+    data.track.version = null;
+    data.track.version_history = [];
+
+    expect(component.currentVersion).toBe('v0.1');
+  });
+
   it('should use the backend diff when previewing a virtual release', () => {
     data.previewSummary = {
       type: 'virtual',

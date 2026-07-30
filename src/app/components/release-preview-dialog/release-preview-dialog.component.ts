@@ -50,7 +50,7 @@ export class ReleasePreviewDialogComponent {
   public get currentVersion(): string {
     const history = this.asArray(this.data.track?.version_history);
     const version =
-      this.data.track?.version ?? history[history.length - 1]?.version ?? '0.0';
+      this.data.track?.version ?? history[history.length - 1]?.version ?? '0.1';
 
     return this.formatVersion(version);
   }
