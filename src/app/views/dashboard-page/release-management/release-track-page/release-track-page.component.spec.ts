@@ -46,7 +46,6 @@ describe('ReleaseTrackPageComponent', () => {
       exportLatestSnapshot: vi.fn(() => createAsyncObservable({})),
       exportSnapshotByModified: vi.fn(() => createAsyncObservable({})),
       retrieveSnapshotByModified: vi.fn(() => createAsyncObservable(null)),
-      previewVirtualSnapshot: vi.fn(() => createAsyncObservable({})),
       createVirtualSnapshot: vi.fn(() => createAsyncObservable({})),
       previewBump: vi.fn(() => createAsyncObservable({})),
       bumpByLatest: vi.fn(() => createAsyncObservable({})),
@@ -483,21 +482,6 @@ describe('ReleaseTrackPageComponent', () => {
     const historySpy = vi
       .spyOn(component, 'getSnapshotHistory')
       .mockImplementation(() => undefined);
-    mockReleaseTrackApiConnector.previewVirtualSnapshot.mockReturnValue(
-      of({
-        preview: {
-          would_resolve_to: {
-            total_objects: 20,
-            component_snapshots: [
-              {
-                track_name: 'Component Track',
-                resolved_version: '1.0',
-              },
-            ],
-          },
-        },
-      })
-    );
     mockDialog.open.mockReturnValue({
       afterClosed: () => of('create'),
     });
@@ -507,15 +491,12 @@ describe('ReleaseTrackPageComponent', () => {
 
     component.onDraft();
 
-    expect(
-      mockReleaseTrackApiConnector.previewVirtualSnapshot
-    ).toHaveBeenCalledWith('release-track--123');
     expect(mockDialog.open).toHaveBeenCalledWith(
       MultipleChoiceDialogComponent,
       expect.objectContaining({
         data: expect.objectContaining({
           title: 'Create draft snapshot?',
-          description: expect.stringContaining('20 objects'),
+          description: expect.stringContaining('persistent virtual draft'),
         }),
       })
     );
@@ -535,8 +516,9 @@ describe('ReleaseTrackPageComponent', () => {
 
     component.onDraft();
 
+    expect(mockDialog.open).not.toHaveBeenCalled();
     expect(
-      mockReleaseTrackApiConnector.previewVirtualSnapshot
+      mockReleaseTrackApiConnector.createVirtualSnapshot
     ).not.toHaveBeenCalled();
   });
 
@@ -546,8 +528,9 @@ describe('ReleaseTrackPageComponent', () => {
 
     component.onDraft();
 
+    expect(mockDialog.open).not.toHaveBeenCalled();
     expect(
-      mockReleaseTrackApiConnector.previewVirtualSnapshot
+      mockReleaseTrackApiConnector.createVirtualSnapshot
     ).not.toHaveBeenCalled();
   });
 

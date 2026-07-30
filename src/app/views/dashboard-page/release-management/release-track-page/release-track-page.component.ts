@@ -1243,67 +1243,16 @@ export class ReleaseTrackPageComponent implements OnInit {
     return `${safeName}-latest-${format}.json`;
   }
 
-  private getVirtualSnapshotPreviewDescription(preview: any): string {
-    const resolved =
-      preview?.preview?.would_resolve_to ||
-      preview?.would_resolve_to ||
-      preview?.composition_resolution ||
-      preview;
-    const components = resolved?.component_snapshots || [];
-    const totalObjects =
-      resolved?.total_objects ||
-      resolved?.summary?.total_objects ||
-      preview?.total_objects ||
-      preview?.summary?.total_objects;
-
-    const componentText = components.length
-      ? `Components: ${components
-          .map((component: any) => {
-            const name =
-              component.track_name || component.track_id || 'component track';
-            const version =
-              component.resolved_version ||
-              component.version ||
-              component.resolved_snapshot;
-            return version ? `${name} (${version})` : name;
-          })
-          .join(', ')}.`
-      : 'No component details were returned.';
-    const objectText =
-      totalObjects === undefined || totalObjects === null
-        ? 'Object count was not returned.'
-        : `${totalObjects} objects will be resolved.`;
-
-    return `${objectText} ${componentText}`;
-  }
-
   public onDraft(): void {
     if (!this.canCreateDraft) return;
 
-    this.isCreatingDraft = true;
-    this.connector
-      .previewVirtualSnapshot(this.id)
-      .pipe(take(1))
-      .subscribe({
-        next: preview => {
-          this.isCreatingDraft = false;
-          if (!preview) return;
-          this.openVirtualSnapshotPreview(preview);
-        },
-        error: err => {
-          this.isCreatingDraft = false;
-          console.error('Failed to preview draft snapshot', err);
-        },
-      });
-  }
-
-  private openVirtualSnapshotPreview(preview: any): void {
     const dialogRef = this.dialog.open(MultipleChoiceDialogComponent, {
       width: '30em',
       autoFocus: false,
       data: {
         title: 'Create draft snapshot?',
-        description: this.getVirtualSnapshotPreviewDescription(preview),
+        description:
+          'Resolve the tagged component releases into a persistent virtual draft snapshot.',
         choices: [
           {
             label: 'Create Draft',
