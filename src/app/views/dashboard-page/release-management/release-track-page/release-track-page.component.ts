@@ -771,7 +771,10 @@ export class ReleaseTrackPageComponent implements OnInit {
         : this.resolveStagedDiffObjects(item);
     const relationshipAddedAfter =
       tier === 'candidate'
-        ? this.findStagedEntry(item.object_ref)?.object_modified
+        ? (
+            this.findStagedEntry(item.object_ref) ??
+            this.findMemberEntry(item.object_ref)
+          )?.object_modified
         : undefined;
     diff.pipe(take(1)).subscribe(({ current, prior, expectedBaseline }) => {
       if (!current) {
