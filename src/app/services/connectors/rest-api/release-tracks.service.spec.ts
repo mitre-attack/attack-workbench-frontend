@@ -144,6 +144,26 @@ describe('ReleaseTracksConnectorService', () => {
     expect(options.params.get('offset')).toBe('50');
   });
 
+  it('should list tracks with only supported query parameters', () => {
+    service
+      .listReleaseTracks({
+        type: 'virtual',
+        limit: 25,
+        offset: 0,
+        search: 'enterprise',
+      })
+      .subscribe();
+
+    const [url, options] = http.get.mock.calls[0];
+    expect(url).toBe(
+      `${environment.integrations.rest_api.url}/release-tracks`
+    );
+    expect(options.params.get('type')).toBe('virtual');
+    expect(options.params.get('limit')).toBe('25');
+    expect(options.params.get('offset')).toBe('0');
+    expect(options.params.get('search')).toBe('enterprise');
+  });
+
   it('should confirm the target ID when deleting a release track', () => {
     service.deleteReleaseTrack('release-track--standard').subscribe();
 

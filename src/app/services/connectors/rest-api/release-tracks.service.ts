@@ -109,12 +109,11 @@ export class ReleaseTracksConnectorService extends ApiConnector {
   /**
    * GET /api/release-tracks
    * List release tracks.
-   * @param options Query options: type, releases, limit, offset, search
+   * @param options Query options: type, limit, offset, search
    * @returns Observable<any> paginated list
    */
   public listReleaseTracks(options?: {
     type?: string;
-    releases?: 'only';
     limit?: number;
     offset?: number;
     search?: string;
