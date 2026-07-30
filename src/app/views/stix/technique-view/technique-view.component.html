@@ -377,7 +377,7 @@
               relationshipCreatedBefore: config.relationshipCreatedBefore,
               relationshipAddedAfter: config.relationshipAddedAfter,
               relationshipType: 'subtechnique-of',
-              allowEdits: true,
+              allowEdits: canEdit,
               clickBehavior: 'none',
             }"></app-stix-list>
         </div>
@@ -402,7 +402,7 @@
                 relationshipAddedAfter: config.relationshipAddedAfter,
                 relationshipType: 'subtechnique-of',
                 clickBehavior: 'none',
-                allowEdits: true,
+                allowEdits: canEdit,
                 excludeSourceRefs: [technique.stixID],
               }"></app-stix-list>
           </div>
@@ -441,7 +441,7 @@
             sourceType: 'campaign',
             relationshipType: 'uses',
             clickBehavior: 'dialog',
-            allowEdits: true,
+            allowEdits: canEdit,
           }"></app-stix-list>
       </div>
     </div>
@@ -475,7 +475,7 @@
             relationshipAddedAfter: config.relationshipAddedAfter,
             relationshipType: 'mitigates',
             clickBehavior: 'dialog',
-            allowEdits: true,
+            allowEdits: canEdit,
           }"></app-stix-list>
       </div>
     </div>
@@ -509,7 +509,7 @@
             relationshipAddedAfter: config.relationshipAddedAfter,
             relationshipType: 'uses',
             clickBehavior: 'dialog',
-            allowEdits: true,
+            allowEdits: canEdit,
           }"></app-stix-list>
       </div>
     </div>
@@ -540,7 +540,7 @@
               relationshipType: 'detects',
               sourceType: 'data-component',
               clickBehavior: 'dialog',
-              allowEdits: true,
+              allowEdits: canEdit,
             }"></app-stix-list>
         </div>
       </div>
@@ -577,7 +577,7 @@
             relationshipType: 'detects',
             sourceType: 'detection-strategy',
             clickBehavior: 'dialog',
-            allowEdits: true,
+            allowEdits: canEdit,
           }"></app-stix-list>
       </div>
     </div>
@@ -612,7 +612,7 @@
             targetType: 'asset',
             relationshipType: 'targets',
             clickBehavior: 'dialog',
-            allowEdits: true,
+            allowEdits: canEdit,
           }"></app-stix-list>
       </div>
     </div>

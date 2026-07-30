@@ -75,7 +75,10 @@ export class StixDialogComponent implements OnInit {
       showRelationships: this.showRelationships,
       relationshipCreatedBefore: this._config.relationshipCreatedBefore,
       relationshipAddedAfter: this._config.relationshipAddedAfter,
-      editable: this._config.editable && this.authenticationService.canEdit(),
+      editable:
+        this._config.mode !== 'diff' &&
+        this._config.editable &&
+        this.authenticationService.canEdit(),
       is_new: this._config.is_new ? true : false,
       sidebarControl:
         this._config.sidebarControl == 'disable' ? 'disable' : 'events',

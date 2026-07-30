@@ -17,7 +17,9 @@ export abstract class StixViewPage {
     return this.config.mode == 'edit';
   }
   public get canEdit(): boolean {
-    return this.authenticationService.canEdit();
+    return (
+      this.config.editable !== false && this.authenticationService.canEdit()
+    );
   }
   public get configCurrentObject(): StixObject {
     return Array.isArray(this.config.object)
