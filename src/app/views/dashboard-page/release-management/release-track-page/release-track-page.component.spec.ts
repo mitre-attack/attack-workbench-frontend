@@ -248,7 +248,7 @@ describe('ReleaseTrackPageComponent', () => {
 
     expect(mockReleaseTrackApiConnector.getLatestSnapshot).toHaveBeenCalledWith(
       'release-track--123',
-      { include: 'all' }
+      { format: 'workbench', include: 'all' }
     );
     expect(component.releaseTrack?.name).toBe('Enterprise Release');
   });
@@ -707,6 +707,7 @@ describe('ReleaseTrackPageComponent', () => {
         next_version_minor: '1.2',
         staged_count: 3,
         candidates_count: 1,
+        next_version_major: '2.0',
         conflicts: [],
       })
     );

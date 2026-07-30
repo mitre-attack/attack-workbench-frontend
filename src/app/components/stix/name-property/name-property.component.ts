@@ -14,7 +14,7 @@ import { MatMenuTrigger } from '@angular/material/menu';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { forkJoin, of } from 'rxjs';
 import { catchError, map } from 'rxjs/operators';
-import { SnapshotTier } from 'src/app/classes/release-tracks';
+import { ExportFormat, SnapshotTier } from 'src/app/classes/release-tracks';
 import type {
   ReleaseTrackObjectTier,
   StixObjectRef,
@@ -257,7 +257,10 @@ export class NamePropertyComponent implements OnChanges, OnInit {
     forkJoin(
       releaseTracks.map(track =>
         this.releaseTracksService
-          .getLatestSnapshot(track.trackId, { include: 'all' })
+          .getLatestSnapshot(track.trackId, {
+            format: ExportFormat.Workbench,
+            include: 'all',
+          })
           .pipe(
             map(snapshot => this.toTrackStatus(track, snapshot)),
             catchError(err => {
