@@ -61,4 +61,52 @@ describe('ReleaseTracksConnectorService', () => {
   it('should not expose the removed virtual snapshot preview operation', () => {
     expect((service as any).previewVirtualSnapshot).toBeUndefined();
   });
+
+  it('should preview a release with query-based version selection', () => {
+    service
+      .previewRelease('release-track--standard', {
+        format: 'summary',
+        increment: 'major',
+      })
+      .subscribe();
+
+    const [url, options] = http.get.mock.calls[0];
+    expect(url).toBe(
+      `${environment.integrations.rest_api.url}/release-tracks/release-track--standard/snapshots/latest/release/preview`
+    );
+    expect(options.params.get('format')).toBe('summary');
+    expect(options.params.get('increment')).toBe('major');
+  });
+
+  it('should release the latest snapshot with the current request body', () => {
+    service
+      .releaseLatest('release-track--standard', { increment: 'minor' })
+      .subscribe();
+
+    expect(http.post).toHaveBeenCalledWith(
+      `${environment.integrations.rest_api.url}/release-tracks/release-track--standard/snapshots/latest/release`,
+      { increment: 'minor' }
+    );
+  });
+
+  it('should release a selected snapshot with an exact version', () => {
+    service
+      .releaseSnapshot(
+        'release-track--standard',
+        '2026-07-23T13:37:28.000Z',
+        { version: '14.1' }
+      )
+      .subscribe();
+
+    expect(http.post).toHaveBeenCalledWith(
+      `${environment.integrations.rest_api.url}/release-tracks/release-track--standard/snapshots/2026-07-23T13%3A37%3A28.000Z/release`,
+      { version: '14.1' }
+    );
+  });
+
+  it('should not expose bump-oriented operations', () => {
+    expect((service as any).previewBump).toBeUndefined();
+    expect((service as any).bumpByLatest).toBeUndefined();
+    expect((service as any).bumpByModified).toBeUndefined();
+  });
 });
