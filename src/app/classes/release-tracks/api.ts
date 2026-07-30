@@ -56,9 +56,14 @@ export interface ReviewPayload {
   object_refs?: StixObjectRef[];
 }
 
+export interface PromoteQuarantinePayload {
+  object_ref: string;
+  object_modified: string;
+}
+
 export interface ReleaseTrackSnapshotOptions {
   format?: ExportFormatType;
-  include?: 'members' | 'staged' | 'candidates' | 'all';
+  include?: 'members' | 'staged' | 'candidates' | 'quarantine' | 'all';
   state?: string | string[];
   stixVersion?: '2.0' | '2.1';
   includeToc?: boolean;

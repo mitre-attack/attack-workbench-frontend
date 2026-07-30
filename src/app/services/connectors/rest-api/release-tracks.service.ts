@@ -15,6 +15,7 @@ import type {
   Composition,
   CreateReleaseTrackPayload,
   ExportFormatType,
+  PromoteQuarantinePayload,
   ReleasePayload,
   ReleasePreviewOptions,
   ReleaseTrackConfig,
@@ -33,6 +34,7 @@ export type {
   ClonePayload,
   Composition,
   CreateReleaseTrackPayload,
+  PromoteQuarantinePayload,
   ReleasePayload,
   ReleasePreviewOptions,
   ReleaseTrackSnapshotHistoryItem,
@@ -593,6 +595,27 @@ export class ReleaseTracksConnectorService extends ApiConnector {
     return this.http.put(url, payload).pipe(
       tap(result =>
         logger.log(`updated virtual composition for track ${id}`, result)
+      ),
+      catchError(this.handleError_raise()),
+      share()
+    );
+  }
+
+  /**
+   * POST /api/release-tracks/:id/virtual/quarantine/promote
+   * Resolve one quarantined object to an exact revision in a new virtual draft.
+   * @param id Virtual release track id
+   * @param body Exact quarantined object revision to promote
+   * @returns Observable<any>
+   */
+  public promoteQuarantinedRevision(
+    id: string,
+    body: PromoteQuarantinePayload
+  ): Observable<any> {
+    const url = `${this.apiUrl}/release-tracks/${id}/virtual/quarantine/promote`;
+    return this.http.post(url, body).pipe(
+      tap(result =>
+        logger.log(`promoted quarantined revision for track ${id}`, result)
       ),
       catchError(this.handleError_raise()),
       share()

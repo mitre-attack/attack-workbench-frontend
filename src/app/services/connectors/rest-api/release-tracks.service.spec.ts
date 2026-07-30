@@ -58,6 +58,22 @@ describe('ReleaseTracksConnectorService', () => {
     );
   });
 
+  it('should promote an exact quarantined revision', () => {
+    const body = {
+      object_ref: 'attack-pattern--one',
+      object_modified: '2026-07-23T13:37:28.000Z',
+    };
+
+    service
+      .promoteQuarantinedRevision('release-track--virtual', body)
+      .subscribe();
+
+    expect(http.post).toHaveBeenCalledWith(
+      `${environment.integrations.rest_api.url}/release-tracks/release-track--virtual/virtual/quarantine/promote`,
+      body
+    );
+  });
+
   it('should not expose the removed virtual snapshot preview operation', () => {
     expect((service as any).previewVirtualSnapshot).toBeUndefined();
   });
