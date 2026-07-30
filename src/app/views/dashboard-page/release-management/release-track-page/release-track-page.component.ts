@@ -1664,7 +1664,7 @@ export class ReleaseTrackPageComponent implements OnInit {
     const baselineEntry = stagedEntry ?? memberEntry;
 
     return forkJoin({
-      current: this.fetchObjectVersion(item.object_ref),
+      current: this.fetchObjectVersion(item.object_ref, item.object_modified),
       prior: baselineEntry
         ? this.fetchObjectVersion(
             baselineEntry.object_ref,
