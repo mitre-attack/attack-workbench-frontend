@@ -180,11 +180,13 @@
           #techniqueList
           [config]="{
             type: 'relationship',
+            relationshipCreatedBefore: config.relationshipCreatedBefore,
+            relationshipAddedAfter: config.relationshipAddedAfter,
             targetRef: asset.stixID,
             sourceType: 'technique',
             relationshipType: 'targets',
             clickBehavior: 'dialog',
-            allowEdits: true,
+            allowEdits: canEdit,
           }"></app-stix-list>
       </div>
     </div>

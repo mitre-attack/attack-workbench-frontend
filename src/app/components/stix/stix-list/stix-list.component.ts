@@ -715,6 +715,21 @@ export class StixListComponent implements OnInit, AfterViewInit, OnDestroy {
     }
   }
 
+  public toggleSelection(element: StixObject): void {
+    this.selection.toggle(element.stixID);
+    const selectedObjectRefs = this.config.selectedObjectRefs;
+    if (!selectedObjectRefs) return;
+
+    if (this.selection.isSelected(element.stixID)) {
+      selectedObjectRefs.set(element.stixID, {
+        id: element.stixID,
+        modified: element.modified.toISOString(),
+      });
+    } else {
+      selectedObjectRefs.delete(element.stixID);
+    }
+  }
+
   public isCollectionType(): boolean {
     return ['collection', 'collection-created', 'collection-imported'].includes(
       this.config.type
@@ -988,6 +1003,20 @@ export class StixListComponent implements OnInit, AfterViewInit, OnDestroy {
     let subscription: Subscription | undefined;
     subscription = this.data$.subscribe({
       next: data => {
+        if (
+          this.config.type === 'relationship' &&
+          this.config.relationshipCreatedBefore
+        ) {
+          // For a staged diff, hide relationships created after that timestamp so they do not
+          // appear in the staged view. Keep the pagination count in sync with
+          // the rows hidden client-side.
+          const relationshipCount = data.data.length;
+          data.data = this.filterRelationshipsCreatedBefore(
+            data.data,
+            this.config.relationshipCreatedBefore
+          );
+          data.pagination.total -= relationshipCount - data.data.length;
+        }
         data.data = this.filterExcludedAttackTypes(data.data);
         this.totalObjectCount = data.pagination.total;
         this.emitDetectsHasData(data.data.length > 0);
@@ -996,6 +1025,75 @@ export class StixListComponent implements OnInit, AfterViewInit, OnDestroy {
         if (subscription) subscription.unsubscribe();
       },
     });
+  }
+
+  /**
+   * Relationships created after `createdBefore` did not exist at
+   * the staged object's timestamp, so they are hidden. An invalid cutoff, or
+   * an unreadable relationship creation date, leaves that relationship visible
+   * to avoid treating missing date data as proof that it is new.
+   */
+  private filterRelationshipsCreatedBefore(
+    relationships: StixObject[],
+    createdBefore: Date | string
+  ): StixObject[] {
+    const cutoff = new Date(createdBefore).getTime();
+    if (!Number.isFinite(cutoff)) return relationships;
+
+    return relationships.filter(relationship => {
+      const created = new Date(relationship.created).getTime();
+      return !Number.isFinite(created) || created <= cutoff;
+    });
+  }
+
+  /**
+   * Determines whether a relationship should receive the candidate-diff
+   * styling. The candidate table remains the current relationship list;
+   * a row is new only when its creation time is later than the staged object's
+   * `relationshipAddedAfter` baseline. Non-relationship tables and invalid or
+   * missing timestamps are never marked as new.
+   */
+  public isNewRelationship(relationship: StixObject): boolean {
+    if (
+      this.config.type !== 'relationship' ||
+      !this.config.relationshipAddedAfter
+    ) {
+      return false;
+    }
+
+    const baseline = new Date(this.config.relationshipAddedAfter).getTime();
+    const created = new Date(relationship.created).getTime();
+    return (
+      Number.isFinite(baseline) &&
+      Number.isFinite(created) &&
+      created > baseline
+    );
+  }
+
+  /**
+   * Determines whether an existing relationship changed after the staged
+   * baseline. Candidate relationships are fetched at their current version,
+   * so this highlights changes that cannot be represented accurately in the
+   * staged table without relationship version history.
+   */
+  public isChangedRelationship(relationship: StixObject): boolean {
+    if (
+      this.config.type !== 'relationship' ||
+      !this.config.relationshipAddedAfter
+    ) {
+      return false;
+    }
+
+    const baseline = new Date(this.config.relationshipAddedAfter).getTime();
+    const created = new Date(relationship.created).getTime();
+    const modified = new Date(relationship.modified).getTime();
+    return (
+      Number.isFinite(baseline) &&
+      Number.isFinite(created) &&
+      Number.isFinite(modified) &&
+      created <= baseline &&
+      modified > baseline
+    );
   }
 
   private filterLocalObjects(
@@ -1240,6 +1338,10 @@ export interface StixListConfig {
   targetType?: AttackType;
   /** relationship type to get, use with type=='relationship' */
   relationshipType?: string;
+  /** Hide relationships created after this timestamp. */
+  relationshipCreatedBefore?: Date | string;
+  /** Mark relationships created after this timestamp as new. */
+  relationshipAddedAfter?: Date | string;
 
   /** force the list to show only this type */
   type?: AttackType | 'collection-created' | 'collection-imported';
@@ -1257,6 +1359,7 @@ export interface StixListConfig {
    * Only relevant if 'select' is also enabled. Also, will cause problems if multiple constructor pram is set according to 'select'.
    */
   selectionModel?: SelectionModel<string>;
+  selectedObjectRefs?: Map<string, { id: string; modified: string }>;
   /** show links to view/edit pages for relevant objects? */
   showLinks?: boolean;
   /** default true, if false hides the filter dropdown menu */

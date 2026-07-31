@@ -45,14 +45,19 @@ describe('ReleaseTrackPageComponent', () => {
     mockReleaseTrackApiConnector = createMockReleaseTrackApiConnector({
       getLatestSnapshot: vi.fn(() => createAsyncObservable(null)),
       listReleaseTracks: vi.fn(() => createAsyncObservable({ data: [] })),
-      listSnapshots: vi.fn(() => createAsyncObservable([])),
+      listSnapshots: vi.fn(() =>
+        createAsyncObservable({
+          data: [],
+          pagination: { total: 0, limit: 50, offset: 0 },
+        })
+      ),
       exportLatestSnapshot: vi.fn(() => createAsyncObservable({})),
       exportSnapshotByModified: vi.fn(() => createAsyncObservable({})),
       retrieveSnapshotByModified: vi.fn(() => createAsyncObservable(null)),
       createVirtualSnapshot: vi.fn(() => createAsyncObservable({})),
-      previewBump: vi.fn(() => createAsyncObservable({})),
-      bumpByLatest: vi.fn(() => createAsyncObservable({})),
-      bumpByModified: vi.fn(() => createAsyncObservable({})),
+      previewRelease: vi.fn(() => createAsyncObservable({})),
+      releaseLatest: vi.fn(() => createAsyncObservable({})),
+      releaseSnapshot: vi.fn(() => createAsyncObservable({})),
       getConfig: vi.fn(() => createAsyncObservable(null)),
       updateConfig: vi.fn(() => createAsyncObservable({})),
       updateComposition: vi.fn(() => createAsyncObservable({})),
@@ -132,6 +137,33 @@ describe('ReleaseTrackPageComponent', () => {
 
   it('should create', () => {
     expect(component).toBeTruthy();
+  });
+
+  it('should only show a diff for the latest pin when an object is both staged and a candidate', () => {
+    const staged = {
+      object_ref: 'attack-pattern--shared',
+      object_modified: '2026-01-01T00:00:00.000Z',
+    } as any;
+    const candidate = {
+      object_ref: 'attack-pattern--shared',
+      object_modified: '2026-02-01T00:00:00.000Z',
+    } as any;
+    const unrelatedCandidate = {
+      object_ref: 'attack-pattern--candidate-only',
+      object_modified: '2026-01-01T00:00:00.000Z',
+    } as any;
+    component.releaseTrack = {
+      staged: [staged],
+      candidates: [candidate, unrelatedCandidate],
+    } as any;
+
+    expect(component.shouldShowDiff(staged)).toBe(false);
+    expect(component.shouldShowDiff(candidate)).toBe(true);
+    expect(component.shouldShowDiff(unrelatedCandidate)).toBe(true);
+    expect(component.getDiffUnavailableMessage(staged)).toBe(
+      'A newer revision of this object is available in the release track. View its diff instead.'
+    );
+    expect(component.getDiffUnavailableMessage(candidate)).toBeNull();
   });
 
   it('should delete the release track after confirmation', () => {
@@ -271,6 +303,7 @@ describe('ReleaseTrackPageComponent', () => {
             priority: 0,
             filters: {
               object_types: ['attack-pattern'],
+              domains: ['enterprise-attack'],
             },
           },
           {
@@ -350,7 +383,12 @@ describe('ReleaseTrackPageComponent', () => {
     ).toBe('Component One');
     expect(
       component.getComponentTrackFilters(component.virtualComponentTracks[0])
-    ).toEqual(['attack pattern']);
+    ).toEqual(['attack pattern', 'enterprise']);
+    expect(
+      component.getVirtualComponentTrackDomains(
+        component.virtualComponentTracks[0]
+      )
+    ).toEqual(['enterprise']);
     expect(component.virtualResolutionRows[0]).toEqual(
       expect.objectContaining({
         trackId: 'release-track--component-one',
@@ -430,33 +468,32 @@ describe('ReleaseTrackPageComponent', () => {
     ]);
   });
 
-  it('should load snapshot history and compute timeline counts', () => {
+  it('should load the type-oriented counts from snapshot summaries', () => {
     mockReleaseTrackApiConnector.listSnapshots.mockReturnValue(
-      of([
-        {
-          modified: '2024-05-21T07:00:00.000Z',
-          members: [
-            {
-              object_ref: 'attack-pattern--one',
-              object_modified: '2024-05-20T00:00:00.000Z',
-            },
-            {
-              object_ref: 'attack-pattern--two',
-              object_modified: '2024-05-20T00:00:00.000Z',
-            },
-          ],
-        },
-        {
-          version: '1.3',
-          modified: '2024-04-15T06:00:00.000Z',
-          members: [
-            {
-              object_ref: 'attack-pattern--one',
-              object_modified: '2024-04-01T00:00:00.000Z',
-            },
-          ],
-        },
-      ])
+      of({
+        data: [
+          {
+            id: 'release-track--123',
+            type: 'standard',
+            modified: '2024-05-21T07:00:00.000Z',
+            version: null,
+            name: 'Enterprise',
+            members_count: 2,
+            staged_count: 3,
+            candidates_count: 4,
+          },
+          {
+            id: 'release-track--456',
+            type: 'virtual',
+            version: '1.3',
+            modified: '2024-04-15T06:00:00.000Z',
+            name: 'Combined',
+            members_count: 5,
+            quarantine_count: 1,
+          },
+        ],
+        pagination: { total: 2, limit: 50, offset: 0 },
+      })
     );
     component.id = 'release-track--123';
 
@@ -468,17 +505,18 @@ describe('ReleaseTrackPageComponent', () => {
     expect(component.snapshotHistory[0]).toEqual(
       expect.objectContaining({
         title: 'Draft Snapshot',
-        addedCount: 1,
-        modifiedCount: 1,
-        totalObjects: 2,
+        isVirtual: false,
+        membersCount: 2,
+        stagedCount: 3,
+        candidatesCount: 4,
       })
     );
     expect(component.snapshotHistory[1]).toEqual(
       expect.objectContaining({
         title: 'v1.3',
-        addedCount: 0,
-        modifiedCount: 0,
-        totalObjects: 1,
+        isVirtual: true,
+        membersCount: 5,
+        quarantineCount: 1,
       })
     );
   });
@@ -504,9 +542,7 @@ describe('ReleaseTrackPageComponent', () => {
       expect.objectContaining({
         data: expect.objectContaining({
           title: 'Create draft snapshot?',
-          description: expect.stringContaining(
-            'Resolve the configured component tracks'
-          ),
+          description: expect.stringContaining('persistent virtual draft'),
         }),
       })
     );
@@ -527,6 +563,9 @@ describe('ReleaseTrackPageComponent', () => {
     component.onDraft();
 
     expect(mockDialog.open).not.toHaveBeenCalled();
+    expect(
+      mockReleaseTrackApiConnector.createVirtualSnapshot
+    ).not.toHaveBeenCalled();
   });
 
   it('should not create a draft snapshot for a standard release track', () => {
@@ -536,6 +575,9 @@ describe('ReleaseTrackPageComponent', () => {
     component.onDraft();
 
     expect(mockDialog.open).not.toHaveBeenCalled();
+    expect(
+      mockReleaseTrackApiConnector.createVirtualSnapshot
+    ).not.toHaveBeenCalled();
   });
 
   it('should open the all objects table to add candidates', () => {
@@ -578,15 +620,31 @@ describe('ReleaseTrackPageComponent', () => {
     const historySpy = vi
       .spyOn(component, 'getSnapshotHistory')
       .mockImplementation(() => undefined);
-    mockReleaseTrackApiConnector.previewBump.mockReturnValue(
+    mockReleaseTrackApiConnector.previewRelease.mockReturnValue(
       of({
-        version: '1.1',
+        type: ReleaseTrackType.Standard,
+        version: '1.2',
+        before: {
+          members_count: 10,
+          staged_count: 3,
+          candidates_count: 1,
+        },
+        after: {
+          members_count: 13,
+          staged_count: 0,
+          candidates_count: 1,
+        },
+        changes: {
+          promoted_count: 3,
+        },
         conflicts: [],
       })
     );
+    mockReleaseTrackApiConnector.releaseLatest.mockReturnValue(of({}));
     component.releaseTrack = {
       id: 'release-track--123',
       name: 'Core Objects',
+      version: null,
       members: [],
       staged: [],
       candidates: [
@@ -599,7 +657,6 @@ describe('ReleaseTrackPageComponent', () => {
         },
       ],
     } as any;
-    mockReleaseTrackApiConnector.bumpByLatest.mockReturnValue(of({}));
     mockDialog.open.mockReturnValue({
       afterClosed: () => of('minor'),
     });
@@ -607,12 +664,15 @@ describe('ReleaseTrackPageComponent', () => {
 
     component.onPreviewRelease();
 
-    expect(mockReleaseTrackApiConnector.previewBump).toHaveBeenCalledWith(
+    expect(mockReleaseTrackApiConnector.previewRelease).toHaveBeenCalledWith(
       'release-track--123',
-      'summary',
-      undefined,
-      'minor'
+      { format: 'summary', increment: 'minor' }
     );
+    expect(mockRestApiConnector.getAllObjects).toHaveBeenCalledWith({
+      revoked: true,
+      deprecated: true,
+      versions: 'all',
+    });
     expect(mockDialog.open).toHaveBeenCalledWith(
       ReleasePreviewDialogComponent,
       expect.objectContaining({
@@ -631,7 +691,7 @@ describe('ReleaseTrackPageComponent', () => {
         }),
       })
     );
-    expect(mockReleaseTrackApiConnector.bumpByLatest).toHaveBeenCalledWith(
+    expect(mockReleaseTrackApiConnector.releaseLatest).toHaveBeenCalledWith(
       'release-track--123',
       { increment: 'minor' }
     );
@@ -647,12 +707,27 @@ describe('ReleaseTrackPageComponent', () => {
     const historySpy = vi
       .spyOn(component, 'getSnapshotHistory')
       .mockImplementation(() => undefined);
-    mockReleaseTrackApiConnector.previewBump.mockReturnValue(
+    mockReleaseTrackApiConnector.previewRelease.mockReturnValue(
       of({
+        type: ReleaseTrackType.Standard,
         version: '2.0',
+        before: {
+          members_count: 10,
+          staged_count: 3,
+          candidates_count: 1,
+        },
+        after: {
+          members_count: 13,
+          staged_count: 0,
+          candidates_count: 1,
+        },
+        changes: {
+          promoted_count: 3,
+        },
         conflicts: [],
       })
     );
+    mockReleaseTrackApiConnector.releaseSnapshot.mockReturnValue(of({}));
     mockReleaseTrackApiConnector.retrieveSnapshotByModified.mockReturnValue(
       of({
         id: 'release-track--123',
@@ -697,7 +772,6 @@ describe('ReleaseTrackPageComponent', () => {
         ])
       )
     );
-    mockReleaseTrackApiConnector.bumpByModified.mockReturnValue(of({}));
     mockDialog.open.mockReturnValue({
       afterClosed: () => of('major'),
     });
@@ -709,11 +783,10 @@ describe('ReleaseTrackPageComponent', () => {
       snapshot: {},
     } as any);
 
-    expect(mockReleaseTrackApiConnector.previewBump).toHaveBeenCalledWith(
+    expect(mockReleaseTrackApiConnector.previewRelease).toHaveBeenCalledWith(
       'release-track--123',
-      'summary',
-      '2026-07-23T13:37:28.000Z',
-      'minor'
+      { format: 'summary', increment: 'minor' },
+      '2026-07-23T13:37:28.000Z'
     );
     expect(
       mockReleaseTrackApiConnector.retrieveSnapshotByModified
@@ -745,18 +818,18 @@ describe('ReleaseTrackPageComponent', () => {
         }),
       })
     );
-    expect(mockReleaseTrackApiConnector.bumpByModified).toHaveBeenCalledWith(
+    expect(mockReleaseTrackApiConnector.releaseSnapshot).toHaveBeenCalledWith(
       'release-track--123',
       '2026-07-23T13:37:28.000Z',
       { increment: 'major' }
     );
-    expect(mockReleaseTrackApiConnector.bumpByLatest).not.toHaveBeenCalled();
+    expect(mockReleaseTrackApiConnector.releaseLatest).not.toHaveBeenCalled();
     expect(refreshSpy).toHaveBeenCalled();
     expect(historySpy).toHaveBeenCalled();
   });
 
   it('should preview the newest draft when multiple drafts exist', () => {
-    mockReleaseTrackApiConnector.previewBump.mockReturnValue(
+    mockReleaseTrackApiConnector.previewRelease.mockReturnValue(
       of({ version: '1.1', conflicts: [] })
     );
     mockReleaseTrackApiConnector.retrieveSnapshotByModified.mockReturnValue(
@@ -789,11 +862,10 @@ describe('ReleaseTrackPageComponent', () => {
 
     component.onPreviewRelease();
 
-    expect(mockReleaseTrackApiConnector.previewBump).toHaveBeenCalledWith(
+    expect(mockReleaseTrackApiConnector.previewRelease).toHaveBeenCalledWith(
       'release-track--123',
-      'summary',
-      '2026-07-30T14:00:00.000Z',
-      'minor'
+      { format: 'summary', increment: 'minor' },
+      '2026-07-30T14:00:00.000Z'
     );
     expect(
       mockReleaseTrackApiConnector.retrieveSnapshotByModified
@@ -804,9 +876,10 @@ describe('ReleaseTrackPageComponent', () => {
   });
 
   it('should not tag a release when preview returns conflicts', () => {
-    mockReleaseTrackApiConnector.previewBump.mockReturnValue(
+    mockReleaseTrackApiConnector.previewRelease.mockReturnValue(
       of({
-        version: '1.1',
+        type: ReleaseTrackType.Standard,
+        version: '1.2',
         conflicts: [
           {
             object_ref: 'attack-pattern--123',
@@ -841,11 +914,11 @@ describe('ReleaseTrackPageComponent', () => {
         }),
       })
     );
-    expect(mockReleaseTrackApiConnector.bumpByLatest).not.toHaveBeenCalled();
+    expect(mockReleaseTrackApiConnector.releaseLatest).not.toHaveBeenCalled();
   });
 
   it('should not create a snapshot when the preview is cancelled', () => {
-    mockReleaseTrackApiConnector.previewBump.mockReturnValue(
+    mockReleaseTrackApiConnector.previewRelease.mockReturnValue(
       of({
         version: '1.1',
         conflicts: [],
@@ -874,14 +947,14 @@ describe('ReleaseTrackPageComponent', () => {
         }),
       })
     );
-    expect(mockReleaseTrackApiConnector.bumpByLatest).not.toHaveBeenCalled();
+    expect(mockReleaseTrackApiConnector.releaseLatest).not.toHaveBeenCalled();
   });
 
   it('should stop releasing when the preview request fails', () => {
     const consoleSpy = vi
       .spyOn(console, 'error')
       .mockImplementation(() => undefined);
-    mockReleaseTrackApiConnector.previewBump.mockReturnValue(
+    mockReleaseTrackApiConnector.previewRelease.mockReturnValue(
       throwError(() => new Error('preview failed'))
     );
     component.id = 'release-track--123';
@@ -901,7 +974,7 @@ describe('ReleaseTrackPageComponent', () => {
   });
 
   it('should notify the user when the preview response is empty', () => {
-    mockReleaseTrackApiConnector.previewBump.mockReturnValue(of(null));
+    mockReleaseTrackApiConnector.previewRelease.mockReturnValue(of(null));
     component.id = 'release-track--123';
     component.releaseTrack = {
       id: 'release-track--123',
@@ -941,7 +1014,7 @@ describe('ReleaseTrackPageComponent', () => {
 
     component.onPreviewRelease();
 
-    expect(mockReleaseTrackApiConnector.previewBump).not.toHaveBeenCalled();
+    expect(mockReleaseTrackApiConnector.previewRelease).not.toHaveBeenCalled();
     expect(mockDialog.open).toHaveBeenCalledWith(
       MultipleChoiceDialogComponent,
       expect.objectContaining({
@@ -1211,6 +1284,21 @@ describe('ReleaseTrackPageComponent', () => {
     expect(component.isEditingConfig).toBe(false);
     expect(refreshSpy).toHaveBeenCalled();
     expect(historySpy).toHaveBeenCalled();
+  });
+
+  it('should retain object types when clearing component-track domains', () => {
+    const track: any = {
+      filters: {
+        object_types: ['malware'],
+        domains: ['mobile'],
+      },
+    };
+
+    (component as any).setVirtualComponentTrackDomains(track, []);
+
+    expect(track.filters).toEqual({
+      object_types: ['malware'],
+    });
   });
 
   it('should edit virtual release track component tracks', () => {

@@ -54,14 +54,24 @@
 
         <ng-content select="[card-footer-action]"></ng-content>
 
-        <button
-          *ngIf="showDiff"
-          mat-stroked-button
-          type="button"
-          (click)="onDiff()">
-          <mat-icon>difference</mat-icon>
-          Diff
-        </button>
+        <ng-container *ngIf="showDiff">
+          <button
+            *ngIf="!diffDisabled; else disabledDiff"
+            mat-stroked-button
+            type="button"
+            (click)="onDiff()">
+            <mat-icon>difference</mat-icon>
+            Diff
+          </button>
+          <ng-template #disabledDiff>
+            <span [matTooltip]="diffDisabledMessage" tabindex="0">
+              <button mat-stroked-button type="button" disabled>
+                <mat-icon>difference</mat-icon>
+                Diff
+              </button>
+            </span>
+          </ng-template>
+        </ng-container>
       </div>
     </div>
   </mat-card-actions>

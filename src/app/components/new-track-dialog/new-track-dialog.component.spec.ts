@@ -11,9 +11,7 @@ import {
   ReleaseTrackType,
   ResolutionStrategy,
   SnapshotScheduleMode,
-  SnapshotTier,
 } from 'src/app/classes/release-tracks';
-import { WorkflowStatus } from 'src/app/utils/types';
 
 describe('NewTrackDialogComponent', () => {
   let component: NewTrackDialogComponent;
@@ -169,8 +167,6 @@ describe('NewTrackDialogComponent', () => {
         ],
         deduplication: {
           strategy: DeduplicationStrategy.PrioritizeLatestObject,
-          tier_resolution: SnapshotTier.Member,
-          status_resolution: WorkflowStatus.WorkInProgress,
         },
       },
       snapshot_schedule: {
@@ -180,6 +176,35 @@ describe('NewTrackDialogComponent', () => {
     expect(mockDialogRef.close).toHaveBeenCalledWith({
       track_id: 'release-track--new-virtual',
     });
+  });
+
+  it('should create a virtual track with public domain filters', () => {
+    component.form.patchValue({
+      name: 'Combined domain content',
+    });
+    component.toggleComponentTrack(component.componentTrackOptions[0], true);
+    component.componentTrackOptions[0].objectTypes = ['malware'];
+    (component.componentTrackOptions[0] as any).domains = [
+      'enterprise',
+      'mobile',
+    ];
+
+    component.handleCreate();
+
+    expect(mockConnector.createReleaseTrack).toHaveBeenCalledWith(
+      expect.objectContaining({
+        composition: expect.objectContaining({
+          component_tracks: [
+            expect.objectContaining({
+              filters: {
+                object_types: ['malware'],
+                domains: ['enterprise', 'mobile'],
+              },
+            }),
+          ],
+        }),
+      })
+    );
   });
 
   it('should allow untagged standard tracks in virtual track composition', () => {
@@ -206,14 +231,40 @@ describe('NewTrackDialogComponent', () => {
     );
   });
 
-  it('should preserve optional virtual track settings in the create payload', () => {
+  it('should create a standard track with the API member-sync supplant shape', () => {
+    component.mode = ReleaseTrackType.Standard;
+    component.form.patchValue({
+      name: 'Enterprise Content',
+      description: 'Tracks Enterprise content',
+      memberSync: 'track_latest',
+      supplantBehavior: 'replace',
+    });
+
+    component.handleCreate();
+
+    expect(mockConnector.createReleaseTrack).toHaveBeenCalledWith({
+      type: ReleaseTrackType.Standard,
+      name: 'Enterprise Content',
+      description: 'Tracks Enterprise content',
+      config: {
+        auto_promote: false,
+        member_sync: {
+          strategy: 'track_latest',
+          supplant: {
+            behavior: 'replace',
+            status_policy: 'preserve',
+          },
+        },
+      },
+    });
+  });
+
+  it('should omit unsupported virtual deduplication resolution settings', () => {
     component.form.patchValue({
       name: 'Scheduled Combined Track',
       description: 'Includes optional virtual settings',
       composition: {
         deduplicationStrategy: DeduplicationStrategy.Quarantine,
-        deduplicationTier: SnapshotTier.Staged,
-        deduplicationStatus: WorkflowStatus.Reviewed,
       },
       snapshotSchedule: {
         mode: SnapshotScheduleMode.Cron,
@@ -229,8 +280,6 @@ describe('NewTrackDialogComponent', () => {
         composition: expect.objectContaining({
           deduplication: {
             strategy: DeduplicationStrategy.Quarantine,
-            tier_resolution: SnapshotTier.Staged,
-            status_resolution: WorkflowStatus.Reviewed,
           },
         }),
         snapshot_schedule: {

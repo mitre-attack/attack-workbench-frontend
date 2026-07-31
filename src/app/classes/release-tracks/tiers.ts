@@ -5,6 +5,8 @@ export type ReleaseTrackObjectTier =
   | SnapshotTier.Candidate
   | SnapshotTier.Staged;
 
+export type WorkflowRevisionSelector = Date | 'latest';
+
 export interface TierEntryModifiedByUser {
   id?: string;
   username?: string;
@@ -26,7 +28,7 @@ export interface MemberEntry {
 
 export interface StagedEntry extends TierEntryDisplayFields {
   object_ref: string;
-  object_modified: Date;
+  object_modified: WorkflowRevisionSelector;
   object_status: WorkflowStatusType;
   object_staged_at: Date;
   object_staged_by: string;
@@ -34,7 +36,7 @@ export interface StagedEntry extends TierEntryDisplayFields {
 
 export interface CandidateEntry extends TierEntryDisplayFields {
   object_ref: string;
-  object_modified: Date;
+  object_modified: WorkflowRevisionSelector;
   object_status: WorkflowStatusType;
   object_added_at: Date;
   object_added_by: string;
