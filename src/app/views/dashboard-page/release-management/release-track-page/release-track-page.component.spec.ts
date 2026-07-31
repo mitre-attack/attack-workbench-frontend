@@ -295,6 +295,7 @@ describe('ReleaseTrackPageComponent', () => {
             priority: 0,
             filters: {
               object_types: ['attack-pattern'],
+              domains: ['enterprise-attack'],
             },
           },
           {
@@ -374,7 +375,12 @@ describe('ReleaseTrackPageComponent', () => {
     ).toBe('Component One');
     expect(
       component.getComponentTrackFilters(component.virtualComponentTracks[0])
-    ).toEqual(['attack pattern']);
+    ).toEqual(['attack pattern', 'enterprise']);
+    expect(
+      component.getVirtualComponentTrackDomains(
+        component.virtualComponentTracks[0]
+      )
+    ).toEqual(['enterprise']);
     expect(component.virtualResolutionRows[0]).toEqual(
       expect.objectContaining({
         trackId: 'release-track--component-one',
@@ -1009,6 +1015,21 @@ describe('ReleaseTrackPageComponent', () => {
     expect(component.isEditingConfig).toBe(false);
     expect(refreshSpy).toHaveBeenCalled();
     expect(historySpy).toHaveBeenCalled();
+  });
+
+  it('should retain object types when clearing component-track domains', () => {
+    const track: any = {
+      filters: {
+        object_types: ['malware'],
+        domains: ['mobile'],
+      },
+    };
+
+    (component as any).setVirtualComponentTrackDomains(track, []);
+
+    expect(track.filters).toEqual({
+      object_types: ['malware'],
+    });
   });
 
   it('should edit virtual release track component tracks', () => {

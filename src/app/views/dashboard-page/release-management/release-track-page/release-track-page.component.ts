@@ -147,6 +147,8 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 import { StixObject } from 'src/app/classes/stix';
 import { StixDialogComponent } from 'src/app/views/stix/stix-dialog/stix-dialog.component';
 
+const VIRTUAL_DOMAIN_FILTER_OPTIONS = ['enterprise', 'ics', 'mobile'];
+
 @Component({
   selector: 'app-release-track-page',
   standalone: false,
@@ -194,6 +196,7 @@ export class ReleaseTrackPageComponent implements OnInit {
     label: this.formatStixType(type),
     value: type,
   }));
+  public virtualDomainOptions = VIRTUAL_DOMAIN_FILTER_OPTIONS;
 
   constructor(
     private connector: ReleaseTracksConnectorService,
@@ -1043,8 +1046,13 @@ export class ReleaseTrackPageComponent implements OnInit {
 
   public getComponentTrackFilters(track: any): string[] {
     const objectTypes = track?.filters?.object_types;
-    if (!Array.isArray(objectTypes)) return [];
-    return objectTypes.map(type => this.formatConfigOption(type));
+    const domains = track?.filters?.domains;
+    return [
+      ...(Array.isArray(objectTypes)
+        ? objectTypes.map(type => this.formatConfigOption(type))
+        : []),
+      ...(Array.isArray(domains) ? domains.map(this.formatDomain) : []),
+    ];
   }
 
   public getResolvedComponentLabel(component: any): string {
@@ -1131,6 +1139,22 @@ export class ReleaseTrackPageComponent implements OnInit {
       ...(track.filters || {}),
       object_types: objectTypes,
     };
+  }
+
+  public getVirtualComponentTrackDomains(track: any): string[] {
+    const domains = track?.filters?.domains;
+    return Array.isArray(domains) ? domains.map(this.formatDomain) : [];
+  }
+
+  public setVirtualComponentTrackDomains(track: any, domains: string[]): void {
+    const filters = { ...(track.filters || {}) };
+    if (domains.length) filters.domains = domains;
+    else delete filters.domains;
+    track.filters = Object.keys(filters).length ? filters : undefined;
+  }
+
+  private formatDomain(domain: string): string {
+    return domain.replace(/-attack$/, '');
   }
 
   public getVirtualComponentTrackDescription(track: any): string {

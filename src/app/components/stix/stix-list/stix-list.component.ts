@@ -387,12 +387,10 @@ export class StixListComponent implements OnInit, AfterViewInit, OnDestroy {
               this.config.sourceRef ? sticky_allowed : false,
               ['relationship-name']
             );
-            if (
-              !(
-                this.config.relationshipType &&
-                this.config.relationshipType == 'subtechnique-of'
-              )
-            )
+            if (!(
+              this.config.relationshipType &&
+              this.config.relationshipType == 'subtechnique-of'
+            ))
               this.addColumn(
                 'description',
                 'description',
