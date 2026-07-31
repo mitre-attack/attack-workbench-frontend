@@ -2,7 +2,7 @@ import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { Observable } from 'rxjs';
-import { catchError, share, tap, map } from 'rxjs/operators';
+import { catchError, map, share, tap } from 'rxjs/operators';
 import { environment } from '../../../../environments/environment';
 import { logger } from '../../../utils/logger';
 import { ApiConnector } from '../api-connector';
@@ -214,13 +214,18 @@ export class ReleaseTracksConnectorService extends ApiConnector {
    * GET /api/release-tracks/:id/snapshots
    * List snapshot history summaries.
    * @param id Release track id
+   * @param options Pagination and tagged filter options
    * @returns Observable paginated snapshot summaries
    */
   public listSnapshots(
     id: string,
-    options?: SnapshotHistoryOptions
+    options: SnapshotHistoryOptions = {}
   ): Observable<Paginated<ReleaseTrackSnapshotHistoryItem>> {
-    const params = this.buildHttpParams(options);
+    const params = this.buildHttpParams({
+      limit: 200,
+      offset: 0,
+      ...options,
+    });
     const url = `${this.apiUrl}/release-tracks/${id}/snapshots`;
     return this.http
       .get<Paginated<ReleaseTrackSnapshotHistoryItem>>(url, {

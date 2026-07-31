@@ -139,7 +139,7 @@ describe('NamePropertyComponent', () => {
         }),
       })
     );
-    expect(component.statusControl.value).toBe(WorkflowStatus.Reviewed);
+    expect(component.statusControl.value).toBe(WorkflowStatus.WorkInProgress);
     expect(mockEditorService.onReload.emit).toHaveBeenCalled();
   });
 

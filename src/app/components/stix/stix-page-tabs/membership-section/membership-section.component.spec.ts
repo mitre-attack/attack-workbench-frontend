@@ -6,6 +6,7 @@ import { vi } from 'vitest';
 
 import { AuthenticationService } from 'src/app/services/connectors/authentication/authentication.service';
 import { MembershipSectionComponent } from './membership-section.component';
+import { WorkbenchChipComponent } from 'src/app/components/workbench-chip/workbench-chip.component';
 import {
   MembershipSectionDataService,
   MembershipTrack,
@@ -66,6 +67,7 @@ describe('MembershipSectionComponent', () => {
 
     await TestBed.configureTestingModule({
       declarations: [MembershipSectionComponent],
+      imports: [WorkbenchChipComponent],
       providers: [
         {
           provide: MembershipSectionDataService,

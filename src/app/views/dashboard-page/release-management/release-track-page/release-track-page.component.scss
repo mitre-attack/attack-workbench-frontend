@@ -424,8 +424,27 @@ $released-members-disabled-dark: colors.on-color-deemphasis(dark);
     flex-direction: column;
     gap: 32px;
     max-width: 896px;
-    margin: 32px auto 0;
+    margin: 20px auto 0;
     padding-left: 72px;
+  }
+
+  .snapshot-history-summary {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 16px;
+    max-width: 896px;
+    margin: 24px auto 0;
+    padding-left: 72px;
+    font-size: 13px;
+    line-height: 18px;
+
+    .dark & {
+      color: colors.on-color-deemphasis(dark);
+    }
+
+    .light & {
+      color: colors.on-color-deemphasis(light);
+    }
   }
 
   .snapshot-history-entry {
@@ -436,15 +455,16 @@ $released-members-disabled-dark: colors.on-color-deemphasis(dark);
       position: absolute;
       top: 48px;
       bottom: -32px;
-      left: -38px;
-      width: 2px;
+      left: -37px;
+      border-left: 1px solid;
+      border-left-color: colors.border-color(light);
 
       .dark & {
-        background: rgba(colors.on-color(dark), 0.36);
+        border-left-color: colors.border-color(dark);
       }
 
       .light & {
-        background: rgba(colors.on-color(light), 0.24);
+        border-left-color: colors.border-color(light);
       }
     }
   }
@@ -457,9 +477,12 @@ $released-members-disabled-dark: colors.on-color-deemphasis(dark);
     place-items: center;
     width: 40px;
     height: 40px;
+    border: 1px solid;
     border-radius: 50%;
+    border-color: colors.border-color(light);
 
     .dark & {
+      border-color: colors.border-color(dark);
       color: colors.on-color-deemphasis(dark);
       background: color.mix(
         colors.color(mitre-navy),
@@ -469,6 +492,7 @@ $released-members-disabled-dark: colors.on-color-deemphasis(dark);
     }
 
     .light & {
+      border-color: colors.border-color(light);
       color: colors.on-color-deemphasis(light);
       background: color.mix(
         colors.color(mitre-silver),
@@ -478,6 +502,7 @@ $released-members-disabled-dark: colors.on-color-deemphasis(dark);
     }
 
     &.snapshot-history-marker-tagged {
+      border-color: colors.color(success);
       color: colors.color(success);
     }
 
@@ -492,6 +517,7 @@ $released-members-disabled-dark: colors.on-color-deemphasis(dark);
   .snapshot-history-card {
     overflow: hidden;
     border: 1px solid;
+    border-color: colors.border-color(light);
     border-radius: 6px;
 
     .dark & {
@@ -503,6 +529,14 @@ $released-members-disabled-dark: colors.on-color-deemphasis(dark);
       border-color: colors.border-color(light);
       background: colors.color(mitre-silver);
     }
+
+    &.snapshot-history-card-tagged {
+      border-color: colors.color(success);
+
+      .snapshot-history-card-header {
+        border-bottom-color: colors.color(success);
+      }
+    }
   }
 
   .snapshot-history-card-header {
@@ -511,20 +545,28 @@ $released-members-disabled-dark: colors.on-color-deemphasis(dark);
     gap: 16px;
     padding: 20px 16px 22px;
     border-bottom: 1px solid;
+    border-bottom-color: colors.border-color(light);
 
     .dark & {
-      border-color: colors.border-color(dark);
+      border-bottom-color: colors.border-color(dark);
       background: color.mix(colors.color(dark), colors.color(mitre-navy), 68%);
     }
 
     .light & {
-      border-color: colors.border-color(light);
+      border-bottom-color: colors.border-color(light);
       background: colors.color(light);
     }
   }
 
   .snapshot-history-title {
     min-width: 0;
+
+    .snapshot-history-title-row {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px 12px;
+    }
 
     h3 {
       margin: 0;
@@ -540,6 +582,13 @@ $released-members-disabled-dark: colors.on-color-deemphasis(dark);
       }
     }
 
+    .snapshot-history-chips {
+      display: inline-flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 6px;
+    }
+
     p {
       margin: 4px 0 0;
       font-size: 13px;
@@ -553,6 +602,11 @@ $released-members-disabled-dark: colors.on-color-deemphasis(dark);
         color: colors.on-color-deemphasis(light);
       }
     }
+
+    .snapshot-history-meta {
+      margin-top: 2px;
+      font-size: 12px;
+    }
   }
 
   .snapshot-history-actions {
@@ -563,7 +617,7 @@ $released-members-disabled-dark: colors.on-color-deemphasis(dark);
 
   .snapshot-history-stats {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(104px, 1fr));
     gap: 16px;
     padding: 14px 16px 12px;
   }

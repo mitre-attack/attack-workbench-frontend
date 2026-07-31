@@ -71,11 +71,10 @@
             <span class="external-link-icon" aria-hidden="true"> ↗ </span>
           </button>
 
-          <span
-            class="track-type-badge"
-            [class.track-type-badge--virtual]="isVirtualTrack(membership)">
-            {{ getTrackType(membership) }}
-          </span>
+          <app-workbench-chip
+            [variant]="
+              isVirtualTrack(membership) ? 'virtual' : 'standard'
+            "></app-workbench-chip>
         </div>
       </header>
 

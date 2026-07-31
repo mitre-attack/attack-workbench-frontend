@@ -44,10 +44,13 @@
   }
 
   .buttons {
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
     margin: 18px 0;
 
     button + button {
-      margin-left: 10px;
+      margin-left: 0;
     }
 
     .warn {

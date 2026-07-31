@@ -24,6 +24,7 @@ export class ReleaseTrackSnapshot {
 
   public config: ReleaseTrackConfig = {} as ReleaseTrackConfig;
   public version_history: VersionHistoryEntry[] = [];
+  public summary?: Record<string, any>;
 
   // standard track tiers
   public members: MemberEntry[] = [];
@@ -96,6 +97,7 @@ export class ReleaseTrackSnapshot {
       this.object_marking_refs = raw.object_marking_refs.slice();
 
     if ('config' in raw) this.config = raw.config;
+    if ('summary' in raw) this.summary = raw.summary;
 
     if ('version_history' in raw && Array.isArray(raw.version_history)) {
       this.version_history = raw.version_history.map((v: any) => {
@@ -192,6 +194,7 @@ export class ReleaseTrackSnapshot {
       created_by_ref: this.created_by_ref,
       object_marking_refs: this.object_marking_refs,
       config: this.config,
+      summary: this.summary,
       version_history: this.version_history?.map(v => ({
         ...v,
         tagged_at: v.tagged_at

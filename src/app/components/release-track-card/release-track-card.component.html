@@ -11,14 +11,9 @@
   (keydown.space)="onViewTrack()">
   <div class="card-top">
     <span class="subheading">{{ track.name }}</span>
-    <mat-chip
+    <app-workbench-chip
       class="release-track-type-chip"
-      [ngClass]="{
-        'standard-chip': type === 'standard',
-        'virtual-chip': type === 'virtual',
-      }">
-      {{ type | titlecase }}
-    </mat-chip>
+      [variant]="chipVariant"></app-workbench-chip>
   </div>
 
   <div class="card-body">

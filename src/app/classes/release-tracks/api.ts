@@ -127,26 +127,58 @@ export interface VirtualReleasePreviewSummary extends ReleasePreviewSummaryBase 
 export type ReleasePreviewSummary =
   StandardReleasePreviewSummary | VirtualReleasePreviewSummary;
 
-interface ReleaseTrackSnapshotHistoryBase {
-  id: string;
-  modified: string;
-  version: string | null;
-  name: string;
+export interface ReleaseTrackSnapshotHistoryItem {
+  id?: string;
+  modified?: string | Date;
+  version?: string | null;
+  type?: ReleaseTrackType;
+  name?: string;
   description?: string;
-  members_count: number;
+  created?: string | Date;
+  tagged_at?: string | Date;
+  snapshot_id?: string | Date;
+  is_latest?: boolean;
+  members_count?: number;
+  staged_count?: number;
+  candidates_count?: number;
+  quarantine_count?: number;
+  added_count?: number;
+  modified_count?: number;
+  promoted_count?: number;
+  members?: any[];
+  staged?: any[];
+  candidates?: any[];
+  contents?: {
+    members?: any[];
+    staged?: any[];
+    candidates?: any[];
+    quarantine?: any[];
+    [key: string]: any;
+  };
+  summary?: {
+    members_count?: number;
+    staged_count?: number;
+    candidates_count?: number;
+    quarantine_count?: number;
+    added_count?: number;
+    modified_count?: number;
+    promoted_count?: number;
+    quarantined_count?: number;
+    [key: string]: any;
+  };
+  statistics?: {
+    [key: string]: any;
+  };
+  composition_resolution?: {
+    total_objects?: number;
+    [key: string]: any;
+  };
+  stix?: {
+    id?: string;
+    modified?: string | Date;
+    x_mitre_version?: string | null;
+    x_mitre_contents?: any[];
+    [key: string]: any;
+  };
+  [key: string]: any;
 }
-
-export interface StandardReleaseTrackSnapshotHistoryItem extends ReleaseTrackSnapshotHistoryBase {
-  type: ReleaseTrackType.Standard;
-  staged_count: number;
-  candidates_count: number;
-}
-
-export interface VirtualReleaseTrackSnapshotHistoryItem extends ReleaseTrackSnapshotHistoryBase {
-  type: ReleaseTrackType.Virtual;
-  quarantine_count: number;
-}
-
-export type ReleaseTrackSnapshotHistoryItem =
-  | StandardReleaseTrackSnapshotHistoryItem
-  | VirtualReleaseTrackSnapshotHistoryItem;

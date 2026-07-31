@@ -7,11 +7,6 @@ $membership-accent-dark: #62c9ff;
 $membership-success: colors.color(secondary);
 $membership-release: colors.color(active);
 
-// Explicit purple values for the virtual release-track badge.
-$membership-virtual: #8c5bd6;
-$membership-virtual-light: #6f3db8;
-$membership-virtual-dark: #c3a0f4;
-
 :host {
   display: block;
   width: 100%;
@@ -214,28 +209,6 @@ button.membership-action-button {
   color: inherit;
   font-size: 13px;
   line-height: 1;
-}
-
-.track-type-badge {
-  display: inline-flex;
-  box-sizing: border-box;
-  min-height: 22px;
-  align-items: center;
-  justify-content: center;
-  padding: 0 10px;
-  border: 1px solid;
-  border-radius: 999px;
-  font-size: 10px;
-  font-weight: 750;
-  line-height: 20px;
-  white-space: nowrap;
-  text-transform: uppercase;
-}
-
-.track-type-badge--virtual {
-  border-color: rgba($membership-virtual, 0.9);
-  background: rgba($membership-virtual, 0.18);
-  color: $membership-virtual;
 }
 
 .release-track-content {
@@ -540,18 +513,6 @@ input[type='checkbox'] {
     }
   }
 
-  .track-type-badge {
-    border-color: rgba(colors.color(primary), 0.55);
-    background: color.mix(colors.color(mitre-light-blue), #ffffff, 24%);
-    color: colors.color(primary);
-  }
-
-  .track-type-badge--virtual {
-    border-color: rgba($membership-virtual-light, 0.8);
-    background: rgba($membership-virtual, 0.14);
-    color: $membership-virtual-light;
-  }
-
   .no-current-draft,
   .no-production-releases,
   .release-information small {
@@ -683,18 +644,6 @@ input[type='checkbox'] {
       color: colors.on-color-deemphasis(dark);
       opacity: 0.65;
     }
-  }
-
-  .track-type-badge {
-    border-color: rgba($membership-accent, 0.65);
-    background: rgba($membership-accent, 0.12);
-    color: $membership-accent;
-  }
-
-  .track-type-badge--virtual {
-    border-color: rgba($membership-virtual-dark, 0.9);
-    background: rgba($membership-virtual, 0.26);
-    color: $membership-virtual-dark;
   }
 
   .no-current-draft,

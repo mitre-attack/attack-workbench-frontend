@@ -170,7 +170,7 @@ export class NamePropertyComponent implements OnChanges, OnInit {
 
     dialogRef.afterClosed().subscribe(result => {
       if (result) {
-        this.statusControl.setValue(targetStatus);
+        this.syncStatusControl();
         this.getTrackStatuses();
         this.editorService.onReload.emit();
       } else {

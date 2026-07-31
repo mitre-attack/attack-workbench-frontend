@@ -615,7 +615,15 @@
       <div
         *ngIf="!isLoadingSnapshotHistory && !snapshotHistory.length"
         class="empty-state">
-        No snapshots
+        No tagged releases or current draft snapshot
+      </div>
+
+      <div *ngIf="snapshotHistory.length" class="snapshot-history-summary">
+        <span>Tagged releases: {{ taggedSnapshotCount }}</span>
+        <span
+          >Current draft:
+          {{ hasCurrentDraftSnapshot ? 'available' : 'none' }}</span
+        >
       </div>
 
       <div *ngIf="snapshotHistory.length" class="snapshot-history-list">
@@ -628,28 +636,53 @@
             <mat-icon>{{ item.isTagged ? 'sell' : 'schedule' }}</mat-icon>
           </div>
 
-          <div class="snapshot-history-card">
+          <div
+            class="snapshot-history-card"
+            [class.snapshot-history-card-tagged]="item.isTagged">
             <div class="snapshot-history-card-header">
               <div class="snapshot-history-title">
-                <h3 [class.promote-color]="item.isTagged">
-                  <ng-container *ngIf="item.isTagged; else draftTitle">
-                    {{ item.title }}
+                <div class="snapshot-history-title-row">
+                  <h3 [class.promote-color]="item.isTagged">
+                    <ng-container *ngIf="item.isTagged; else draftTitle">
+                      {{ item.title }}
+                    </ng-container>
+                    <ng-template #draftTitle>
+                      <ng-container *ngIf="item.created; else unknownDate">
+                        {{ item.created | date: 'MMM d, y, h:mm:ss a' }}
+                      </ng-container>
+                    </ng-template>
+                  </h3>
+                  <div class="snapshot-history-chips">
+                    <app-workbench-chip
+                      [variant]="
+                        item.isTagged ? 'tagged' : 'draft'
+                      "></app-workbench-chip>
+                    <app-workbench-chip
+                      *ngIf="item.isLatest"
+                      variant="latest"></app-workbench-chip>
+                  </div>
+                </div>
+                <p *ngIf="item.isTagged; else draftSubtitle">
+                  <ng-container *ngIf="item.taggedAt; else taggedSnapshotDate">
+                    Tagged:
+                    {{ item.taggedAt | date: 'MMM d, y, h:mm:ss a' }}
                   </ng-container>
-                  <ng-template #draftTitle>
-                    <ng-container *ngIf="item.created; else unknownDate">
-                      {{ item.created | date: 'MMM d, y, h:mm:ss a' }}
+                  <ng-template #taggedSnapshotDate>
+                    Snapshot:
+                    <ng-container *ngIf="item.modified; else unknownDate">
+                      {{ item.modified | date: 'MMM d, y, h:mm:ss a' }}
                     </ng-container>
                   </ng-template>
-                </h3>
-                <p *ngIf="item.isTagged; else draftSubtitle">
-                  Created:
-                  <ng-container *ngIf="item.created; else unknownDate">
-                    {{ item.created | date: 'MMM d, y, h:mm:ss a' }}
-                  </ng-container>
                 </p>
                 <ng-template #draftSubtitle>
-                  <p>Draft snapshot</p>
+                  <p>Draft release snapshot</p>
                 </ng-template>
+                <p
+                  *ngIf="item.isTagged && item.taggedAt && item.modified"
+                  class="snapshot-history-meta">
+                  Snapshot:
+                  {{ item.modified | date: 'MMM d, y, h:mm:ss a' }}
+                </p>
               </div>
 
               <div class="snapshot-history-actions small-buttons">
@@ -657,48 +690,31 @@
                   *ngIf="!item.isTagged"
                   class="view-color"
                   mat-stroked-button
+                  [disabled]="isReleasing || !item.modified"
                   (click)="onTagSnapshot(item)">
                   <mat-icon>sell</mat-icon>
-                  Tag
+                  Preview &amp; Tag
                 </button>
                 <button
-                  *ngIf="item.isTagged"
                   mat-stroked-button
+                  [disabled]="!item.modified"
                   (click)="onExportSnapshot(item)">
                   <mat-icon>cloud_download</mat-icon>
                   Export
-                </button>
-                <button mat-stroked-button (click)="onInspectSnapshot(item)">
-                  <mat-icon>visibility</mat-icon>
-                  Inspect
                 </button>
               </div>
             </div>
 
             <div class="snapshot-history-stats">
-              <div class="snapshot-history-stat">
-                <div class="snapshot-history-stat-value">
-                  {{ item.membersCount }}
+              <div
+                *ngFor="let stat of item.stats"
+                class="snapshot-history-stat">
+                <div
+                  class="snapshot-history-stat-value"
+                  [ngClass]="stat.modifier">
+                  {{ stat.value }}
                 </div>
-                <div class="snapshot-history-stat-label">Members</div>
-              </div>
-              <div *ngIf="!item.isVirtual" class="snapshot-history-stat">
-                <div class="snapshot-history-stat-value modified-color">
-                  {{ item.stagedCount }}
-                </div>
-                <div class="snapshot-history-stat-label">Staged</div>
-              </div>
-              <div *ngIf="!item.isVirtual" class="snapshot-history-stat">
-                <div class="snapshot-history-stat-value">
-                  {{ item.candidatesCount }}
-                </div>
-                <div class="snapshot-history-stat-label">Candidates</div>
-              </div>
-              <div *ngIf="item.isVirtual" class="snapshot-history-stat">
-                <div class="snapshot-history-stat-value">
-                  {{ item.quarantineCount }}
-                </div>
-                <div class="snapshot-history-stat-label">Quarantine</div>
+                <div class="snapshot-history-stat-label">{{ stat.label }}</div>
               </div>
             </div>
           </div>

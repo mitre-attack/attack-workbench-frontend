@@ -1,6 +1,8 @@
-import { of } from 'rxjs';
-import { environment } from '../../../../environments/environment';
+import { firstValueFrom, of } from 'rxjs';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
 import { ReleaseTracksConnectorService } from './release-tracks.service';
+import { environment } from 'src/environments/environment';
 
 describe('ReleaseTracksConnectorService', () => {
   let http: {
@@ -22,6 +24,105 @@ describe('ReleaseTracksConnectorService', () => {
       http as any,
       { open: vi.fn() } as any
     );
+  });
+
+  it('should retrieve the latest snapshot from the explicit latest endpoint', async () => {
+    const apiUrl = environment.integrations.rest_api.url;
+    const trackId = 'release-track--123';
+    http.get.mockReturnValue(
+      of({
+        id: trackId,
+        name: 'Enterprise Release',
+      })
+    );
+
+    const snapshot = await firstValueFrom(
+      service.getLatestSnapshot(trackId, { include: 'all' })
+    );
+
+    expect(http.get).toHaveBeenCalledWith(
+      `${apiUrl}/release-tracks/${trackId}/snapshots/latest`,
+      {
+        params: expect.anything(),
+      }
+    );
+    expect(http.get.mock.calls[0][1].params.get('include')).toBe('all');
+    expect(snapshot?.name).toBe('Enterprise Release');
+  });
+
+  it('should export the latest snapshot from the explicit latest endpoint', async () => {
+    const apiUrl = environment.integrations.rest_api.url;
+    const trackId = 'release-track--123';
+    const exportPayload = { type: 'bundle', objects: [] };
+    http.get.mockReturnValue(of(exportPayload));
+
+    const result = await firstValueFrom(
+      service.exportLatestSnapshot(trackId, 'bundle', { include: 'all' })
+    );
+
+    expect(http.get).toHaveBeenCalledWith(
+      `${apiUrl}/release-tracks/${trackId}/snapshots/latest`,
+      {
+        params: expect.anything(),
+      }
+    );
+    expect(http.get.mock.calls[0][1].params.get('format')).toBe('bundle');
+    expect(http.get.mock.calls[0][1].params.get('include')).toBe('all');
+    expect(result).toEqual(exportPayload);
+  });
+
+  it('should request snapshot history with default pagination', async () => {
+    const apiUrl = environment.integrations.rest_api.url;
+    const trackId = 'release-track--123';
+    const response = {
+      data: [
+        {
+          id: trackId,
+          modified: '2024-05-21T07:00:00.000Z',
+          version: null,
+          type: 'standard',
+          members_count: 10,
+          staged_count: 2,
+          candidates_count: 4,
+        },
+      ],
+      pagination: {
+        total: 1,
+        limit: 200,
+        offset: 0,
+      },
+    };
+    http.get.mockReturnValue(of(response));
+
+    const history = await firstValueFrom(service.listSnapshots(trackId));
+
+    expect(http.get).toHaveBeenCalledWith(
+      `${apiUrl}/release-tracks/${trackId}/snapshots`,
+      {
+        params: expect.anything(),
+      }
+    );
+    expect(http.get.mock.calls[0][1].params.get('limit')).toBe('200');
+    expect(http.get.mock.calls[0][1].params.get('offset')).toBe('0');
+    expect(history).toEqual(response);
+  });
+
+  it('should pass tagged and pagination options to the snapshot list endpoint', async () => {
+    service
+      .listSnapshots('release-track--standard', {
+        tagged: false,
+        limit: 25,
+        offset: 50,
+      })
+      .subscribe();
+
+    const [url, options] = http.get.mock.calls[0];
+    expect(url).toBe(
+      `${environment.integrations.rest_api.url}/release-tracks/release-track--standard/snapshots`
+    );
+    expect(options.params.get('tagged')).toBe('false');
+    expect(options.params.get('limit')).toBe('25');
+    expect(options.params.get('offset')).toBe('50');
   });
 
   it('should create virtual snapshots through the virtual namespace', () => {
@@ -122,24 +223,6 @@ describe('ReleaseTracksConnectorService', () => {
     expect((service as any).previewBump).toBeUndefined();
     expect((service as any).bumpByLatest).toBeUndefined();
     expect((service as any).bumpByModified).toBeUndefined();
-  });
-
-  it('should preserve snapshot-history pagination and filtering', () => {
-    service
-      .listSnapshots('release-track--standard', {
-        tagged: false,
-        limit: 25,
-        offset: 50,
-      })
-      .subscribe();
-
-    const [url, options] = http.get.mock.calls[0];
-    expect(url).toBe(
-      `${environment.integrations.rest_api.url}/release-tracks/release-track--standard/snapshots`
-    );
-    expect(options.params.get('tagged')).toBe('false');
-    expect(options.params.get('limit')).toBe('25');
-    expect(options.params.get('offset')).toBe('50');
   });
 
   it('should list tracks with only supported query parameters', () => {
