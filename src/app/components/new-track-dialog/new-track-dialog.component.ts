@@ -34,6 +34,8 @@ const OBJECT_FILTER_OPTIONS: StixType[] = [
   'x-mitre-tactic',
 ];
 
+const DOMAIN_FILTER_OPTIONS = ['enterprise', 'ics', 'mobile'];
+
 @Component({
   standalone: false,
   selector: 'app-new-track-dialog',
@@ -64,6 +66,7 @@ export class NewTrackDialogComponent implements OnInit {
     label: this.formatStixType(type),
     value: type,
   }));
+  public domainOptions = DOMAIN_FILTER_OPTIONS;
 
   public mode: 'standard' | 'virtual' = 'standard';
 
@@ -184,6 +187,7 @@ export class NewTrackDialogComponent implements OnInit {
   public removeComponentTrack(track: VirtualComponentTrackOption): void {
     track.selected = false;
     track.objectTypes = [];
+    track.domains = [];
   }
 
   public handleCreate(): void {
@@ -277,11 +281,10 @@ export class NewTrackDialogComponent implements OnInit {
           priority,
         };
 
-        if (track.objectTypes.length) {
-          componentTrack.filters = {
-            object_types: track.objectTypes,
-          };
-        }
+        const filters: any = {};
+        if (track.objectTypes.length) filters.object_types = track.objectTypes;
+        if (track.domains.length) filters.domains = track.domains;
+        if (Object.keys(filters).length) componentTrack.filters = filters;
 
         return componentTrack;
       }),
@@ -325,6 +328,7 @@ export class NewTrackDialogComponent implements OnInit {
       taggedReleaseCount,
       selected: false,
       objectTypes: [],
+      domains: [],
     };
   }
 
@@ -384,4 +388,5 @@ interface VirtualComponentTrackOption {
   taggedReleaseCount: number;
   selected: boolean;
   objectTypes: StixType[];
+  domains: string[];
 }

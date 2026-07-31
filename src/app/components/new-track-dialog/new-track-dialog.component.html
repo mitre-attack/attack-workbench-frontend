@@ -184,6 +184,21 @@
               </mat-select>
               <mat-hint>Leave empty to include all object types</mat-hint>
             </mat-form-field>
+
+            <mat-form-field
+              *ngIf="track.selected"
+              appearance="outline"
+              class="object-type-filter">
+              <mat-label>Domain filter</mat-label>
+              <mat-select multiple [(value)]="track.domains">
+                <mat-option
+                  *ngFor="let domain of domainOptions"
+                  [value]="domain">
+                  {{ domain }}
+                </mat-option>
+              </mat-select>
+              <mat-hint>Leave empty to include all domains</mat-hint>
+            </mat-form-field>
           </div>
         </div>
 
