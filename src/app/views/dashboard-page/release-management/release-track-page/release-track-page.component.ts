@@ -1433,33 +1433,32 @@ export class ReleaseTrackPageComponent implements OnInit {
   public onExport(): void {
     if (!this.id) return;
 
+    this.openExportFormatDialog('Export latest release snapshot')
+      .pipe(take(1))
+      .subscribe(format => {
+        if (!format) return;
+        this.downloadLatestReleaseTrack(format);
+      });
+  }
+
+  private openExportFormatDialog(
+    title: string
+  ): Observable<ExportFormatType | null> {
     const formatRef = this.dialog.open(MultipleChoiceDialogComponent, {
       width: '30em',
       autoFocus: false,
       data: {
-        title: `Export latest release snapshot`,
+        title,
         choices: [
           {
-            label: 'STIX Bundle',
-            value: 'bundle',
+            label: 'Bundle',
+            value: ExportFormat.Bundle,
             description:
               'A standard STIX 2.1 JSON bundle containing all member objects of the release.',
           },
           {
-            label: 'Snapshot',
-            value: 'snapshot',
-            description:
-              'The raw release track snapshot, including tiers, version history, and configuration.',
-          },
-          {
-            label: 'File System Store',
-            value: 'filesystemstore',
-            description:
-              'A directory structure with individual STIX JSON files, suitable for Git releases.',
-          },
-          {
-            label: 'Workbench Format',
-            value: 'workbench',
+            label: 'Workbench',
+            value: ExportFormat.Workbench,
             description:
               'A richer format including workflow statuses, metadata, and other Workbench-specific data.',
           },
@@ -1467,13 +1466,15 @@ export class ReleaseTrackPageComponent implements OnInit {
       },
     });
 
-    formatRef
+    return formatRef
       .afterClosed()
-      .pipe(take(1))
-      .subscribe(format => {
-        if (!format) return;
-        this.downloadLatestReleaseTrack(format as ExportFormat);
-      });
+      .pipe(
+        map(format =>
+          format === ExportFormat.Bundle || format === ExportFormat.Workbench
+            ? format
+            : null
+        )
+      );
   }
 
   private downloadLatestReleaseTrack(format: ExportFormatType): void {
@@ -1763,49 +1764,36 @@ export class ReleaseTrackPageComponent implements OnInit {
       });
   }
 
-  public onInspectSnapshot(item: SnapshotHistoryViewModel): void {
+  public onExportSnapshot(item: SnapshotHistoryViewModel): void {
     if (!this.id || !item.modified) return;
+    const modified = item.modified;
 
-    this.connector
-      .retrieveSnapshotByModified(this.id, item.modified, {
-        format: ExportFormat.Workbench,
-        include: 'all',
-      })
+    this.openExportFormatDialog('Export release track snapshot')
       .pipe(take(1))
-      .subscribe({
-        next: snapshot => {
-          if (!snapshot) return;
-          this.releaseTrack = snapshot;
-          if (this.isVirtualReleaseTrack) {
-            this.loadVirtualComponentTrackSummaries();
-          }
-          this.breadcrumbService.changeBreadcrumb(
-            this.route.snapshot,
-            snapshot.name
-          );
-        },
-        error: err => {
-          console.error('Failed to inspect release track snapshot', err);
-        },
+      .subscribe(format => {
+        if (!format) return;
+        this.downloadSnapshot(item, modified, format);
       });
   }
 
-  public onExportSnapshot(item: SnapshotHistoryViewModel): void {
-    if (!this.id || !item.modified) return;
-
+  private downloadSnapshot(
+    item: SnapshotHistoryViewModel,
+    modified: string,
+    format: ExportFormatType
+  ): void {
     this.connector
       .exportSnapshotByModified(
         this.id,
-        item.modified,
-        ExportFormat.Bundle,
-        this.getSnapshotExportOptions(item)
+        modified,
+        format,
+        this.getSnapshotExportOptions(item, format)
       )
       .pipe(take(1))
       .subscribe({
         next: result => {
           this.restApiConnectorService.triggerBrowserDownload(
             result,
-            this.getSnapshotExportFilename(item, ExportFormat.Bundle)
+            this.getSnapshotExportFilename(item, format)
           );
         },
         error: err => {
@@ -1815,8 +1803,13 @@ export class ReleaseTrackPageComponent implements OnInit {
   }
 
   private getSnapshotExportOptions(
-    item: SnapshotHistoryViewModel
-  ): { include: 'staged' } | undefined {
+    item: SnapshotHistoryViewModel,
+    format: ExportFormatType
+  ): { include: 'staged' | 'all' } | undefined {
+    if (format === ExportFormat.Workbench) {
+      return { include: 'all' };
+    }
+
     const trackType =
       this.getSnapshotType(item.snapshot) || this.releaseTrack?.type;
     if (trackType === ReleaseTrackType.Standard && !item.isTagged) {

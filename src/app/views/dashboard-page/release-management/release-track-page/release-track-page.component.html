@@ -693,15 +693,11 @@
                   Preview &amp; Tag
                 </button>
                 <button
-                  *ngIf="item.isTagged"
                   mat-stroked-button
+                  [disabled]="!item.modified"
                   (click)="onExportSnapshot(item)">
                   <mat-icon>cloud_download</mat-icon>
                   Export
-                </button>
-                <button mat-stroked-button (click)="onInspectSnapshot(item)">
-                  <mat-icon>visibility</mat-icon>
-                  Inspect
                 </button>
               </div>
             </div>

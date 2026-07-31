@@ -235,19 +235,19 @@ describe('ReleaseTrackPageComponent', () => {
 
     component.onExport();
 
+    const choices = mockDialog.open.mock.calls[0][1].data.choices;
     expect(mockDialog.open).toHaveBeenCalledWith(
       MultipleChoiceDialogComponent,
-      expect.objectContaining({
-        data: expect.objectContaining({
-          choices: expect.arrayContaining([
-            expect.objectContaining({
-              label: 'STIX Bundle',
-              value: 'bundle',
-            }),
-          ]),
-        }),
-      })
+      expect.anything()
     );
+    expect(choices.map((choice: any) => choice.value)).toEqual([
+      'bundle',
+      'workbench',
+    ]);
+    expect(choices.map((choice: any) => choice.label)).toEqual([
+      'Bundle',
+      'Workbench',
+    ]);
     expect(
       mockReleaseTrackApiConnector.exportLatestSnapshot
     ).toHaveBeenCalledWith('release-track--123', 'bundle', { include: 'all' });
@@ -280,6 +280,9 @@ describe('ReleaseTrackPageComponent', () => {
 
   it('should export a standard draft snapshot with staged content', () => {
     const exportPayload = { type: 'bundle', objects: [] };
+    mockDialog.open.mockReturnValue({
+      afterClosed: () => of('bundle'),
+    });
     mockReleaseTrackApiConnector.exportSnapshotByModified.mockReturnValue(
       of(exportPayload)
     );
@@ -321,6 +324,9 @@ describe('ReleaseTrackPageComponent', () => {
   });
 
   it('should export a tagged standard snapshot without staged content', () => {
+    mockDialog.open.mockReturnValue({
+      afterClosed: () => of('bundle'),
+    });
     mockReleaseTrackApiConnector.exportSnapshotByModified.mockReturnValue(
       of({ type: 'bundle', objects: [] })
     );
@@ -357,6 +363,9 @@ describe('ReleaseTrackPageComponent', () => {
   });
 
   it('should export a virtual draft snapshot without staged content', () => {
+    mockDialog.open.mockReturnValue({
+      afterClosed: () => of('bundle'),
+    });
     mockReleaseTrackApiConnector.exportSnapshotByModified.mockReturnValue(
       of({ type: 'bundle', objects: [] })
     );
@@ -389,6 +398,51 @@ describe('ReleaseTrackPageComponent', () => {
       '2024-05-21T07:00:00.000Z',
       'bundle',
       undefined
+    );
+  });
+
+  it('should export a snapshot in workbench format with all tiers', () => {
+    const exportPayload = { id: 'release-track--123', members: [] };
+    mockDialog.open.mockReturnValue({
+      afterClosed: () => of('workbench'),
+    });
+    mockReleaseTrackApiConnector.exportSnapshotByModified.mockReturnValue(
+      of(exportPayload)
+    );
+    component.id = 'release-track--123';
+    component.releaseTrack = {
+      name: 'Enterprise Release',
+      type: ReleaseTrackType.Standard,
+    } as any;
+
+    component.onExportSnapshot({
+      snapshot: {
+        modified: '2024-05-21T07:00:00.000Z',
+        type: ReleaseTrackType.Standard,
+        version: null,
+      },
+      title: 'Draft Snapshot',
+      created: new Date('2024-05-21T07:00:00.000Z'),
+      modified: '2024-05-21T07:00:00.000Z',
+      taggedAt: null,
+      isTagged: false,
+      stats: [],
+      addedCount: 0,
+      modifiedCount: 0,
+      totalObjects: 0,
+    } as any);
+
+    expect(
+      mockReleaseTrackApiConnector.exportSnapshotByModified
+    ).toHaveBeenCalledWith(
+      'release-track--123',
+      '2024-05-21T07:00:00.000Z',
+      'workbench',
+      { include: 'all' }
+    );
+    expect(mockRestApiConnector.triggerBrowserDownload).toHaveBeenCalledWith(
+      exportPayload,
+      'enterprise-release-draft-workbench.json'
     );
   });
 
