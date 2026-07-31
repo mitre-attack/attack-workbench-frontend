@@ -638,7 +638,9 @@
             <mat-icon>{{ item.isTagged ? 'sell' : 'schedule' }}</mat-icon>
           </div>
 
-          <div class="snapshot-history-card">
+          <div
+            class="snapshot-history-card"
+            [class.snapshot-history-card-tagged]="item.isTagged">
             <div class="snapshot-history-card-header">
               <div class="snapshot-history-title">
                 <div class="snapshot-history-title-row">

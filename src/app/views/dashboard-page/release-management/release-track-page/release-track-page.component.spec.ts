@@ -242,6 +242,120 @@ describe('ReleaseTrackPageComponent', () => {
     expect(mockDialog.open).not.toHaveBeenCalled();
   });
 
+  it('should export a standard draft snapshot with staged content', () => {
+    const exportPayload = { type: 'bundle', objects: [] };
+    mockReleaseTrackApiConnector.exportSnapshotByModified.mockReturnValue(
+      of(exportPayload)
+    );
+    component.id = 'release-track--123';
+    component.releaseTrack = {
+      name: 'Enterprise Release',
+      type: ReleaseTrackType.Standard,
+    } as any;
+
+    component.onExportSnapshot({
+      snapshot: {
+        modified: '2024-05-21T07:00:00.000Z',
+        type: ReleaseTrackType.Standard,
+        version: null,
+      },
+      title: 'Draft Snapshot',
+      created: new Date('2024-05-21T07:00:00.000Z'),
+      modified: '2024-05-21T07:00:00.000Z',
+      taggedAt: null,
+      isTagged: false,
+      stats: [],
+      addedCount: 0,
+      modifiedCount: 0,
+      totalObjects: 0,
+    } as any);
+
+    expect(
+      mockReleaseTrackApiConnector.exportSnapshotByModified
+    ).toHaveBeenCalledWith(
+      'release-track--123',
+      '2024-05-21T07:00:00.000Z',
+      'bundle',
+      { include: 'staged' }
+    );
+    expect(mockRestApiConnector.triggerBrowserDownload).toHaveBeenCalledWith(
+      exportPayload,
+      'enterprise-release-draft-bundle.json'
+    );
+  });
+
+  it('should export a tagged standard snapshot without staged content', () => {
+    mockReleaseTrackApiConnector.exportSnapshotByModified.mockReturnValue(
+      of({ type: 'bundle', objects: [] })
+    );
+    component.id = 'release-track--123';
+    component.releaseTrack = {
+      type: ReleaseTrackType.Standard,
+    } as any;
+
+    component.onExportSnapshot({
+      snapshot: {
+        modified: '2024-04-15T06:00:00.000Z',
+        type: ReleaseTrackType.Standard,
+        version: '1.3',
+      },
+      title: 'v1.3',
+      created: new Date('2024-04-15T06:00:00.000Z'),
+      modified: '2024-04-15T06:00:00.000Z',
+      taggedAt: new Date('2024-04-15T06:30:00.000Z'),
+      isTagged: true,
+      stats: [],
+      addedCount: 0,
+      modifiedCount: 0,
+      totalObjects: 0,
+    } as any);
+
+    expect(
+      mockReleaseTrackApiConnector.exportSnapshotByModified
+    ).toHaveBeenCalledWith(
+      'release-track--123',
+      '2024-04-15T06:00:00.000Z',
+      'bundle',
+      undefined
+    );
+  });
+
+  it('should export a virtual draft snapshot without staged content', () => {
+    mockReleaseTrackApiConnector.exportSnapshotByModified.mockReturnValue(
+      of({ type: 'bundle', objects: [] })
+    );
+    component.id = 'release-track--virtual';
+    component.releaseTrack = {
+      type: ReleaseTrackType.Virtual,
+    } as any;
+
+    component.onExportSnapshot({
+      snapshot: {
+        modified: '2024-05-21T07:00:00.000Z',
+        type: ReleaseTrackType.Virtual,
+        version: null,
+      },
+      title: 'Draft Snapshot',
+      created: new Date('2024-05-21T07:00:00.000Z'),
+      modified: '2024-05-21T07:00:00.000Z',
+      taggedAt: null,
+      isTagged: false,
+      stats: [],
+      addedCount: 0,
+      modifiedCount: 0,
+      totalObjects: 0,
+    } as any);
+
+    expect(
+      mockReleaseTrackApiConnector.exportSnapshotByModified
+    ).toHaveBeenCalledWith(
+      'release-track--virtual',
+      '2024-05-21T07:00:00.000Z',
+      'bundle',
+      undefined
+    );
+  });
+
   it('should load the latest release track with the snapshot model response', () => {
     mockReleaseTrackApiConnector.getLatestSnapshot.mockReturnValue(
       of({ name: 'Enterprise Release' })

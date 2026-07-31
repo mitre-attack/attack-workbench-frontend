@@ -22,7 +22,6 @@ import {
   ReleaseTrackConfig,
   ReleaseTrackSnapshot,
   ReleaseTrackSnapshotHistoryItem,
-  ReleaseTrackSnapshotOptions,
   ReleaseTrackType,
   ResolutionStrategy,
   SnapshotScheduleMode,
@@ -1562,6 +1561,17 @@ export class ReleaseTrackPageComponent implements OnInit {
       });
   }
 
+  private getSnapshotExportOptions(
+    item: SnapshotHistoryViewModel
+  ): { include: 'staged' } | undefined {
+    const trackType =
+      this.getSnapshotType(item.snapshot) || this.releaseTrack?.type;
+    if (trackType === ReleaseTrackType.Standard && !item.isTagged) {
+      return { include: 'staged' };
+    }
+    return undefined;
+  }
+
   private reviewCandidateStatus(
     from: WorkflowStatusType,
     to: WorkflowStatusType,
@@ -2330,16 +2340,6 @@ export class ReleaseTrackPageComponent implements OnInit {
       ? item.title.replace(/^v/, 'v')
       : 'draft';
     return `${safeName}-${snapshotName}-${format}.json`;
-  }
-
-  private getSnapshotExportOptions(
-    item: SnapshotHistoryViewModel
-  ): Omit<ReleaseTrackSnapshotOptions, 'format'> | undefined {
-    if (item.isTagged || this.releaseTrack?.type === ReleaseTrackType.Virtual) {
-      return undefined;
-    }
-
-    return { include: 'staged' };
   }
 
   private toIsoString(value: Date | string | undefined): string | undefined {

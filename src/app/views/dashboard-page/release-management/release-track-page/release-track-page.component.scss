@@ -459,15 +459,16 @@ $snapshot-draft-chip-dark: #c7b9ff;
       position: absolute;
       top: 48px;
       bottom: -32px;
-      left: -38px;
-      width: 2px;
+      left: -37px;
+      border-left: 1px solid;
+      border-left-color: colors.border-color(light);
 
       .dark & {
-        background: colors.border-color(dark);
+        border-left-color: colors.border-color(dark);
       }
 
       .light & {
-        background: colors.border-color(light);
+        border-left-color: colors.border-color(light);
       }
     }
   }
@@ -482,6 +483,7 @@ $snapshot-draft-chip-dark: #c7b9ff;
     height: 40px;
     border: 1px solid;
     border-radius: 50%;
+    border-color: colors.border-color(light);
 
     .dark & {
       border-color: colors.border-color(dark);
@@ -504,6 +506,7 @@ $snapshot-draft-chip-dark: #c7b9ff;
     }
 
     &.snapshot-history-marker-tagged {
+      border-color: colors.color(success);
       color: colors.color(success);
     }
 
@@ -518,6 +521,7 @@ $snapshot-draft-chip-dark: #c7b9ff;
   .snapshot-history-card {
     overflow: hidden;
     border: 1px solid;
+    border-color: colors.border-color(light);
     border-radius: 6px;
 
     .dark & {
@@ -529,6 +533,14 @@ $snapshot-draft-chip-dark: #c7b9ff;
       border-color: colors.border-color(light);
       background: colors.color(mitre-silver);
     }
+
+    &.snapshot-history-card-tagged {
+      border-color: colors.color(success);
+
+      .snapshot-history-card-header {
+        border-bottom-color: colors.color(success);
+      }
+    }
   }
 
   .snapshot-history-card-header {
@@ -537,14 +549,15 @@ $snapshot-draft-chip-dark: #c7b9ff;
     gap: 16px;
     padding: 20px 16px 22px;
     border-bottom: 1px solid;
+    border-bottom-color: colors.border-color(light);
 
     .dark & {
-      border-color: colors.border-color(dark);
+      border-bottom-color: colors.border-color(dark);
       background: color.mix(colors.color(dark), colors.color(mitre-navy), 68%);
     }
 
     .light & {
-      border-color: colors.border-color(light);
+      border-bottom-color: colors.border-color(light);
       background: colors.color(light);
     }
   }
@@ -579,6 +592,7 @@ $snapshot-draft-chip-dark: #c7b9ff;
       justify-content: center;
       min-height: 24px;
       border: 1px solid;
+      border-color: colors.border-color(light);
       border-radius: 999px;
       padding: 0 12px;
       font-size: 12px;
@@ -594,6 +608,8 @@ $snapshot-draft-chip-dark: #c7b9ff;
       }
 
       &.snapshot-history-type-tagged {
+        border-color: colors.color(success);
+
         .dark & {
           background: rgba($snapshot-tagged-chip-dark, 0.18);
           color: $snapshot-tagged-chip-dark;
