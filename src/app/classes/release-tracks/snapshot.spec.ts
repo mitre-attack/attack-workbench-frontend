@@ -64,4 +64,67 @@ describe('ReleaseTrackSnapshot', () => {
       })
     );
   });
+
+  it('should preserve latest selectors for candidate and staged revisions', () => {
+    const snapshot = new ReleaseTrackSnapshot({
+      candidates: [
+        {
+          object_ref: 'attack-pattern--candidate',
+          object_modified: 'latest',
+          object_status: 'work-in-progress',
+        },
+      ],
+      staged: [
+        {
+          object_ref: 'attack-pattern--staged',
+          object_modified: 'latest',
+          object_status: 'reviewed',
+        },
+      ],
+    });
+
+    expect(snapshot.candidates?.[0].object_modified).toBe('latest');
+    expect(snapshot.staged?.[0].object_modified).toBe('latest');
+    expect(snapshot.serialize()).toEqual(
+      expect.objectContaining({
+        candidates: [
+          expect.objectContaining({
+            object_modified: 'latest',
+          }),
+        ],
+        staged: [
+          expect.objectContaining({
+            object_modified: 'latest',
+          }),
+        ],
+      })
+    );
+  });
+
+  it('should deserialize and serialize exact workflow revision timestamps', () => {
+    const modified = '2026-01-04T00:00:00.000Z';
+    const snapshot = new ReleaseTrackSnapshot({
+      candidates: [
+        {
+          object_ref: 'attack-pattern--candidate',
+          object_modified: modified,
+          object_status: 'work-in-progress',
+        },
+      ],
+      staged: [
+        {
+          object_ref: 'attack-pattern--staged',
+          object_modified: modified,
+          object_status: 'reviewed',
+        },
+      ],
+    });
+
+    expect(snapshot.candidates?.[0].object_modified).toEqual(
+      new Date(modified)
+    );
+    expect(snapshot.staged?.[0].object_modified).toEqual(new Date(modified));
+    expect(snapshot.serialize().candidates[0].object_modified).toBe(modified);
+    expect(snapshot.serialize().staged[0].object_modified).toBe(modified);
+  });
 });

@@ -17,6 +17,8 @@ import {
   MemberSyncPolicyType,
   MemberSyncStrategy,
   MemberSyncStrategyType,
+  ReleasePayload,
+  ReleasePreviewFormat,
   ReleaseTrackConfig,
   ReleaseTrackSnapshot,
   ReleaseTrackSnapshotHistoryItem,
@@ -151,6 +153,8 @@ const VIRTUAL_OBJECT_TYPE_OPTIONS: StixType[] = [
   'x-mitre-tactic',
 ];
 
+const VIRTUAL_DOMAIN_FILTER_OPTIONS = ['enterprise', 'ics', 'mobile'];
+
 @Component({
   selector: 'app-release-track-page',
   standalone: false,
@@ -199,6 +203,7 @@ export class ReleaseTrackPageComponent implements OnInit {
     label: this.formatStixType(type),
     value: type,
   }));
+  public virtualDomainOptions = VIRTUAL_DOMAIN_FILTER_OPTIONS;
 
   constructor(
     private connector: ReleaseTracksConnectorService,
@@ -584,7 +589,8 @@ export class ReleaseTrackPageComponent implements OnInit {
         })
       )
       .subscribe({
-        next: snapshots => {
+        next: result => {
+          const snapshots = Array.isArray(result) ? result : result?.data || [];
           this.snapshotHistory = this.buildSnapshotHistory(
             this.withCreatedDraftSnapshot(snapshots)
           );
@@ -898,8 +904,13 @@ export class ReleaseTrackPageComponent implements OnInit {
 
   public getComponentTrackFilters(track: any): string[] {
     const objectTypes = track?.filters?.object_types;
-    if (!Array.isArray(objectTypes)) return [];
-    return objectTypes.map(type => this.formatConfigOption(type));
+    const domains = track?.filters?.domains;
+    return [
+      ...(Array.isArray(objectTypes)
+        ? objectTypes.map(type => this.formatConfigOption(type))
+        : []),
+      ...(Array.isArray(domains) ? domains.map(this.formatDomain) : []),
+    ];
   }
 
   public getResolvedComponentLabel(component: any): string {
@@ -986,6 +997,22 @@ export class ReleaseTrackPageComponent implements OnInit {
       ...(track.filters || {}),
       object_types: objectTypes,
     };
+  }
+
+  public getVirtualComponentTrackDomains(track: any): string[] {
+    const domains = track?.filters?.domains;
+    return Array.isArray(domains) ? domains.map(this.formatDomain) : [];
+  }
+
+  public setVirtualComponentTrackDomains(track: any, domains: string[]): void {
+    const filters = { ...(track.filters || {}) };
+    if (domains.length) filters.domains = domains;
+    else delete filters.domains;
+    track.filters = Object.keys(filters).length ? filters : undefined;
+  }
+
+  private formatDomain(domain: string): string {
+    return domain.replace(/-attack$/, '');
   }
 
   public getVirtualComponentTrackDescription(track: any): string {
@@ -1268,67 +1295,16 @@ export class ReleaseTrackPageComponent implements OnInit {
     return `${safeName}-latest-${format}.json`;
   }
 
-  private getVirtualSnapshotPreviewDescription(preview: any): string {
-    const resolved =
-      preview?.preview?.would_resolve_to ||
-      preview?.would_resolve_to ||
-      preview?.composition_resolution ||
-      preview;
-    const components = resolved?.component_snapshots || [];
-    const totalObjects =
-      resolved?.total_objects ||
-      resolved?.summary?.total_objects ||
-      preview?.total_objects ||
-      preview?.summary?.total_objects;
-
-    const componentText = components.length
-      ? `Components: ${components
-          .map((component: any) => {
-            const name =
-              component.track_name || component.track_id || 'component track';
-            const version =
-              component.resolved_version ||
-              component.version ||
-              component.resolved_snapshot;
-            return version ? `${name} (${version})` : name;
-          })
-          .join(', ')}.`
-      : 'No component details were returned.';
-    const objectText =
-      totalObjects === undefined || totalObjects === null
-        ? 'Object count was not returned.'
-        : `${totalObjects} objects will be resolved.`;
-
-    return `${objectText} ${componentText}`;
-  }
-
   public onDraft(): void {
     if (!this.canCreateDraft) return;
 
-    this.isCreatingDraft = true;
-    this.connector
-      .previewVirtualSnapshot(this.id)
-      .pipe(take(1))
-      .subscribe({
-        next: preview => {
-          this.isCreatingDraft = false;
-          if (!preview) return;
-          this.openVirtualSnapshotPreview(preview);
-        },
-        error: err => {
-          this.isCreatingDraft = false;
-          console.error('Failed to preview draft snapshot', err);
-        },
-      });
-  }
-
-  private openVirtualSnapshotPreview(preview: any): void {
     const dialogRef = this.dialog.open(MultipleChoiceDialogComponent, {
       width: '30em',
       autoFocus: false,
       data: {
         title: 'Create draft snapshot?',
-        description: this.getVirtualSnapshotPreviewDescription(preview),
+        description:
+          'Resolve the tagged component releases into a persistent virtual draft snapshot.',
         choices: [
           {
             label: 'Create Draft',
@@ -1463,25 +1439,61 @@ export class ReleaseTrackPageComponent implements OnInit {
   }
 
   public onPreviewRelease(): void {
-    this.previewRelease();
+    this.chooseReleaseIncrement();
   }
 
   public onTagSnapshot(item: SnapshotHistoryViewModel): void {
     if (!item || item.isTagged || !item.modified) return;
-    this.previewRelease(item);
+    this.chooseReleaseIncrement(item);
   }
 
-  private previewRelease(item?: SnapshotHistoryViewModel): void {
+  private chooseReleaseIncrement(item?: SnapshotHistoryViewModel): void {
     if (!this.id || this.isReleasing) return;
 
+    const selectionRef = this.dialog.open(MultipleChoiceDialogComponent, {
+      width: '34em',
+      autoFocus: false,
+      data: {
+        title: 'Choose a release version',
+        description:
+          'Use the next minor or major version for the release preview.',
+        choices: [
+          {
+            label: 'Next minor version',
+            value: 'minor',
+          },
+          {
+            label: 'Next major version',
+            value: 'major',
+          },
+        ],
+      },
+    });
+
+    selectionRef
+      .afterClosed()
+      .pipe(take(1))
+      .subscribe((increment: 'major' | 'minor' | undefined) => {
+        if (increment !== 'major' && increment !== 'minor') return;
+        this.previewRelease({ increment }, item);
+      });
+  }
+
+  private previewRelease(
+    selection: ReleasePayload,
+    item?: SnapshotHistoryViewModel
+  ): void {
     this.isReleasing = true;
     const preview = item?.modified
-      ? this.connector.previewBump(
+      ? this.connector.previewRelease(
           this.id,
-          ExportFormat.Workbench,
+          { format: ReleasePreviewFormat.Summary, ...selection },
           item.modified
         )
-      : this.connector.previewBump(this.id, ExportFormat.Workbench);
+      : this.connector.previewRelease(this.id, {
+          format: ReleasePreviewFormat.Summary,
+          ...selection,
+        });
 
     preview
       .pipe(
@@ -1491,9 +1503,10 @@ export class ReleaseTrackPageComponent implements OnInit {
         })
       )
       .subscribe({
-        next: preview => this.openReleasePreviewDialog(preview, item),
+        next: preview =>
+          this.openReleasePreviewDialog(preview, selection, item),
         error: err => {
-          console.error('Failed to preview release track bump', err);
+          console.error('Failed to preview release track release', err);
         },
       });
   }
@@ -1850,6 +1863,7 @@ export class ReleaseTrackPageComponent implements OnInit {
 
   private openReleasePreviewDialog(
     preview: any,
+    selection: ReleasePayload,
     item?: SnapshotHistoryViewModel
   ): void {
     const conflicts = this.getReleaseConflicts(preview);
@@ -1876,23 +1890,13 @@ export class ReleaseTrackPageComponent implements OnInit {
       return;
     }
 
-    const minorVersion = preview?.next_version_minor || preview?.next_version;
-    const majorVersion = preview?.next_version_major;
     const choices = [
       {
-        label: `Minor Release${minorVersion ? ` (${minorVersion})` : ''}`,
-        value: 'minor',
+        label: `Release${preview?.version ? ` (${preview.version})` : ''}`,
+        value: 'release',
         description: this.getReleasePreviewDescription(preview),
       },
     ];
-
-    if (majorVersion) {
-      choices.push({
-        label: `Major Release (${majorVersion})`,
-        value: 'major',
-        description: this.getReleasePreviewDescription(preview),
-      });
-    }
 
     const releaseRef = this.dialog.open(MultipleChoiceDialogComponent, {
       width: '34em',
@@ -1900,7 +1904,7 @@ export class ReleaseTrackPageComponent implements OnInit {
       data: {
         title: 'Preview & release',
         description:
-          'The release preview found no blocking conflicts. Choose a version bump to tag the draft snapshot.',
+          'The release preview found no blocking conflicts. Confirm to tag the draft snapshot.',
         choices,
       },
     });
@@ -1908,22 +1912,22 @@ export class ReleaseTrackPageComponent implements OnInit {
     releaseRef
       .afterClosed()
       .pipe(take(1))
-      .subscribe((type: 'major' | 'minor' | undefined) => {
-        if (type !== 'major' && type !== 'minor') return;
-        this.bumpRelease(type, item);
+      .subscribe((action: 'release' | undefined) => {
+        if (action !== 'release') return;
+        this.releaseSnapshot(selection, item);
       });
   }
 
-  private bumpRelease(
-    type: 'major' | 'minor',
+  private releaseSnapshot(
+    selection: ReleasePayload,
     item?: SnapshotHistoryViewModel
   ): void {
     if (!this.id) return;
 
     this.isReleasing = true;
     const release = item?.modified
-      ? this.connector.bumpByModified(this.id, item.modified, { type })
-      : this.connector.bumpByLatest(this.id, { type });
+      ? this.connector.releaseSnapshot(this.id, item.modified, selection)
+      : this.connector.releaseLatest(this.id, selection);
 
     release
       .pipe(
@@ -1933,31 +1937,10 @@ export class ReleaseTrackPageComponent implements OnInit {
         })
       )
       .subscribe({
-        next: () => this.refreshReleaseTrackState(),
-        error: err => {
-          console.error('Failed to tag release track snapshot', err);
-        },
-      });
-  }
-
-  private bumpSnapshotRelease(
-    item: SnapshotHistoryViewModel,
-    type: 'major' | 'minor'
-  ): void {
-    if (!this.id || !item.modified) return;
-
-    this.isReleasing = true;
-    this.connector
-      .bumpByModified(this.id, item.modified, { type })
-      .pipe(
-        take(1),
-        finalize(() => {
-          this.isReleasing = false;
-        })
-      )
-      .subscribe({
         next: () => {
-          this.createdDraftSnapshot = null;
+          if (item?.modified === this.createdDraftSnapshot?.modified) {
+            this.createdDraftSnapshot = null;
+          }
           this.refreshReleaseTrackState();
         },
         error: err => {
@@ -1971,20 +1954,22 @@ export class ReleaseTrackPageComponent implements OnInit {
   }
 
   private getReleasePreviewDescription(preview: any): string {
-    const included =
-      preview?.statistics?.included_objects ??
-      preview?.release_preview?.will_include?.length ??
-      preview?.staged_count ??
-      0;
-    const excluded =
-      preview?.statistics?.excluded_objects ??
-      preview?.release_preview?.will_exclude?.length ??
-      preview?.candidates_count ??
-      0;
+    if (preview?.type === ReleaseTrackType.Virtual) {
+      const changes = preview?.changes || {};
+      return `${changes.new_count || 0} new, ${
+        changes.updated_count || 0
+      } updated, ${changes.removed_count || 0} removed, and ${
+        changes.quarantined_count || 0
+      } quarantined objects.`;
+    }
 
-    return `${included} object${included === 1 ? '' : 's'} will be included. ${
-      excluded || 0
-    } object${excluded === 1 ? '' : 's'} will remain out of this release.`;
+    const promoted = preview?.changes?.promoted_count || 0;
+    const candidates = preview?.after?.candidates_count || 0;
+    return `${promoted} staged object${
+      promoted === 1 ? '' : 's'
+    } will become members. ${candidates} candidate object${
+      candidates === 1 ? '' : 's'
+    } will remain outside the release.`;
   }
 
   private buildSnapshotHistory(

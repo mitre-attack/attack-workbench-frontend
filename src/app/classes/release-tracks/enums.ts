@@ -53,7 +53,6 @@ export const DEDUPLICATION_STRATEGY_OPTIONS: DeduplicationStrategyType[] =
 // -----------------------------------------------------------------------------
 
 export enum ExportFormat {
-  Snapshot = 'snapshot',
   Bundle = 'bundle',
   Workbench = 'workbench',
   FileSystemStore = 'filesystemstore',
@@ -64,6 +63,15 @@ export type ExportFormatType = EnumValue<typeof ExportFormat>;
 export const EXPORT_FORMAT_OPTIONS: ExportFormatType[] = Object.values(
   ExportFormat
 ) as ExportFormatType[];
+
+export enum ReleasePreviewFormat {
+  Summary = 'summary',
+  Bundle = 'bundle',
+  Workbench = 'workbench',
+  FileSystemStore = 'filesystemstore',
+}
+
+export type ReleasePreviewFormatType = EnumValue<typeof ReleasePreviewFormat>;
 
 // -----------------------------------------------------------------------------
 // Release Track Snapshot Tiers

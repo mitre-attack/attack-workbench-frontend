@@ -8,6 +8,7 @@ import {
   MemberEntry,
   QuarantineEntry,
   StagedEntry,
+  WorkflowRevisionSelector,
 } from './tiers';
 
 export class ReleaseTrackSnapshot {
@@ -121,9 +122,7 @@ export class ReleaseTrackSnapshot {
       this.staged = raw.staged.map((s: any) => ({
         ...s,
         object_ref: s.object_ref,
-        object_modified: s.object_modified
-          ? new Date(s.object_modified)
-          : undefined,
+        object_modified: this.deserializeWorkflowRevision(s.object_modified),
         object_status: s.object_status,
         object_staged_at: s.object_staged_at
           ? new Date(s.object_staged_at)
@@ -136,9 +135,7 @@ export class ReleaseTrackSnapshot {
       this.candidates = raw.candidates.map((c: any) => ({
         ...c,
         object_ref: c.object_ref,
-        object_modified: c.object_modified
-          ? new Date(c.object_modified)
-          : undefined,
+        object_modified: this.deserializeWorkflowRevision(c.object_modified),
         object_status: c.object_status,
         object_added_at: c.object_added_at
           ? new Date(c.object_added_at)
@@ -215,18 +212,14 @@ export class ReleaseTrackSnapshot {
       })),
       staged: this.staged?.map(s => ({
         ...s,
-        object_modified: s.object_modified
-          ? (s.object_modified as any).toISOString()
-          : s.object_modified,
+        object_modified: this.serializeWorkflowRevision(s.object_modified),
         object_staged_at: s.object_staged_at
           ? (s.object_staged_at as any).toISOString()
           : s.object_staged_at,
       })),
       candidates: this.candidates?.map(c => ({
         ...c,
-        object_modified: c.object_modified
-          ? (c.object_modified as any).toISOString()
-          : c.object_modified,
+        object_modified: this.serializeWorkflowRevision(c.object_modified),
         object_added_at: c.object_added_at
           ? (c.object_added_at as any).toISOString()
           : c.object_added_at,
@@ -261,6 +254,21 @@ export class ReleaseTrackSnapshot {
   // Get the member entry for the given STIX ID
   public findMember(objectRef: string): MemberEntry | undefined {
     return this.members.find(m => m.object_ref === objectRef);
+  }
+
+  private deserializeWorkflowRevision(
+    value: string | Date | undefined
+  ): WorkflowRevisionSelector | undefined {
+    if (!value) return undefined;
+    return value === 'latest' ? 'latest' : new Date(value);
+  }
+
+  private serializeWorkflowRevision(
+    value: WorkflowRevisionSelector | undefined
+  ): string | undefined {
+    if (value === undefined) return undefined;
+    if (value === 'latest') return value;
+    return value.toISOString();
   }
 
   // Get the candidate entry for the given STIX ID

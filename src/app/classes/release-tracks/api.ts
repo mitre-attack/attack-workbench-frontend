@@ -1,7 +1,11 @@
 import type { WorkflowStatusType } from 'src/app/utils/types';
 import type { Composition } from './composition';
 import type { ReleaseTrackConfig } from './config';
-import type { ExportFormatType, ReleaseTrackType } from './enums';
+import {
+  ReleaseTrackType,
+  type ExportFormatType,
+  type ReleasePreviewFormatType,
+} from './enums';
 import type { SnapshotSchedule } from './release-track';
 
 export type StixObjectRef = string | { id: string; modified?: string };
@@ -30,15 +34,10 @@ export interface UpdateMetadataPayload {
   object_marking_refs?: string[];
 }
 
-export interface UpdateContentsPayload {
-  x_mitre_contents: string[];
-}
-
-export interface BumpPayload {
-  type?: 'major' | 'minor';
-  version?: string;
-  dry_run?: boolean;
-}
+export type ReleasePayload =
+  | { increment: 'major' | 'minor'; version?: never }
+  | { increment?: never; version: string }
+  | { increment?: undefined; version?: undefined };
 
 export interface ClonePayload {
   name?: string;
@@ -50,36 +49,98 @@ export interface ReviewPayload {
   object_refs?: StixObjectRef[];
 }
 
-export interface ReleaseTrackSnapshotOptions {
-  format?: ExportFormatType;
-  include?: 'members' | 'staged' | 'candidates' | 'all';
-  releases?: 'only';
-  version?: string;
-  [key: string]: any;
+export interface PromoteQuarantinePayload {
+  object_ref: string;
+  object_modified: string;
 }
 
-export interface ReleaseTrackSnapshotListOptions {
+export interface ReleaseTrackSnapshotOptions {
+  format?: ExportFormatType;
+  include?: 'members' | 'staged' | 'candidates' | 'quarantine' | 'all';
+  state?: string | string[];
+  stixVersion?: '2.0' | '2.1';
+  includeToc?: boolean;
+}
+
+export interface SnapshotHistoryOptions {
   tagged?: boolean;
   limit?: number;
   offset?: number;
 }
+
+export type ReleasePreviewOptions = ReleasePayload & {
+  format?: ReleasePreviewFormatType;
+};
+
+export interface ReleasePreviewSummaryBase {
+  track_id: string;
+  type: ReleaseTrackType;
+  source_snapshot_modified: string;
+  version: string;
+  releasable: boolean;
+  conflicts: any[];
+}
+
+export interface StandardReleasePreviewSummary extends ReleasePreviewSummaryBase {
+  type: ReleaseTrackType.Standard;
+  before: {
+    members_count: number;
+    staged_count: number;
+    candidates_count: number;
+  };
+  after: {
+    members_count: number;
+    staged_count: number;
+    candidates_count: number;
+  };
+  changes: {
+    promoted_count: number;
+  };
+}
+
+export interface VirtualReleasePreviewSummary extends ReleasePreviewSummaryBase {
+  type: ReleaseTrackType.Virtual;
+  previous_release: {
+    version: string;
+    modified: string;
+  } | null;
+  before: {
+    members_count: number;
+    quarantine_count: number;
+  };
+  after: {
+    members_count: number;
+    quarantine_count: number;
+  };
+  changes: {
+    new_count: number;
+    updated_count: number;
+    removed_count: number;
+    quarantined_count: number;
+  };
+}
+
+export type ReleasePreviewSummary =
+  StandardReleasePreviewSummary | VirtualReleasePreviewSummary;
 
 export interface ReleaseTrackSnapshotHistoryItem {
   id?: string;
   modified?: string | Date;
   version?: string | null;
   type?: ReleaseTrackType;
+  name?: string;
+  description?: string;
   created?: string | Date;
   tagged_at?: string | Date;
   snapshot_id?: string | Date;
   is_latest?: boolean;
-  name?: string;
   members_count?: number;
   staged_count?: number;
   candidates_count?: number;
   quarantine_count?: number;
   added_count?: number;
   modified_count?: number;
+  promoted_count?: number;
   members?: any[];
   staged?: any[];
   candidates?: any[];
@@ -87,6 +148,7 @@ export interface ReleaseTrackSnapshotHistoryItem {
     members?: any[];
     staged?: any[];
     candidates?: any[];
+    quarantine?: any[];
     [key: string]: any;
   };
   summary?: {
@@ -97,6 +159,14 @@ export interface ReleaseTrackSnapshotHistoryItem {
     added_count?: number;
     modified_count?: number;
     promoted_count?: number;
+    quarantined_count?: number;
+    [key: string]: any;
+  };
+  statistics?: {
+    [key: string]: any;
+  };
+  composition_resolution?: {
+    total_objects?: number;
     [key: string]: any;
   };
   stix?: {
