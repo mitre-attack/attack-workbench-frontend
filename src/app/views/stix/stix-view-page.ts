@@ -17,7 +17,9 @@ export abstract class StixViewPage {
     return this.config.mode == 'edit';
   }
   public get canEdit(): boolean {
-    return this.authenticationService.canEdit();
+    return (
+      this.config.editable !== false && this.authenticationService.canEdit()
+    );
   }
   public get configCurrentObject(): StixObject {
     return Array.isArray(this.config.object)
@@ -44,6 +46,10 @@ export interface StixViewConfig {
   targetType?: string; // the relationship target type (only relevant when creating a new relationship)
   /* if true or omitted, show relationships with the object on the page. If false, omit the relationships */
   showRelationships?: boolean;
+  /** Hide relationships created after this timestamp. */
+  relationshipCreatedBefore?: Date | string;
+  /** Mark relationships created after this timestamp as new. */
+  relationshipAddedAfter?: Date | string;
   /* is the current page editable?
    * if true or omitted, include edit elements on the page such as buttons to add a relationship
    * if false, hide such elements

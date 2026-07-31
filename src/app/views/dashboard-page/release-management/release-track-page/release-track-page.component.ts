@@ -3,7 +3,8 @@ import { Component, OnInit } from '@angular/core';
 import { FormBuilder, FormGroup } from '@angular/forms';
 import { MatDialog } from '@angular/material/dialog';
 import { ActivatedRoute, Router } from '@angular/router';
-import { finalize, take } from 'rxjs/operators';
+import { forkJoin, Observable, of } from 'rxjs';
+import { finalize, map, take } from 'rxjs/operators';
 import {
   ConflictPolicy,
   ConflictPolicyType,
@@ -48,6 +49,7 @@ import {
   WorkflowStatus,
   WorkflowStatusType,
 } from 'src/app/utils/types';
+
 import { ALL_OBJECTS_STIX_LIST_CONFIG } from 'src/app/views/stix/all-objects-page/all-objects-page.component';
 
 type ReleaseTrackLaneType = 'candidate' | 'staged' | 'member';
@@ -141,6 +143,9 @@ const VIRTUAL_OBJECT_TYPE_OPTIONS: StixType[] = [
   'x-mitre-matrix',
   'x-mitre-tactic',
 ];
+import { MatSnackBar } from '@angular/material/snack-bar';
+import { StixObject } from 'src/app/classes/stix';
+import { StixDialogComponent } from 'src/app/views/stix/stix-dialog/stix-dialog.component';
 
 const VIRTUAL_DOMAIN_FILTER_OPTIONS = ['enterprise', 'ics', 'mobile'];
 
@@ -201,7 +206,8 @@ export class ReleaseTrackPageComponent implements OnInit {
     private dialog: MatDialog,
     private restApiConnectorService: RestApiConnectorService,
     private authenticationService: AuthenticationService,
-    private fb: FormBuilder
+    private fb: FormBuilder,
+    private snackbar: MatSnackBar
   ) {
     this.configForm = this.fb.group({
       autoPromote: [true],
@@ -391,8 +397,8 @@ export class ReleaseTrackPageComponent implements OnInit {
           title: 'Candidates WIP',
           type: 'candidate',
           modifier: 'candidates',
-          items: this.candidates.filter(
-            item => this.getObjectStatus(item) === WorkflowStatus.WorkInProgress
+          items: this.candidates.filter(item =>
+            this.isWorkInProgressCandidate(item)
           ),
           emptyLabel: 'No work in progress candidates',
           statusFallback: WorkflowStatus.WorkInProgress,
@@ -480,6 +486,7 @@ export class ReleaseTrackPageComponent implements OnInit {
         next: res => {
           this.releaseTrack = res;
           if (!this.releaseTrack) return;
+          this.hydrateDynamicEntryDates();
 
           this.breadcrumbService.changeBreadcrumb(
             this.route.snapshot,
@@ -508,6 +515,60 @@ export class ReleaseTrackPageComponent implements OnInit {
   private refreshReleaseTrackState(): void {
     this.getReleaseTrack();
     this.getSnapshotHistory();
+  }
+
+  private hydrateDynamicEntryDates(): void {
+    const entries = ([] as ReleaseTrackObjectItem[]).concat(
+      ...['candidates', 'staged', 'members'].map(tier =>
+        (this.releaseTrack?.[tier] || []).filter(
+          (entry: ReleaseTrackObjectItem) => entry.object_modified === 'latest'
+        )
+      )
+    );
+    if (!entries.length) return;
+
+    forkJoin(
+      entries.map(entry =>
+        this.fetchLatestObject(entry.object_ref).pipe(
+          map(object => ({ entry, modified: object?.modified }))
+        )
+      )
+    )
+      .pipe(take(1))
+      .subscribe(results => {
+        results.forEach(({ entry, modified }) => {
+          if (modified) {
+            entry.resolved_object_modified =
+              modified instanceof Date ? modified.toISOString() : modified;
+          }
+        });
+      });
+  }
+
+  private fetchLatestObject(objectRef: string): Observable<any | null> {
+    const attackType =
+      StixTypeToAttackType[objectRef.split('--')[0] as StixType];
+    const getters: Partial<Record<string, () => Observable<any[]>>> = {
+      'technique': () => this.restApiConnectorService.getTechnique(objectRef),
+      'tactic': () => this.restApiConnectorService.getTactic(objectRef),
+      'group': () => this.restApiConnectorService.getGroup(objectRef),
+      'campaign': () => this.restApiConnectorService.getCampaign(objectRef),
+      'asset': () => this.restApiConnectorService.getAsset(objectRef),
+      'software': () => this.restApiConnectorService.getSoftware(objectRef),
+      'mitigation': () => this.restApiConnectorService.getMitigation(objectRef),
+      'matrix': () => this.restApiConnectorService.getMatrix(objectRef),
+      'data-source': () =>
+        this.restApiConnectorService.getDataSource(objectRef),
+      'data-component': () =>
+        this.restApiConnectorService.getDataComponent(objectRef),
+      'detection-strategy': () =>
+        this.restApiConnectorService.getDetectionStrategy(objectRef),
+      'analytic': () => this.restApiConnectorService.getAnalytic(objectRef),
+    };
+    const getObject = getters[attackType];
+    return getObject
+      ? getObject().pipe(map(objects => objects[0] || null))
+      : of(null);
   }
 
   public onDeleteReleaseTrack(): void {
@@ -624,6 +685,13 @@ export class ReleaseTrackPageComponent implements OnInit {
     if (!this.releaseTrack) return;
 
     const selection = new SelectionModel<string>(true);
+    const selectedObjectRefs = new Map<
+      string,
+      {
+        id: string;
+        modified: string;
+      }
+    >();
     const dialogRef = this.dialog.open(AddDialogComponent, {
       data: {
         select: selection,
@@ -636,6 +704,7 @@ export class ReleaseTrackPageComponent implements OnInit {
           ...ALL_OBJECTS_STIX_LIST_CONFIG,
           select: 'many',
           selectionModel: selection,
+          selectedObjectRefs,
           clickBehavior: 'expand',
         },
       },
@@ -648,7 +717,11 @@ export class ReleaseTrackPageComponent implements OnInit {
       next: result => {
         if (!result || !selection.selected.length) return;
 
-        this.connector.addCandidates(this.id, selection.selected).subscribe({
+        const objectRefs = selection.selected.map(
+          id => selectedObjectRefs.get(id) || id
+        );
+
+        this.connector.addCandidates(this.id, objectRefs).subscribe({
           next: () => {
             this.refreshReleaseTrackState();
           },
@@ -736,9 +809,71 @@ export class ReleaseTrackPageComponent implements OnInit {
     this.router.navigate([viewUrl]);
   }
 
-  public onDiff(item: any): void {
-    // TODO: open diff modal for item
-    console.log('onDiff', item);
+  public onDiff(item: ReleaseTrackObjectItem): void {
+    if (!item?.object_ref) {
+      this.snackbar.open(
+        'Unable to determine which object to compare.',
+        undefined,
+        {
+          duration: 3000,
+        }
+      );
+      return;
+    }
+
+    const tier = this.getDiffTier(item);
+    if (!tier) {
+      this.snackbar.open(
+        'Unable to determine which lane to compare.',
+        undefined,
+        {
+          duration: 3000,
+        }
+      );
+      return;
+    }
+
+    const diff =
+      tier === 'candidate'
+        ? this.resolveCandidateDiffObjects(item)
+        : this.resolveStagedDiffObjects(item);
+    const relationshipBaseline =
+      tier === 'candidate'
+        ? (this.findStagedEntry(item.object_ref) ??
+          this.findMemberEntry(item.object_ref))
+        : this.findMemberEntry(item.object_ref);
+    const relationshipAddedAfter =
+      this.getDiffObjectModified(relationshipBaseline);
+    diff.pipe(take(1)).subscribe(({ current, prior, expectedBaseline }) => {
+      if (!current) {
+        this.snackbar.open(
+          'Unable to load the current object version.',
+          undefined,
+          {
+            duration: 3000,
+          }
+        );
+        return;
+      }
+
+      if (expectedBaseline && !prior) {
+        this.snackbar.open(
+          'Unable to load the comparison baseline version.',
+          undefined,
+          {
+            duration: 3000,
+          }
+        );
+        return;
+      }
+
+      this.openDiffDialog(
+        current,
+        prior,
+        tier === 'staged' ? this.getDiffObjectModified(item) : undefined,
+        relationshipAddedAfter
+      );
+    });
   }
 
   public onReviewAndApprove(item: any): void {
@@ -783,8 +918,50 @@ export class ReleaseTrackPageComponent implements OnInit {
     return this.autoPromotionEnabled && !lane.isReleasedMembers;
   }
 
+  /**
+   * When different revisions of an object occupy both workflow tiers, only the
+   * newest pin can present a non-misleading relationship diff.
+   */
+  public shouldShowDiff(item: ReleaseTrackObjectItem): boolean {
+    if (!item?.object_ref) return true;
+
+    const staged = (this.releaseTrack?.staged || []).filter(
+      entry => entry.object_ref === item.object_ref
+    );
+    const candidates = (this.releaseTrack?.candidates || []).filter(
+      entry => entry.object_ref === item.object_ref
+    );
+
+    if (!staged.length || !candidates.length) return true;
+
+    const itemModified = this.getModifiedTimestamp(item.object_modified);
+    const pins = [...staged, ...candidates].map(entry =>
+      this.getModifiedTimestamp(entry.object_modified)
+    );
+    if (
+      !Number.isFinite(itemModified) ||
+      pins.some(time => !Number.isFinite(time))
+    ) {
+      return true;
+    }
+
+    return itemModified === Math.max(...pins);
+  }
+
+  public getDiffUnavailableMessage(
+    item: ReleaseTrackObjectItem
+  ): string | null {
+    return this.shouldShowDiff(item)
+      ? null
+      : 'A newer revision of this object is available in the release track. View its diff instead.';
+  }
+
   public toggleReleasedMembers(): void {
     this.showReleasedMembers = !this.showReleasedMembers;
+  }
+
+  private getModifiedTimestamp(value?: Date | string): number {
+    return value ? new Date(value).getTime() : Number.NaN;
   }
 
   public onEditDescription(): void {
@@ -1525,8 +1702,224 @@ export class ReleaseTrackPageComponent implements OnInit {
     return modified ? { id: item.object_ref, modified } : item.object_ref;
   }
 
+  private getReleaseTrackTier(item: any): 'candidate' | 'staged' | null {
+    if (item?.release_track_tier) {
+      return item.release_track_tier === 'candidate' ||
+        item.release_track_tier === 'staged'
+        ? item.release_track_tier
+        : null;
+    }
+    if (item?.object_staged_at || item?.object_staged_by) return 'staged';
+    return item?.object_ref ? 'candidate' : null;
+  }
+
+  private getDiffTier(
+    item: ReleaseTrackObjectItem
+  ): 'candidate' | 'staged' | null {
+    return this.getReleaseTrackTier(item);
+  }
+
+  private findStagedEntry(objectRef: string): ReleaseTrackObjectItem | null {
+    return (
+      this.releaseTrack?.staged?.find(item => item.object_ref === objectRef) ??
+      null
+    );
+  }
+
+  private findMemberEntry(objectRef: string): ReleaseTrackObjectItem | null {
+    return (
+      this.releaseTrack?.members?.find(item => item.object_ref === objectRef) ??
+      null
+    );
+  }
+
+  private getDiffObjectModified(
+    item: ReleaseTrackObjectItem | null
+  ): Date | string | undefined {
+    return item?.resolved_object_modified ?? item?.object_modified;
+  }
+
+  private resolveCandidateDiffObjects(
+    item: ReleaseTrackObjectItem
+  ): Observable<{
+    current: StixObject | null;
+    prior: StixObject | null;
+    expectedBaseline: boolean;
+  }> {
+    const stagedEntry = this.findStagedEntry(item.object_ref);
+    const memberEntry = stagedEntry
+      ? null
+      : this.findMemberEntry(item.object_ref);
+    const baselineEntry = stagedEntry ?? memberEntry;
+
+    return forkJoin({
+      current: this.fetchObjectVersion(
+        item.object_ref,
+        this.getDiffObjectModified(item)
+      ),
+      prior: baselineEntry
+        ? this.fetchObjectVersion(
+            baselineEntry.object_ref,
+            this.getDiffObjectModified(baselineEntry)
+          )
+        : of(null),
+    }).pipe(
+      map(({ current, prior }) => ({
+        current,
+        prior,
+        expectedBaseline: !!baselineEntry,
+      }))
+    );
+  }
+
+  private resolveStagedDiffObjects(item: ReleaseTrackObjectItem): Observable<{
+    current: StixObject | null;
+    prior: StixObject | null;
+    expectedBaseline: boolean;
+  }> {
+    const memberEntry = this.findMemberEntry(item.object_ref);
+
+    return forkJoin({
+      current: this.fetchObjectVersion(
+        item.object_ref,
+        this.getDiffObjectModified(item)
+      ),
+      prior: memberEntry
+        ? this.fetchObjectVersion(
+            memberEntry.object_ref,
+            this.getDiffObjectModified(memberEntry)
+          )
+        : of(null),
+    }).pipe(
+      map(({ current, prior }) => ({
+        current,
+        prior,
+        expectedBaseline: !!memberEntry,
+      }))
+    );
+  }
+
+  private fetchObjectVersion(
+    objectRef: string,
+    modified?: Date | string
+  ): Observable<StixObject | null> {
+    const stixType = objectRef.split('--')[0] as StixType;
+    const attackType = StixTypeToAttackType[stixType];
+    const requestedModified = modified === 'latest' ? undefined : modified;
+
+    let requestObject: Observable<StixObject[]>;
+    switch (attackType) {
+      case 'technique':
+        requestObject = this.restApiConnectorService.getTechnique(
+          objectRef,
+          requestedModified
+        );
+        break;
+      case 'tactic':
+        requestObject = this.restApiConnectorService.getTactic(
+          objectRef,
+          requestedModified
+        );
+        break;
+      case 'group':
+        requestObject = this.restApiConnectorService.getGroup(
+          objectRef,
+          requestedModified
+        );
+        break;
+      case 'campaign':
+        requestObject = this.restApiConnectorService.getCampaign(
+          objectRef,
+          requestedModified
+        );
+        break;
+      case 'asset':
+        requestObject = this.restApiConnectorService.getAsset(
+          objectRef,
+          requestedModified
+        );
+        break;
+      case 'software':
+        requestObject = this.restApiConnectorService.getSoftware(
+          objectRef,
+          requestedModified
+        );
+        break;
+      case 'mitigation':
+        requestObject = this.restApiConnectorService.getMitigation(
+          objectRef,
+          requestedModified
+        );
+        break;
+      case 'matrix':
+        requestObject = this.restApiConnectorService.getMatrix(
+          objectRef,
+          requestedModified
+        );
+        break;
+      case 'data-source':
+        requestObject = this.restApiConnectorService.getDataSource(
+          objectRef,
+          requestedModified
+        );
+        break;
+      case 'data-component':
+        requestObject = this.restApiConnectorService.getDataComponent(
+          objectRef,
+          requestedModified
+        );
+        break;
+      case 'detection-strategy':
+        requestObject = this.restApiConnectorService.getDetectionStrategy(
+          objectRef,
+          requestedModified
+        );
+        break;
+      case 'analytic':
+        requestObject = this.restApiConnectorService.getAnalytic(
+          objectRef,
+          requestedModified
+        );
+        break;
+      default:
+        return of(null);
+    }
+
+    return requestObject.pipe(
+      take(1),
+      map(results => results[0] ?? null)
+    );
+  }
+
+  private openDiffDialog(
+    current: StixObject,
+    prior: StixObject | null,
+    relationshipCreatedBefore?: Date | string,
+    relationshipAddedAfter?: Date | string
+  ): void {
+    this.dialog.open(StixDialogComponent, {
+      data: {
+        object: [current, prior],
+        mode: 'diff',
+        editable: false,
+        sidebarControl: 'disable',
+        relationshipCreatedBefore,
+        relationshipAddedAfter,
+      },
+      maxHeight: '75vh',
+      autoFocus: false,
+    });
+  }
+
   private getObjectStatus(item: ReleaseTrackObjectItem): WorkflowStatusType {
     return item.object_status || WorkflowStatus.WorkInProgress;
+  }
+
+  private isWorkInProgressCandidate(item: ReleaseTrackObjectItem): boolean {
+    return (
+      this.getObjectStatus(item) === WorkflowStatus.WorkInProgress ||
+      String(item.object_status) === 'modified-in-place'
+    );
   }
 
   public formatConfigOption(value: any): string {

@@ -168,11 +168,13 @@
           #techniquesList
           [config]="{
             type: 'relationship',
+            relationshipCreatedBefore: config.relationshipCreatedBefore,
+            relationshipAddedAfter: config.relationshipAddedAfter,
             sourceRef: software.stixID,
             targetType: 'technique',
             relationshipType: 'uses',
             clickBehavior: 'dialog',
-            allowEdits: true,
+            allowEdits: canEdit,
           }"></app-stix-list>
       </div>
     </div>
@@ -202,11 +204,13 @@
           #groupList
           [config]="{
             type: 'relationship',
+            relationshipCreatedBefore: config.relationshipCreatedBefore,
+            relationshipAddedAfter: config.relationshipAddedAfter,
             targetRef: software.stixID,
             sourceType: 'group',
             relationshipType: 'uses',
             clickBehavior: 'dialog',
-            allowEdits: true,
+            allowEdits: canEdit,
           }"></app-stix-list>
       </div>
     </div>
@@ -236,11 +240,13 @@
           #campaignList
           [config]="{
             type: 'relationship',
+            relationshipCreatedBefore: config.relationshipCreatedBefore,
+            relationshipAddedAfter: config.relationshipAddedAfter,
             targetRef: software.stixID,
             sourceType: 'campaign',
             relationshipType: 'uses',
             clickBehavior: 'dialog',
-            allowEdits: true,
+            allowEdits: canEdit,
           }"></app-stix-list>
       </div>
     </div>
