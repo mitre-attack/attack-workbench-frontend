@@ -519,11 +519,10 @@ export class ReleaseTrackPageComponent implements OnInit {
 
   private hydrateDynamicEntryDates(): void {
     const entries = ([] as ReleaseTrackObjectItem[]).concat(
-      ...['candidates', 'staged', 'members'].map(
-        tier =>
-          (this.releaseTrack?.[tier] || []).filter(
-            (entry: ReleaseTrackObjectItem) => entry.object_modified === 'latest'
-          )
+      ...['candidates', 'staged', 'members'].map(tier =>
+        (this.releaseTrack?.[tier] || []).filter(
+          (entry: ReleaseTrackObjectItem) => entry.object_modified === 'latest'
+        )
       )
     );
     if (!entries.length) return;
@@ -547,24 +546,29 @@ export class ReleaseTrackPageComponent implements OnInit {
   }
 
   private fetchLatestObject(objectRef: string): Observable<any | null> {
-    const attackType = StixTypeToAttackType[objectRef.split('--')[0] as StixType];
+    const attackType =
+      StixTypeToAttackType[objectRef.split('--')[0] as StixType];
     const getters: Partial<Record<string, () => Observable<any[]>>> = {
-      technique: () => this.restApiConnectorService.getTechnique(objectRef),
-      tactic: () => this.restApiConnectorService.getTactic(objectRef),
-      group: () => this.restApiConnectorService.getGroup(objectRef),
-      campaign: () => this.restApiConnectorService.getCampaign(objectRef),
-      asset: () => this.restApiConnectorService.getAsset(objectRef),
-      software: () => this.restApiConnectorService.getSoftware(objectRef),
-      mitigation: () => this.restApiConnectorService.getMitigation(objectRef),
-      matrix: () => this.restApiConnectorService.getMatrix(objectRef),
-      'data-source': () => this.restApiConnectorService.getDataSource(objectRef),
-      'data-component': () => this.restApiConnectorService.getDataComponent(objectRef),
+      'technique': () => this.restApiConnectorService.getTechnique(objectRef),
+      'tactic': () => this.restApiConnectorService.getTactic(objectRef),
+      'group': () => this.restApiConnectorService.getGroup(objectRef),
+      'campaign': () => this.restApiConnectorService.getCampaign(objectRef),
+      'asset': () => this.restApiConnectorService.getAsset(objectRef),
+      'software': () => this.restApiConnectorService.getSoftware(objectRef),
+      'mitigation': () => this.restApiConnectorService.getMitigation(objectRef),
+      'matrix': () => this.restApiConnectorService.getMatrix(objectRef),
+      'data-source': () =>
+        this.restApiConnectorService.getDataSource(objectRef),
+      'data-component': () =>
+        this.restApiConnectorService.getDataComponent(objectRef),
       'detection-strategy': () =>
         this.restApiConnectorService.getDetectionStrategy(objectRef),
-      analytic: () => this.restApiConnectorService.getAnalytic(objectRef),
+      'analytic': () => this.restApiConnectorService.getAnalytic(objectRef),
     };
     const getObject = getters[attackType];
-    return getObject ? getObject().pipe(map(objects => objects[0] || null)) : of(null);
+    return getObject
+      ? getObject().pipe(map(objects => objects[0] || null))
+      : of(null);
   }
 
   public onDeleteReleaseTrack(): void {
@@ -681,10 +685,13 @@ export class ReleaseTrackPageComponent implements OnInit {
     if (!this.releaseTrack) return;
 
     const selection = new SelectionModel<string>(true);
-    const selectedObjectRefs = new Map<string, {
-      id: string;
-      modified: string;
-    }>();
+    const selectedObjectRefs = new Map<
+      string,
+      {
+        id: string;
+        modified: string;
+      }
+    >();
     const dialogRef = this.dialog.open(AddDialogComponent, {
       data: {
         select: selection,
