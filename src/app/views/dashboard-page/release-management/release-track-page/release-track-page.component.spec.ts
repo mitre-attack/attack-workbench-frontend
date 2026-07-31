@@ -18,6 +18,7 @@ import { MultipleChoiceDialogComponent } from 'src/app/components/multiple-choic
 import { AddDialogComponent } from 'src/app/components/add-dialog/add-dialog.component';
 import { DeleteDialogComponent } from 'src/app/components/delete-dialog/delete-dialog.component';
 import { ReleasePreviewDialogComponent } from 'src/app/components/release-preview-dialog/release-preview-dialog.component';
+import { ConfirmationDialogComponent } from 'src/app/components/confirmation-dialog/confirmation-dialog.component';
 import { AuthenticationService } from 'src/app/services/connectors/authentication/authentication.service';
 import { FormsModule, ReactiveFormsModule } from '@angular/forms';
 import {
@@ -406,6 +407,30 @@ describe('ReleaseTrackPageComponent', () => {
     expect(component.releaseTrack?.name).toBe('Enterprise Release');
   });
 
+  it('should load release track summary when latest snapshot is unavailable', () => {
+    mockReleaseTrackApiConnector.getLatestSnapshot.mockReturnValue(of(null));
+    mockReleaseTrackApiConnector.listReleaseTracks.mockReturnValue(
+      of({
+        data: [
+          {
+            track_id: 'release-track--virtual',
+            type: ReleaseTrackType.Virtual,
+            name: 'Virtual Release',
+            composition: {
+              component_tracks: [{ track_id: 'release-track--standard' }],
+            },
+          },
+        ],
+      })
+    );
+    component.id = 'release-track--virtual';
+
+    component.getReleaseTrack();
+
+    expect(component.releaseTrack?.name).toBe('Virtual Release');
+    expect(component.canCreateDraft).toBe(true);
+  });
+
   it('should expose virtual release track composition and resolution details', () => {
     component.releaseTrack = {
       type: ReleaseTrackType.Virtual,
@@ -696,7 +721,7 @@ describe('ReleaseTrackPageComponent', () => {
       .spyOn(component, 'getSnapshotHistory')
       .mockImplementation(() => undefined);
     mockDialog.open.mockReturnValue({
-      afterClosed: () => of('create'),
+      afterClosed: () => of(true),
     });
     mockReleaseTrackApiConnector.createVirtualSnapshot.mockReturnValue(
       of({
@@ -704,22 +729,34 @@ describe('ReleaseTrackPageComponent', () => {
           modified: '2024-05-21T07:00:00.000Z',
           x_mitre_version: null,
         },
-        composition_resolution: {
-          total_objects: 20,
-        },
+        members: [{ object_ref: 'attack-pattern--member' }],
+        quarantine: [{ object_ref: 'attack-pattern--quarantined' }],
       })
     );
     component.id = 'release-track--123';
-    component.releaseTrack = { type: ReleaseTrackType.Virtual } as any;
+    component.releaseTrack = {
+      type: ReleaseTrackType.Virtual,
+      name: 'Virtual Release',
+      composition: {
+        component_tracks: [{ track_id: 'release-track--standard' }],
+      },
+    } as any;
 
     component.onDraft();
 
     expect(mockDialog.open).toHaveBeenCalledWith(
-      MultipleChoiceDialogComponent,
+      ConfirmationDialogComponent,
       expect.objectContaining({
         data: expect.objectContaining({
           title: 'Create draft snapshot?',
-          description: expect.stringContaining('persistent virtual draft'),
+          message: expect.stringContaining(
+            'create a new draft snapshot for the track Virtual Release'
+          ),
+          no_label: 'Cancel',
+          yes_label: 'Create Draft',
+          confirm_color: 'primary',
+          confirm_appearance: 'raised',
+          layout: 'simple',
         }),
       })
     );
@@ -734,10 +771,14 @@ describe('ReleaseTrackPageComponent', () => {
     expect(component.snapshotHistory[0]).toEqual(
       expect.objectContaining({
         title: 'Draft Snapshot',
-        totalObjects: 20,
+        totalObjects: 2,
         isTagged: false,
       })
     );
+    expect(component.snapshotHistory[0].stats).toEqual([
+      expect.objectContaining({ label: 'Members', value: 1 }),
+      expect.objectContaining({ label: 'Quarantine', value: 1 }),
+    ]);
     expect(component.isCreatingDraft).toBe(false);
   });
 
@@ -756,6 +797,23 @@ describe('ReleaseTrackPageComponent', () => {
   it('should not create a draft snapshot for a standard release track', () => {
     component.id = 'release-track--123';
     component.releaseTrack = { type: ReleaseTrackType.Standard } as any;
+
+    component.onDraft();
+
+    expect(mockDialog.open).not.toHaveBeenCalled();
+    expect(
+      mockReleaseTrackApiConnector.createVirtualSnapshot
+    ).not.toHaveBeenCalled();
+  });
+
+  it('should not create a draft snapshot for a virtual track without components', () => {
+    component.id = 'release-track--123';
+    component.releaseTrack = {
+      type: ReleaseTrackType.Virtual,
+      composition: {
+        component_tracks: [],
+      },
+    } as any;
 
     component.onDraft();
 

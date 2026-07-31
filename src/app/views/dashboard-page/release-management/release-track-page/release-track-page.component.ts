@@ -34,6 +34,7 @@ import {
 } from 'src/app/classes/release-tracks';
 import { StixObject } from 'src/app/classes/stix';
 import { AddDialogComponent } from 'src/app/components/add-dialog/add-dialog.component';
+import { ConfirmationDialogComponent } from 'src/app/components/confirmation-dialog/confirmation-dialog.component';
 import { DeleteDialogComponent } from 'src/app/components/delete-dialog/delete-dialog.component';
 import { MultipleChoiceDialogComponent } from 'src/app/components/multiple-choice-dialog/multiple-choice-dialog.component';
 import { ReleasePreviewDialogComponent } from 'src/app/components/release-preview-dialog/release-preview-dialog.component';
@@ -488,7 +489,12 @@ export class ReleaseTrackPageComponent implements OnInit {
   }
 
   public get canCreateDraft(): boolean {
-    return !!this.id && this.isVirtualReleaseTrack && !this.isCreatingDraft;
+    return (
+      !!this.id &&
+      this.isVirtualReleaseTrack &&
+      this.virtualComponentTracks.length > 0 &&
+      !this.isCreatingDraft
+    );
   }
 
   private get latestDraftSnapshot(): SnapshotHistoryViewModel | undefined {
@@ -508,38 +514,60 @@ export class ReleaseTrackPageComponent implements OnInit {
       .pipe(take(1))
       .subscribe({
         next: res => {
-          this.releaseTrack = res;
-          if (!this.releaseTrack) return;
-          this.hydrateDynamicEntryDates();
-
-          this.breadcrumbService.changeBreadcrumb(
-            this.route.snapshot,
-            this.releaseTrack.name
-          );
-
-          if (this.snapshotHistory.length) {
-            this.snapshotHistory = this.buildSnapshotHistory(
-              this.snapshotHistory.map(item => item.snapshot)
-            );
-          }
-
-          if (this.isVirtualReleaseTrack) {
-            this.loadVirtualComponentTrackSummaries();
+          if (res) {
+            this.setReleaseTrack(res);
           } else {
-            this.virtualComponentTrackSummaries.clear();
-          }
-
-          if (!this.isEditingConfig) {
-            if (this.isVirtualReleaseTrack) {
-              this.setVirtualConfig();
-            } else if (this.releaseTrack.config) {
-              this.setConfig(this.releaseTrack.config);
-            }
+            this.loadReleaseTrackSummary();
           }
 
           // this.loadCandidates();
         },
       });
+  }
+
+  private loadReleaseTrackSummary(): void {
+    this.connector
+      .listReleaseTracks()
+      .pipe(take(1))
+      .subscribe({
+        next: result => {
+          const track = this.getReleaseTrackList(result).find(
+            item => this.getReleaseTrackId(item) === this.id
+          );
+          if (track) this.setReleaseTrack(track);
+        },
+      });
+  }
+
+  private setReleaseTrack(track: any): void {
+    this.releaseTrack = track;
+    if (!this.releaseTrack) return;
+    this.hydrateDynamicEntryDates();
+
+    this.breadcrumbService.changeBreadcrumb(
+      this.route.snapshot,
+      this.releaseTrack.name
+    );
+
+    if (this.snapshotHistory.length) {
+      this.snapshotHistory = this.buildSnapshotHistory(
+        this.snapshotHistory.map(item => item.snapshot)
+      );
+    }
+
+    if (this.isVirtualReleaseTrack) {
+      this.loadVirtualComponentTrackSummaries();
+    } else {
+      this.virtualComponentTrackSummaries.clear();
+    }
+
+    if (!this.isEditingConfig) {
+      if (this.isVirtualReleaseTrack) {
+        this.setVirtualConfig();
+      } else if (this.releaseTrack.config) {
+        this.setConfig(this.releaseTrack.config);
+      }
+    }
   }
 
   private refreshReleaseTrackState(): void {
@@ -1479,30 +1507,23 @@ export class ReleaseTrackPageComponent implements OnInit {
   public onDraft(): void {
     if (!this.canCreateDraft) return;
 
-    const dialogRef = this.dialog.open(MultipleChoiceDialogComponent, {
+    const trackName = this.releaseTrackName || this.id || 'this release track';
+    const dialogRef = this.dialog.open(ConfirmationDialogComponent, {
       width: '30em',
       autoFocus: false,
       data: {
         title: 'Create draft snapshot?',
-        description:
-          'Resolve the tagged component releases into a persistent virtual draft snapshot.',
-        choices: [
-          {
-            label: 'Create Draft',
-            value: 'create',
-            description:
-              'Resolve the virtual track composition into a new draft snapshot.',
-          },
-          {
-            label: 'Cancel',
-            value: 'cancel',
-          },
-        ],
+        message: `Are you sure you want to create a new draft snapshot for the track ${trackName}? This will create a copy of the latest snapshot as a new draft.`,
+        no_label: 'Cancel',
+        yes_label: 'Create Draft',
+        confirm_color: 'primary',
+        confirm_appearance: 'raised',
+        layout: 'simple',
       },
     });
 
-    dialogRef.afterClosed().subscribe(choice => {
-      if (choice !== 'create' || !this.id || !this.isVirtualReleaseTrack) {
+    dialogRef.afterClosed().subscribe(confirmed => {
+      if (!confirmed || !this.id || !this.isVirtualReleaseTrack) {
         return;
       }
       this.createVirtualDraftSnapshot();
@@ -1551,7 +1572,35 @@ export class ReleaseTrackPageComponent implements OnInit {
   ): ReleaseTrackSnapshotHistoryItem | null {
     const draftSnapshot = snapshot?.data || snapshot?.snapshot || snapshot;
     if (!draftSnapshot || this.isTaggedSnapshot(draftSnapshot)) return null;
-    return this.getSnapshotModified(draftSnapshot) ? draftSnapshot : null;
+
+    const modified = this.getSnapshotModified(draftSnapshot);
+    if (!modified) return null;
+    const resolvedTotalObjects =
+      typeof draftSnapshot.composition_resolution?.total_objects === 'number'
+        ? draftSnapshot.composition_resolution.total_objects
+        : null;
+    const membersCount =
+      this.getSnapshotCount(draftSnapshot, 'members_count') ??
+      this.getSnapshotMembers(draftSnapshot).length;
+    const quarantineCount =
+      this.getSnapshotCount(
+        draftSnapshot,
+        'quarantine_count',
+        'quarantined_count'
+      ) ?? this.getSnapshotQuarantineCount(draftSnapshot);
+    const shouldUseResolvedTotal =
+      !membersCount && !quarantineCount && resolvedTotalObjects !== null;
+
+    return {
+      ...draftSnapshot,
+      modified,
+      version: null,
+      type: ReleaseTrackType.Virtual,
+      members_count: shouldUseResolvedTotal
+        ? resolvedTotalObjects
+        : membersCount,
+      quarantine_count: quarantineCount,
+    };
   }
 
   private withCreatedDraftSnapshot(
@@ -2612,6 +2661,14 @@ export class ReleaseTrackPageComponent implements OnInit {
     return members
       .map((member: any) => this.getSnapshotMemberRef(member))
       .filter((member): member is SnapshotMemberRef => !!member);
+  }
+
+  private getSnapshotQuarantineCount(
+    snapshot: ReleaseTrackSnapshotHistoryItem
+  ): number {
+    const quarantine =
+      snapshot.quarantine || snapshot.contents?.quarantine || [];
+    return Array.isArray(quarantine) ? quarantine.length : 0;
   }
 
   private getSnapshotMemberRef(member: any): SnapshotMemberRef | null {
