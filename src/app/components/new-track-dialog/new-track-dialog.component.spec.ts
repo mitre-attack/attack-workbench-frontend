@@ -206,6 +206,34 @@ describe('NewTrackDialogComponent', () => {
     );
   });
 
+  it('should create a standard track with the API member-sync supplant shape', () => {
+    component.mode = ReleaseTrackType.Standard;
+    component.form.patchValue({
+      name: 'Enterprise Content',
+      description: 'Tracks Enterprise content',
+      memberSync: 'track_latest',
+      supplantBehavior: 'replace',
+    });
+
+    component.handleCreate();
+
+    expect(mockConnector.createReleaseTrack).toHaveBeenCalledWith({
+      type: ReleaseTrackType.Standard,
+      name: 'Enterprise Content',
+      description: 'Tracks Enterprise content',
+      config: {
+        auto_promote: false,
+        member_sync: {
+          strategy: 'track_latest',
+          supplant: {
+            behavior: 'replace',
+            status_policy: 'preserve',
+          },
+        },
+      },
+    });
+  });
+
   it('should preserve optional virtual track settings in the create payload', () => {
     component.form.patchValue({
       name: 'Scheduled Combined Track',

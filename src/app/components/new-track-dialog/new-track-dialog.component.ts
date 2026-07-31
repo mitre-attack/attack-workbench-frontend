@@ -4,6 +4,7 @@ import { MatDialogRef, MAT_DIALOG_DATA } from '@angular/material/dialog';
 import {
   MemberSyncStrategy,
   MemberSyncBehavior,
+  MemberSyncPolicy,
   ReleaseTrackType,
   DeduplicationStrategy,
   ResolutionStrategy,
@@ -206,7 +207,10 @@ export class NewTrackDialogComponent implements OnInit {
           auto_promote: !!this.form.get('autoPromote')?.value,
           member_sync: {
             strategy: this.form.get('memberSync')?.value,
-            supplant: this.form.get('supplantBehavior')?.value,
+            supplant: {
+              behavior: this.form.get('supplantBehavior')?.value,
+              status_policy: MemberSyncPolicy.Preserve,
+            },
           },
         },
         type: ReleaseTrackType.Standard,
