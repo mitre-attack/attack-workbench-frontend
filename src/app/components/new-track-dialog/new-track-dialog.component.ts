@@ -8,7 +8,6 @@ import {
   ReleaseTrackType,
   DeduplicationStrategy,
   ResolutionStrategy,
-  SnapshotTier,
   SnapshotScheduleMode,
 } from 'src/app/classes/release-tracks/enums';
 import { ReleaseTracksConnectorService } from 'src/app/services/connectors/rest-api/release-tracks.service';
@@ -57,8 +56,6 @@ export class NewTrackDialogComponent implements OnInit {
   public supplantOptions = Object.values(MemberSyncBehavior);
 
   public deduplicationOptions = Object.values(DeduplicationStrategy);
-  public deduplicationTierOptions = Object.values(SnapshotTier);
-  public deduplicationStatusOptions = Object.values(WorkflowStatus);
   public snapshotModeOptions = Object.values(SnapshotScheduleMode);
   public componentTrackOptions: VirtualComponentTrackOption[] = [];
   public isLoadingComponentTracks = false;
@@ -90,8 +87,6 @@ export class NewTrackDialogComponent implements OnInit {
       composition: this.fb.group({
         componentTrackSearch: [''],
         deduplicationStrategy: [DeduplicationStrategy.PrioritizeLatestObject],
-        deduplicationTier: [this.deduplicationTierOptions[0]],
-        deduplicationStatus: [this.deduplicationStatusOptions[0]],
       }),
       snapshotSchedule: this.fb.group({
         mode: [SnapshotScheduleMode.Manual],
@@ -267,11 +262,7 @@ export class NewTrackDialogComponent implements OnInit {
   private buildVirtualComposition(): any {
     const deduplication: any = {};
     const strategy = this.form.get('composition.deduplicationStrategy')?.value;
-    const tier = this.form.get('composition.deduplicationTier')?.value;
-    const status = this.form.get('composition.deduplicationStatus')?.value;
     if (strategy) deduplication.strategy = strategy;
-    if (tier) deduplication.tier_resolution = tier;
-    if (status) deduplication.status_resolution = status;
 
     return {
       component_tracks: this.selectedComponentTracks.map((track, priority) => {
