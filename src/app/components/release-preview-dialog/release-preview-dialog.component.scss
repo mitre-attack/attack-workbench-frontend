@@ -1,0 +1,408 @@
+@use '../../../style/colors';
+@use '../../../style/typography';
+
+.release-preview-dialog-backdrop {
+  background: rgba(colors.color(mitre-black), 0.76);
+}
+
+.release-preview-dialog-panel .mat-mdc-dialog-surface {
+  border: 1px solid;
+  border-radius: 10px;
+  overflow: hidden;
+  @include colors.theme-border-color;
+}
+
+.release-preview-dialog {
+  display: flex;
+  width: min(94vw, 1160px);
+  max-height: min(88vh, 820px);
+  flex-direction: column;
+  box-sizing: border-box;
+
+  .release-preview-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 24px;
+    padding: 20px 24px 16px;
+    border-bottom: 1px solid;
+    @include colors.theme-border-color;
+    @include colors.theme-property(
+      background,
+      rgba(colors.on-color(dark), 0.045),
+      rgba(colors.color(mitre-black), 0.025)
+    );
+
+    h2 {
+      margin: 0;
+      font-size: 22px;
+      font-weight: 800;
+      line-height: 28px;
+    }
+
+    p {
+      margin: 4px 0 0;
+      font-size: 13px;
+      line-height: 20px;
+      @include colors.theme-text-deemphasis;
+    }
+  }
+
+  .release-version-summary {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 18px;
+    font-family: typography.$mono-font;
+
+    strong {
+      @include colors.theme-property(
+        color,
+        colors.color(mitre-light-blue),
+        colors.color(primary-dark)
+      );
+    }
+  }
+
+  .release-preview-tabs {
+    min-height: 0;
+    flex: 1 1 auto;
+
+    .mat-mdc-tab-header {
+      border-bottom: 1px solid;
+      @include colors.theme-border-color;
+    }
+
+    .mat-mdc-tab-labels {
+      padding: 0 24px;
+    }
+
+    .mdc-tab {
+      min-width: 150px;
+    }
+
+    .mdc-tab__text-label {
+      display: inline-flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .mat-icon {
+      width: 19px;
+      height: 19px;
+      font-size: 19px;
+      line-height: 19px;
+    }
+
+    .mat-mdc-tab-body-wrapper {
+      min-height: 0;
+      height: min(55vh, 520px);
+    }
+
+    .mat-mdc-tab-body-content {
+      box-sizing: border-box;
+      overflow: auto;
+    }
+  }
+
+  .release-summary {
+    display: grid;
+    width: min(760px, calc(100% - 48px));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 24px 28px;
+    margin: 28px auto;
+  }
+
+  .release-stat {
+    display: flex;
+    min-height: 132px;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    box-sizing: border-box;
+    gap: 8px;
+    padding: 20px;
+    border: 1px solid;
+    border-radius: 8px;
+    text-align: center;
+    @include colors.theme-border-color;
+    @include colors.theme-property(
+      background,
+      rgba(colors.on-color(dark), 0.035),
+      rgba(colors.color(mitre-black), 0.025)
+    );
+
+    strong {
+      font-size: 52px;
+      font-weight: 800;
+      line-height: 56px;
+    }
+
+    span {
+      font-size: 15px;
+      font-weight: 800;
+      letter-spacing: 0.04em;
+      line-height: 20px;
+      text-transform: uppercase;
+      @include colors.theme-text-emphasis;
+    }
+  }
+
+  .release-stat--included strong {
+    color: colors.color(success);
+  }
+
+  .release-stat--excluded strong {
+    color: colors.color(error);
+  }
+
+  .release-stat--new strong {
+    @include colors.theme-property(
+      color,
+      colors.color(mitre-light-blue),
+      colors.color(primary-dark)
+    );
+  }
+
+  .release-stat--updated strong {
+    color: colors.color(warn);
+  }
+
+  .release-stat--unchanged strong {
+    color: #c34ddd;
+  }
+
+  .release-object-list {
+    display: grid;
+    gap: 10px;
+    width: calc(100% - 48px);
+    margin: 24px auto;
+  }
+
+  .release-object-empty {
+    box-sizing: border-box;
+    border: 1px solid;
+    border-radius: 6px;
+    @include colors.theme-border-color;
+  }
+
+  .release-table-wrapper {
+    overflow: auto;
+    border: 1px solid;
+    border-radius: 8px;
+    @include colors.theme-border-color;
+  }
+
+  .release-preview-table {
+    width: 100%;
+    min-width: 760px;
+    border-collapse: collapse;
+    table-layout: fixed;
+
+    th,
+    td {
+      box-sizing: border-box;
+      padding: 18px 26px;
+      border-bottom: 1px solid;
+      text-align: left;
+      vertical-align: middle;
+      @include colors.theme-border-color;
+    }
+
+    th {
+      font-size: 13px;
+      font-weight: 800;
+      line-height: 18px;
+      @include colors.theme-property(
+        background,
+        rgba(colors.on-color(dark), 0.07),
+        rgba(colors.color(mitre-black), 0.055)
+      );
+    }
+
+    td {
+      height: 76px;
+      font-size: 13px;
+      line-height: 18px;
+      @include colors.theme-text-deemphasis;
+
+      strong {
+        display: inline-block;
+        @include colors.theme-text-emphasis;
+      }
+
+      small {
+        display: block;
+        margin-top: 2px;
+        font-family: typography.$mono-font;
+        @include colors.theme-text-deemphasis;
+      }
+    }
+
+    tbody tr:last-child td {
+      border-bottom: 0;
+    }
+
+    th:first-child,
+    td:first-child {
+      width: 43%;
+    }
+  }
+
+  .release-preview-table--excluded {
+    th:first-child,
+    td:first-child {
+      width: 60%;
+    }
+
+    th:nth-child(2),
+    td:nth-child(2) {
+      width: 40%;
+    }
+  }
+
+  .release-preview-table--replacements {
+    th,
+    td {
+      width: 34%;
+    }
+  }
+
+  .source-chip,
+  .workflow-chip {
+    display: inline-flex;
+    padding: 3px 8px;
+    border: 1px solid;
+    border-radius: 5px;
+    font-family: typography.$mono-font;
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 16px;
+  }
+
+  .source-chip {
+    border-color: rgba(#c34ddd, 0.45);
+    background: rgba(#c34ddd, 0.13);
+    color: #c34ddd;
+  }
+
+  .source-chip--staged {
+    border-color: rgba(colors.color(success), 0.45);
+    background: rgba(colors.color(success), 0.13);
+    color: colors.color(success);
+  }
+
+  .workflow-chip {
+    @include colors.theme-border-color;
+    @include colors.theme-property(
+      background,
+      rgba(colors.on-color(dark), 0.06),
+      rgba(colors.color(mitre-black), 0.045)
+    );
+    @include colors.theme-text-emphasis;
+  }
+
+  .release-table-row--invalid {
+    background: rgba(colors.color(error), 0.12);
+  }
+
+  .incoming-version {
+    color: colors.color(success) !important;
+    font-family: typography.$mono-font;
+  }
+
+  .incoming-version--invalid,
+  .invalid-version-icon {
+    color: colors.color(error) !important;
+  }
+
+  .invalid-version-icon {
+    width: 16px;
+    height: 16px;
+    margin-left: 4px;
+    font-size: 16px;
+    line-height: 16px;
+    vertical-align: middle;
+  }
+
+  .release-object-empty {
+    margin: 0;
+    padding: 28px;
+    text-align: center;
+    @include colors.theme-text-deemphasis;
+  }
+
+  .release-preview-footer {
+    display: flex;
+    min-height: 72px;
+    align-items: center;
+    justify-content: space-between;
+    gap: 20px;
+    box-sizing: border-box;
+    padding: 14px 20px;
+    border-top: 1px solid;
+    @include colors.theme-border-color;
+  }
+
+  .release-blocked-message {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    gap: 8px;
+    margin: 0;
+    color: colors.color(error);
+    font-size: 13px;
+    line-height: 20px;
+
+    .mat-icon {
+      flex: 0 0 auto;
+    }
+  }
+
+  .release-preview-actions {
+    display: flex;
+    flex: 0 0 auto;
+    gap: 12px;
+    margin-left: auto;
+  }
+}
+
+@media (max-width: 720px) {
+  .release-preview-dialog {
+    width: 96vw;
+    max-height: 92vh;
+
+    .release-preview-header {
+      padding: 16px;
+    }
+
+    .release-preview-tabs .mat-mdc-tab-labels {
+      padding: 0;
+    }
+
+    .release-summary {
+      width: calc(100% - 32px);
+      grid-template-columns: 1fr;
+      gap: 12px;
+      margin: 16px auto;
+    }
+
+    .release-stat {
+      min-height: 108px;
+    }
+
+    .release-preview-footer {
+      align-items: stretch;
+      flex-direction: column;
+    }
+
+    .release-preview-actions {
+      width: 100%;
+      flex-wrap: wrap;
+      margin-left: 0;
+
+      button {
+        flex: 1 1 auto;
+      }
+    }
+  }
+}

@@ -2,6 +2,7 @@ import { SelectionModel } from '@angular/cdk/collections';
 import { Component, OnInit } from '@angular/core';
 import { FormBuilder, FormGroup } from '@angular/forms';
 import { MatDialog } from '@angular/material/dialog';
+import { MatSnackBar } from '@angular/material/snack-bar';
 import { ActivatedRoute, Router } from '@angular/router';
 import { forkJoin, Observable, of } from 'rxjs';
 import { finalize, map, take } from 'rxjs/operators';
@@ -32,9 +33,11 @@ import {
   SnapshotTierType,
   StixObjectRef,
 } from 'src/app/classes/release-tracks';
+import { StixObject } from 'src/app/classes/stix';
 import { AddDialogComponent } from 'src/app/components/add-dialog/add-dialog.component';
 import { DeleteDialogComponent } from 'src/app/components/delete-dialog/delete-dialog.component';
 import { MultipleChoiceDialogComponent } from 'src/app/components/multiple-choice-dialog/multiple-choice-dialog.component';
+import { ReleasePreviewDialogComponent } from 'src/app/components/release-preview-dialog/release-preview-dialog.component';
 import { ReleaseTrackObjectItem } from 'src/app/components/release-track-object-card/release-track-object-card.component';
 import { AuthenticationService } from 'src/app/services/connectors/authentication/authentication.service';
 import { ReleaseTracksConnectorService } from 'src/app/services/connectors/rest-api/release-tracks.service';
@@ -51,6 +54,7 @@ import {
 } from 'src/app/utils/types';
 
 import { ALL_OBJECTS_STIX_LIST_CONFIG } from 'src/app/views/stix/all-objects-page/all-objects-page.component';
+import { StixDialogComponent } from 'src/app/views/stix/stix-dialog/stix-dialog.component';
 
 type ReleaseTrackLaneType = 'candidate' | 'staged' | 'member';
 
@@ -143,9 +147,6 @@ const VIRTUAL_OBJECT_TYPE_OPTIONS: StixType[] = [
   'x-mitre-matrix',
   'x-mitre-tactic',
 ];
-import { MatSnackBar } from '@angular/material/snack-bar';
-import { StixObject } from 'src/app/classes/stix';
-import { StixDialogComponent } from 'src/app/views/stix/stix-dialog/stix-dialog.component';
 
 const VIRTUAL_DOMAIN_FILTER_OPTIONS = ['enterprise', 'ics', 'mobile'];
 
@@ -204,10 +205,10 @@ export class ReleaseTrackPageComponent implements OnInit {
     private route: ActivatedRoute,
     private router: Router,
     private dialog: MatDialog,
+    private snackbar: MatSnackBar,
     private restApiConnectorService: RestApiConnectorService,
     private authenticationService: AuthenticationService,
-    private fb: FormBuilder,
-    private snackbar: MatSnackBar
+    private fb: FormBuilder
   ) {
     this.configForm = this.fb.group({
       autoPromote: [true],
@@ -469,6 +470,10 @@ export class ReleaseTrackPageComponent implements OnInit {
 
   public get canCreateDraft(): boolean {
     return !!this.id && this.isVirtualReleaseTrack && !this.isCreatingDraft;
+  }
+
+  private get latestDraftSnapshot(): SnapshotHistoryViewModel | undefined {
+    return this.snapshotHistory.find(snapshot => !snapshot.isTagged);
   }
 
   public get canEditReleaseTrack(): boolean {
@@ -1546,60 +1551,65 @@ export class ReleaseTrackPageComponent implements OnInit {
   }
 
   public onPreviewRelease(): void {
-    this.chooseReleaseIncrement();
+    if (!this.latestDraftSnapshot && this.releaseTrack?.version != null) {
+      this.openNoDraftSnapshotDialog();
+      return;
+    }
+
+    this.previewRelease(this.latestDraftSnapshot);
   }
 
-  public onTagSnapshot(item: SnapshotHistoryViewModel): void {
-    this.chooseReleaseIncrement(item);
-  }
-
-  private chooseReleaseIncrement(item?: SnapshotHistoryViewModel): void {
-    if (!this.id || this.isReleasing) return;
-
-    const selectionRef = this.dialog.open(MultipleChoiceDialogComponent, {
-      width: '34em',
+  private openNoDraftSnapshotDialog(): void {
+    this.dialog.open(MultipleChoiceDialogComponent, {
+      width: '30em',
       autoFocus: false,
+      restoreFocus: true,
       data: {
-        title: 'Choose a release version',
+        title: 'No draft snapshot available',
         description:
-          'Use the next minor or major version for the release preview.',
+          'The latest snapshot has already been released. Modify the release track to create a new draft before previewing another release.',
         choices: [
           {
-            label: 'Next minor version',
-            value: 'minor',
-          },
-          {
-            label: 'Next major version',
-            value: 'major',
+            label: 'Close',
+            value: 'close',
           },
         ],
       },
     });
-
-    selectionRef
-      .afterClosed()
-      .pipe(take(1))
-      .subscribe((increment: 'major' | 'minor' | undefined) => {
-        if (increment !== 'major' && increment !== 'minor') return;
-        this.previewRelease({ increment }, item);
-      });
   }
 
-  private previewRelease(
-    selection: ReleasePayload,
-    item?: SnapshotHistoryViewModel
-  ): void {
+  public onTagSnapshot(item: SnapshotHistoryViewModel): void {
+    this.previewRelease(item);
+  }
+
+  private previewRelease(item?: SnapshotHistoryViewModel): void {
+    if (!this.id || this.isReleasing) return;
+
     this.isReleasing = true;
-    const preview = item?.modified
-      ? this.connector.previewRelease(
-          this.id,
-          { format: ReleasePreviewFormat.Summary, ...selection },
-          item.modified
-        )
-      : this.connector.previewRelease(this.id, {
-          format: ReleasePreviewFormat.Summary,
-          ...selection,
-        });
+    const selection: ReleasePayload = { increment: 'minor' };
+    const preview = forkJoin({
+      preview: item?.modified
+        ? this.connector.previewRelease(
+            this.id,
+            { format: ReleasePreviewFormat.Summary, ...selection },
+            item.modified
+          )
+        : this.connector.previewRelease(this.id, {
+            format: ReleasePreviewFormat.Summary,
+            ...selection,
+          }),
+      track: item?.modified
+        ? this.connector.retrieveSnapshotByModified(this.id, item.modified, {
+            format: ExportFormat.Workbench,
+            include: 'all',
+          })
+        : of(this.releaseTrack),
+      objects: this.restApiConnectorService.getAllObjects({
+        revoked: true,
+        deprecated: true,
+        versions: 'all',
+      }),
+    });
 
     preview
       .pipe(
@@ -1609,10 +1619,27 @@ export class ReleaseTrackPageComponent implements OnInit {
         })
       )
       .subscribe({
-        next: preview =>
-          this.openReleasePreviewDialog(preview, selection, item),
+        next: result => {
+          if (!result.preview || !result.track) {
+            this.snackbar.open(
+              'Unable to load the release preview. Please try again.',
+              null,
+              {
+                duration: 5000,
+                panelClass: 'error',
+              }
+            );
+            return;
+          }
+
+          this.openReleasePreviewDialog(
+            result.preview,
+            this.enrichReleasePreviewTrack(result.track, result.objects),
+            item
+          );
+        },
         error: err => {
-          console.error('Failed to preview release track release', err);
+          console.error('Failed to load objects for release preview', err);
         },
       });
   }
@@ -2185,59 +2212,101 @@ export class ReleaseTrackPageComponent implements OnInit {
 
   private openReleasePreviewDialog(
     preview: any,
-    selection: ReleasePayload,
+    track: ReleaseTrackSnapshot,
     item?: SnapshotHistoryViewModel
   ): void {
-    const conflicts = this.getReleaseConflicts(preview);
-
-    if (conflicts.length) {
-      this.dialog.open(MultipleChoiceDialogComponent, {
-        width: '34em',
-        autoFocus: false,
-        data: {
-          title: 'Release conflicts detected',
-          description: `${conflicts.length} conflict${
-            conflicts.length === 1 ? '' : 's'
-          } must be resolved before this release can be tagged.`,
-          choices: [
-            {
-              label: 'Close',
-              value: 'close',
-              description:
-                'Review the staged and member object versions before retrying the release.',
-            },
-          ],
-        },
-      });
-      return;
-    }
-
-    const choices = [
-      {
-        label: `Release${preview?.version ? ` (${preview.version})` : ''}`,
-        value: 'release',
-        description: this.getReleasePreviewDescription(preview),
-      },
-    ];
-
-    const releaseRef = this.dialog.open(MultipleChoiceDialogComponent, {
-      width: '34em',
+    const releaseRef = this.dialog.open(ReleasePreviewDialogComponent, {
+      maxWidth: 'none',
       autoFocus: false,
+      restoreFocus: true,
+      ariaLabelledBy: 'release-preview-dialog-title',
+      panelClass: 'release-preview-dialog-panel',
+      backdropClass: 'release-preview-dialog-backdrop',
       data: {
-        title: 'Preview & release',
-        description:
-          'The release preview found no blocking conflicts. Confirm to tag the draft snapshot.',
-        choices,
+        track,
+        conflicts: this.getReleaseConflicts(preview),
+        proposedMinorVersion: preview?.version,
+        previewSummary: preview,
       },
     });
 
     releaseRef
       .afterClosed()
       .pipe(take(1))
-      .subscribe((action: 'release' | undefined) => {
-        if (action !== 'release') return;
-        this.releaseSnapshot(selection, item);
+      .subscribe((action: 'major' | 'minor' | undefined) => {
+        if (action !== 'major' && action !== 'minor') return;
+        this.releaseSnapshot({ increment: action }, item);
       });
+  }
+
+  private enrichReleasePreviewTrack(
+    track: ReleaseTrackSnapshot,
+    response: any
+  ) {
+    const objects = Array.isArray(response)
+      ? response
+      : Array.isArray(response?.data)
+        ? response.data
+        : [];
+    const objectsByRevision = new Map<string, any>();
+
+    objects.forEach((object: any) => {
+      const objectRef = object?.stix?.id ?? object?.stixID ?? object?.id;
+      const modified =
+        object?.stix?.modified ?? object?.modified ?? object?.object_modified;
+      if (objectRef && modified) {
+        objectsByRevision.set(
+          this.getReleasePreviewRevisionKey(objectRef, modified),
+          object
+        );
+      }
+    });
+
+    const enrich = (entry: any) => {
+      const object = objectsByRevision.get(
+        this.getReleasePreviewRevisionKey(
+          entry?.object_ref,
+          entry?.object_modified
+        )
+      );
+      if (!object) return entry;
+
+      const stix = object?.stix ?? object;
+      return {
+        ...entry,
+        name: object?.name ?? stix?.name ?? entry?.name,
+        attack_id:
+          object?.attackID ??
+          object?.attack_id ??
+          object?.workspace?.attack_id ??
+          entry?.attack_id,
+        attack_type:
+          object?.attackType ??
+          StixTypeToAttackType[stix?.type as StixType] ??
+          entry?.attack_type,
+        type: stix?.type ?? entry?.type,
+        x_mitre_version:
+          object?.version?.toString?.() ??
+          object?.version ??
+          stix?.x_mitre_version ??
+          entry?.x_mitre_version,
+      };
+    };
+
+    return {
+      ...track,
+      members: (track.members ?? []).map(enrich),
+      staged: (track.staged ?? []).map(enrich),
+      candidates: (track.candidates ?? []).map(enrich),
+    } as ReleaseTrackSnapshot;
+  }
+
+  private getReleasePreviewRevisionKey(
+    objectRef: unknown,
+    modified: unknown
+  ): string {
+    const timestamp = new Date(modified as any).getTime();
+    return `${String(objectRef ?? '')}::${timestamp}`;
   }
 
   private releaseSnapshot(
@@ -2268,25 +2337,6 @@ export class ReleaseTrackPageComponent implements OnInit {
 
   private getReleaseConflicts(preview: any): any[] {
     return Array.isArray(preview?.conflicts) ? preview.conflicts : [];
-  }
-
-  private getReleasePreviewDescription(preview: any): string {
-    if (preview?.type === ReleaseTrackType.Virtual) {
-      const changes = preview?.changes || {};
-      return `${changes.new_count || 0} new, ${
-        changes.updated_count || 0
-      } updated, ${changes.removed_count || 0} removed, and ${
-        changes.quarantined_count || 0
-      } quarantined objects.`;
-    }
-
-    const promoted = preview?.changes?.promoted_count || 0;
-    const candidates = preview?.after?.candidates_count || 0;
-    return `${promoted} staged object${
-      promoted === 1 ? '' : 's'
-    } will become members. ${candidates} candidate object${
-      candidates === 1 ? '' : 's'
-    } will remain outside the release.`;
   }
 
   private buildSnapshotHistory(

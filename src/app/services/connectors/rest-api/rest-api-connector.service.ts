@@ -527,6 +527,7 @@ export class RestApiConnectorService extends ApiConnector {
     revoked?: boolean;
     deprecated?: boolean;
     deserialize?: boolean;
+    versions?: 'all' | 'latest';
     lastUpdatedBy?: string[];
     search?: string;
   }) {
@@ -550,6 +551,7 @@ export class RestApiConnectorService extends ApiConnector {
         'includeDeprecated',
         options.deprecated ? 'true' : 'false'
       );
+    if (options?.versions) query = query.set('versions', options.versions);
     // searching
     if (options?.search) query = query.set('search', options.search);
     // lastUpdatedBy
