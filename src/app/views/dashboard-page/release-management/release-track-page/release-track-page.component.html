@@ -681,22 +681,28 @@
 
             <div class="snapshot-history-stats">
               <div class="snapshot-history-stat">
-                <div class="snapshot-history-stat-value promote-color">
-                  +{{ item.addedCount }}
-                </div>
-                <div class="snapshot-history-stat-label">Added</div>
-              </div>
-              <div class="snapshot-history-stat">
-                <div class="snapshot-history-stat-value modified-color">
-                  {{ item.modifiedCount }}
-                </div>
-                <div class="snapshot-history-stat-label">Modified</div>
-              </div>
-              <div class="snapshot-history-stat">
                 <div class="snapshot-history-stat-value">
-                  {{ item.totalObjects }}
+                  {{ item.membersCount }}
                 </div>
-                <div class="snapshot-history-stat-label">Total Objects</div>
+                <div class="snapshot-history-stat-label">Members</div>
+              </div>
+              <div *ngIf="!item.isVirtual" class="snapshot-history-stat">
+                <div class="snapshot-history-stat-value modified-color">
+                  {{ item.stagedCount }}
+                </div>
+                <div class="snapshot-history-stat-label">Staged</div>
+              </div>
+              <div *ngIf="!item.isVirtual" class="snapshot-history-stat">
+                <div class="snapshot-history-stat-value">
+                  {{ item.candidatesCount }}
+                </div>
+                <div class="snapshot-history-stat-label">Candidates</div>
+              </div>
+              <div *ngIf="item.isVirtual" class="snapshot-history-stat">
+                <div class="snapshot-history-stat-value">
+                  {{ item.quarantineCount }}
+                </div>
+                <div class="snapshot-history-stat-label">Quarantine</div>
               </div>
             </div>
           </div>
@@ -877,6 +883,26 @@
                       </mat-option>
                     </mat-select>
                     <mat-hint>Leave empty to include all object types</mat-hint>
+                  </mat-form-field>
+
+                  <mat-form-field
+                    *ngIf="isEditingConfig"
+                    appearance="outline"
+                    class="config-component-filter">
+                    <mat-label>Domain filter</mat-label>
+                    <mat-select
+                      multiple
+                      [value]="getVirtualComponentTrackDomains(track)"
+                      (selectionChange)="
+                        setVirtualComponentTrackDomains(track, $event.value)
+                      ">
+                      <mat-option
+                        *ngFor="let domain of virtualDomainOptions"
+                        [value]="domain">
+                        {{ domain }}
+                      </mat-option>
+                    </mat-select>
+                    <mat-hint>Leave empty to include all domains</mat-hint>
                   </mat-form-field>
                 </article>
               </div>

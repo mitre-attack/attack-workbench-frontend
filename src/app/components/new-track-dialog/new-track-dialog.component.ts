@@ -4,10 +4,10 @@ import { MatDialogRef, MAT_DIALOG_DATA } from '@angular/material/dialog';
 import {
   MemberSyncStrategy,
   MemberSyncBehavior,
+  MemberSyncPolicy,
   ReleaseTrackType,
   DeduplicationStrategy,
   ResolutionStrategy,
-  SnapshotTier,
   SnapshotScheduleMode,
 } from 'src/app/classes/release-tracks/enums';
 import { ReleaseTracksConnectorService } from 'src/app/services/connectors/rest-api/release-tracks.service';
@@ -33,6 +33,8 @@ const OBJECT_FILTER_OPTIONS: StixType[] = [
   'x-mitre-tactic',
 ];
 
+const DOMAIN_FILTER_OPTIONS = ['enterprise', 'ics', 'mobile'];
+
 @Component({
   standalone: false,
   selector: 'app-new-track-dialog',
@@ -54,8 +56,6 @@ export class NewTrackDialogComponent implements OnInit {
   public supplantOptions = Object.values(MemberSyncBehavior);
 
   public deduplicationOptions = Object.values(DeduplicationStrategy);
-  public deduplicationTierOptions = Object.values(SnapshotTier);
-  public deduplicationStatusOptions = Object.values(WorkflowStatus);
   public snapshotModeOptions = Object.values(SnapshotScheduleMode);
   public componentTrackOptions: VirtualComponentTrackOption[] = [];
   public isLoadingComponentTracks = false;
@@ -63,6 +63,7 @@ export class NewTrackDialogComponent implements OnInit {
     label: this.formatStixType(type),
     value: type,
   }));
+  public domainOptions = DOMAIN_FILTER_OPTIONS;
 
   public mode: 'standard' | 'virtual' = 'standard';
 
@@ -86,8 +87,6 @@ export class NewTrackDialogComponent implements OnInit {
       composition: this.fb.group({
         componentTrackSearch: [''],
         deduplicationStrategy: [DeduplicationStrategy.PrioritizeLatestObject],
-        deduplicationTier: [this.deduplicationTierOptions[0]],
-        deduplicationStatus: [this.deduplicationStatusOptions[0]],
       }),
       snapshotSchedule: this.fb.group({
         mode: [SnapshotScheduleMode.Manual],
@@ -183,6 +182,7 @@ export class NewTrackDialogComponent implements OnInit {
   public removeComponentTrack(track: VirtualComponentTrackOption): void {
     track.selected = false;
     track.objectTypes = [];
+    track.domains = [];
   }
 
   public handleCreate(): void {
@@ -206,7 +206,10 @@ export class NewTrackDialogComponent implements OnInit {
           auto_promote: !!this.form.get('autoPromote')?.value,
           member_sync: {
             strategy: this.form.get('memberSync')?.value,
-            supplant: this.form.get('supplantBehavior')?.value,
+            supplant: {
+              behavior: this.form.get('supplantBehavior')?.value,
+              status_policy: MemberSyncPolicy.Preserve,
+            },
           },
         },
         type: ReleaseTrackType.Standard,
@@ -259,11 +262,7 @@ export class NewTrackDialogComponent implements OnInit {
   private buildVirtualComposition(): any {
     const deduplication: any = {};
     const strategy = this.form.get('composition.deduplicationStrategy')?.value;
-    const tier = this.form.get('composition.deduplicationTier')?.value;
-    const status = this.form.get('composition.deduplicationStatus')?.value;
     if (strategy) deduplication.strategy = strategy;
-    if (tier) deduplication.tier_resolution = tier;
-    if (status) deduplication.status_resolution = status;
 
     return {
       component_tracks: this.selectedComponentTracks.map((track, priority) => {
@@ -273,11 +272,10 @@ export class NewTrackDialogComponent implements OnInit {
           priority,
         };
 
-        if (track.objectTypes.length) {
-          componentTrack.filters = {
-            object_types: track.objectTypes,
-          };
-        }
+        const filters: any = {};
+        if (track.objectTypes.length) filters.object_types = track.objectTypes;
+        if (track.domains.length) filters.domains = track.domains;
+        if (Object.keys(filters).length) componentTrack.filters = filters;
 
         return componentTrack;
       }),
@@ -321,6 +319,7 @@ export class NewTrackDialogComponent implements OnInit {
       taggedReleaseCount,
       selected: false,
       objectTypes: [],
+      domains: [],
     };
   }
 
@@ -380,4 +379,5 @@ interface VirtualComponentTrackOption {
   taggedReleaseCount: number;
   selected: boolean;
   objectTypes: StixType[];
+  domains: string[];
 }
