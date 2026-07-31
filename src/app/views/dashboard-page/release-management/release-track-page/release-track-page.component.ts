@@ -710,10 +710,9 @@ export class ReleaseTrackPageComponent implements OnInit {
       next: result => {
         if (!result || !selection.selected.length) return;
 
-        const objectRefs = selection.selected
-          .map(id => selectedObjectRefs.get(id))
-          .filter((ref): ref is { id: string; modified: string } => !!ref);
-        if (!objectRefs.length) return;
+        const objectRefs = selection.selected.map(
+          id => selectedObjectRefs.get(id) || id
+        );
 
         this.connector.addCandidates(this.id, objectRefs).subscribe({
           next: () => {
