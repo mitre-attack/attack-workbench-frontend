@@ -828,15 +828,13 @@ export class ReleaseTrackPageComponent implements OnInit {
       tier === 'candidate'
         ? this.resolveCandidateDiffObjects(item)
         : this.resolveStagedDiffObjects(item);
-    const relationshipAddedAfter =
+    const relationshipBaseline =
       tier === 'candidate'
-        ? (
-            this.findStagedEntry(item.object_ref) ??
-            this.findMemberEntry(item.object_ref)
-          )?.object_modified
-        : tier === 'staged'
-          ? this.findMemberEntry(item.object_ref)?.object_modified
-          : undefined;
+        ? (this.findStagedEntry(item.object_ref) ??
+          this.findMemberEntry(item.object_ref))
+        : this.findMemberEntry(item.object_ref);
+    const relationshipAddedAfter =
+      this.getDiffObjectModified(relationshipBaseline);
     diff.pipe(take(1)).subscribe(({ current, prior, expectedBaseline }) => {
       if (!current) {
         this.snackbar.open(
@@ -863,7 +861,7 @@ export class ReleaseTrackPageComponent implements OnInit {
       this.openDiffDialog(
         current,
         prior,
-        tier === 'staged' ? item.object_modified : undefined,
+        tier === 'staged' ? this.getDiffObjectModified(item) : undefined,
         relationshipAddedAfter
       );
     });
@@ -1675,7 +1673,12 @@ export class ReleaseTrackPageComponent implements OnInit {
   }
 
   private getReleaseTrackTier(item: any): 'candidate' | 'staged' | null {
-    if (item?.release_track_tier) return item.release_track_tier;
+    if (item?.release_track_tier) {
+      return item.release_track_tier === 'candidate' ||
+        item.release_track_tier === 'staged'
+        ? item.release_track_tier
+        : null;
+    }
     if (item?.object_staged_at || item?.object_staged_by) return 'staged';
     return item?.object_ref ? 'candidate' : null;
   }
@@ -1700,6 +1703,12 @@ export class ReleaseTrackPageComponent implements OnInit {
     );
   }
 
+  private getDiffObjectModified(
+    item: ReleaseTrackObjectItem | null
+  ): Date | string | undefined {
+    return item?.resolved_object_modified ?? item?.object_modified;
+  }
+
   private resolveCandidateDiffObjects(
     item: ReleaseTrackObjectItem
   ): Observable<{
@@ -1714,11 +1723,14 @@ export class ReleaseTrackPageComponent implements OnInit {
     const baselineEntry = stagedEntry ?? memberEntry;
 
     return forkJoin({
-      current: this.fetchObjectVersion(item.object_ref, item.object_modified),
+      current: this.fetchObjectVersion(
+        item.object_ref,
+        this.getDiffObjectModified(item)
+      ),
       prior: baselineEntry
         ? this.fetchObjectVersion(
             baselineEntry.object_ref,
-            baselineEntry.object_modified
+            this.getDiffObjectModified(baselineEntry)
           )
         : of(null),
     }).pipe(
@@ -1738,11 +1750,14 @@ export class ReleaseTrackPageComponent implements OnInit {
     const memberEntry = this.findMemberEntry(item.object_ref);
 
     return forkJoin({
-      current: this.fetchObjectVersion(item.object_ref, item.object_modified),
+      current: this.fetchObjectVersion(
+        item.object_ref,
+        this.getDiffObjectModified(item)
+      ),
       prior: memberEntry
         ? this.fetchObjectVersion(
             memberEntry.object_ref,
-            memberEntry.object_modified
+            this.getDiffObjectModified(memberEntry)
           )
         : of(null),
     }).pipe(
