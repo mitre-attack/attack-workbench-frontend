@@ -145,7 +145,7 @@
             type: 'data-component',
             showDeprecatedFilter: true,
             clickBehavior: 'dialog',
-            allowEdits: true,
+            allowEdits: canEdit,
           }"
           (refresh)="getDataComponents()"></app-stix-list>
       </div>
@@ -165,6 +165,8 @@
           [config]="{
             stixObjects: techniquesDetected,
             type: 'relationship',
+            relationshipCreatedBefore: config.relationshipCreatedBefore,
+            relationshipAddedAfter: config.relationshipAddedAfter,
             showDeprecatedFilter: true,
             clickBehavior: 'dialog',
             allowEdits: false,

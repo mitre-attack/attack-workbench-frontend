@@ -47,6 +47,8 @@ export class ReleaseTrackObjectCardComponent {
   @Input() laneStatus: WorkflowStatusType | null = null;
   @Input() showDescription = true;
   @Input() showDiff = true;
+  @Input() diffDisabled = false;
+  @Input() diffDisabledMessage = '';
   @Input() showModifiedMeta = true;
 
   @Output() viewObject = new EventEmitter<ReleaseTrackObjectItem>();
@@ -71,7 +73,9 @@ export class ReleaseTrackObjectCardComponent {
   }
 
   public get modified(): Date | string | null {
-    return this.item?.object_modified || null;
+    return (
+      this.item?.resolved_object_modified || this.item?.object_modified || null
+    );
   }
 
   public get modifiedHumanized(): string {

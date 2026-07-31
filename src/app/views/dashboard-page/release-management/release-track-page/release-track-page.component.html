@@ -25,11 +25,7 @@
         Create Draft
         <mat-icon>local_see</mat-icon>
       </button>
-      <button
-        mat-raised-button
-        color="primary"
-        [disabled]="!id || isReleasing"
-        (click)="onPreviewRelease()">
+      <button mat-raised-button color="primary" (click)="onPreviewRelease()">
         Preview & Release
         <mat-icon>preview</mat-icon>
       </button>
@@ -560,6 +556,8 @@
       [laneStatus]="getLaneStatus(item, lane)"
       [showDescription]="shouldShowLaneDescription(lane)"
       [showDiff]="!canReviewAndApprove(item, lane)"
+      [diffDisabled]="!shouldShowDiff(item)"
+      [diffDisabledMessage]="getDiffUnavailableMessage(item) || ''"
       [showModifiedMeta]="true"
       (viewObject)="onView($event.object_ref)"
       (diffObject)="onDiff($event)">

@@ -34,6 +34,10 @@ export interface UpdateMetadataPayload {
   object_marking_refs?: string[];
 }
 
+export interface UpdateContentsPayload {
+  x_mitre_contents: string[];
+}
+
 export type ReleasePayload =
   | { increment: 'major' | 'minor'; version?: never }
   | { increment?: never; version: string }

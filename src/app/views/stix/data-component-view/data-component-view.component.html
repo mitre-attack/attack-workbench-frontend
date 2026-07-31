@@ -112,6 +112,8 @@
                 (detectsHasData)="showTechniques = $event"
                 [config]="{
                   type: 'relationship',
+                  relationshipCreatedBefore: config.relationshipCreatedBefore,
+                  relationshipAddedAfter: config.relationshipAddedAfter,
                   sourceRef: dataComponent.stixID,
                   relationshipType: 'detects',
                   clickBehavior: 'dialog',

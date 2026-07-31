@@ -244,6 +244,7 @@ export class ReleaseTracksConnectorService extends ApiConnector {
 
   /**
    * GET /api/release-tracks/:id/snapshots/latest?format=:format
+   * GET /api/release-tracks/:id/snapshots/latest?format=:format
    * Retrieve the latest snapshot in an export format without deserializing it.
    * @param id Release track id
    * @param format Export format
