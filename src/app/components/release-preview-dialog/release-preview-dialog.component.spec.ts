@@ -134,11 +134,20 @@ describe('ReleasePreviewDialogComponent', () => {
 
   it('should block tagging when the backend reports release conflicts', () => {
     data.conflicts = [{ object_ref: 'attack-pattern--member' }];
+    fixture.detectChanges();
 
-    expect(component.hasInvalidVersionBumps).toBe(true);
+    expect(component.hasInvalidVersionBumps).toBe(false);
+    expect(component.hasPromotionConflicts).toBe(true);
+    expect(component.isReleaseBlocked).toBe(true);
     component.tagVersion('minor');
 
     expect(dialogRef.close).not.toHaveBeenCalled();
+    expect(fixture.nativeElement.textContent).toContain(
+      'Release is blocked by promotion conflicts.'
+    );
+    expect(fixture.nativeElement.textContent).not.toContain(
+      'Release is blocked by invalid incoming version bumps.'
+    );
   });
 
   it('should provide fallbacks for incomplete object metadata', () => {
@@ -189,6 +198,7 @@ describe('ReleasePreviewDialogComponent', () => {
     fixture.detectChanges();
 
     expect(component.hasInvalidVersionBumps).toBe(true);
+    expect(component.isReleaseBlocked).toBe(true);
     component.tagVersion('minor');
     expect(dialogRef.close).not.toHaveBeenCalled();
 

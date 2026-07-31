@@ -224,6 +224,13 @@
       <mat-icon aria-hidden="true">warning_amber</mat-icon>
       <span> Release is blocked by invalid incoming version bumps. </span>
     </p>
+    <p
+      *ngIf="!hasInvalidVersionBumps && hasPromotionConflicts"
+      class="release-blocked-message"
+      role="alert">
+      <mat-icon aria-hidden="true">warning_amber</mat-icon>
+      <span> Release is blocked by promotion conflicts. </span>
+    </p>
 
     <div class="release-preview-actions">
       <button mat-stroked-button type="button" (click)="close()">Cancel</button>
@@ -232,7 +239,7 @@
         class="release-preview-tag-minor-button"
         type="button"
         color="primary"
-        [disabled]="hasInvalidVersionBumps"
+        [disabled]="isReleaseBlocked"
         (click)="tagVersion('minor')">
         Tag Minor ({{ minorVersion }})
       </button>
@@ -241,7 +248,7 @@
         class="release-preview-tag-major-button"
         type="button"
         color="primary"
-        [disabled]="hasInvalidVersionBumps"
+        [disabled]="isReleaseBlocked"
         (click)="tagVersion('major')">
         Tag Major ({{ majorVersion }})
       </button>

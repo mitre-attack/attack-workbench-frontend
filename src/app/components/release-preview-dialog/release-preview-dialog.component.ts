@@ -167,10 +167,15 @@ export class ReleasePreviewDialogComponent {
   }
 
   public get hasInvalidVersionBumps(): boolean {
-    return (
-      !!this.data.conflicts?.length ||
-      this.includedObjects.some(item => item.invalidVersionBump)
-    );
+    return this.includedObjects.some(item => item.invalidVersionBump);
+  }
+
+  public get hasPromotionConflicts(): boolean {
+    return !!this.data.conflicts?.length;
+  }
+
+  public get isReleaseBlocked(): boolean {
+    return this.hasInvalidVersionBumps || this.hasPromotionConflicts;
   }
 
   public close(): void {
@@ -178,7 +183,7 @@ export class ReleasePreviewDialogComponent {
   }
 
   public tagVersion(type: 'minor' | 'major'): void {
-    if (this.hasInvalidVersionBumps) {
+    if (this.isReleaseBlocked) {
       return;
     }
 
