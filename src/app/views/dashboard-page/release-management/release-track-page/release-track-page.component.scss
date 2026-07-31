@@ -8,10 +8,6 @@ $awaiting-review-color: color.mix(
 );
 $released-members-disabled-light: colors.on-color-deemphasis(light);
 $released-members-disabled-dark: colors.on-color-deemphasis(dark);
-$snapshot-tagged-chip-light: colors.color(secondary);
-$snapshot-tagged-chip-dark: colors.color(mitre-light-blue);
-$snapshot-draft-chip-light: #5c4fa3;
-$snapshot-draft-chip-dark: #c7b9ff;
 
 .release-track-page {
   .promote-color {
@@ -586,52 +582,11 @@ $snapshot-draft-chip-dark: #c7b9ff;
       }
     }
 
-    .snapshot-history-type {
+    .snapshot-history-chips {
       display: inline-flex;
+      flex-wrap: wrap;
       align-items: center;
-      justify-content: center;
-      min-height: 24px;
-      border: 1px solid;
-      border-color: colors.border-color(light);
-      border-radius: 999px;
-      padding: 0 12px;
-      font-size: 12px;
-      font-weight: 700;
-      line-height: 18px;
-
-      .dark & {
-        border-color: colors.border-color(dark);
-      }
-
-      .light & {
-        border-color: colors.border-color(light);
-      }
-
-      &.snapshot-history-type-tagged {
-        border-color: colors.color(success);
-
-        .dark & {
-          background: rgba($snapshot-tagged-chip-dark, 0.18);
-          color: $snapshot-tagged-chip-dark;
-        }
-
-        .light & {
-          background: rgba($snapshot-tagged-chip-light, 0.16);
-          color: $snapshot-tagged-chip-light;
-        }
-      }
-
-      &.snapshot-history-type-draft {
-        .dark & {
-          background: rgba($snapshot-draft-chip-dark, 0.18);
-          color: $snapshot-draft-chip-dark;
-        }
-
-        .light & {
-          background: rgba($snapshot-draft-chip-light, 0.16);
-          color: $snapshot-draft-chip-light;
-        }
-      }
+      gap: 6px;
     }
 
     p {

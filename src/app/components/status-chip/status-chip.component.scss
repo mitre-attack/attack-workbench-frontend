@@ -1,17 +1,3 @@
-@use 'src/style/colors.scss' as colors;
-
-.status-chip {
-  .mat-mdc-chip.mat-mdc-standard-chip .mat-mdc-chip-action-label {
-    font-size: 12px !important;
-  }
-
-  .mat-mdc-chip.awaiting-review {
-    background: colors.color('pending');
-    color: colors.on-color('pending');
-  }
-
-  .mat-mdc-chip.reviewed {
-    background: colors.color('active');
-    color: colors.on-color('active');
-  }
+:host {
+  display: inline-flex;
 }

@@ -81,6 +81,8 @@ interface SnapshotHistoryViewModel {
   modified: string | null;
   taggedAt: Date | null;
   isTagged: boolean;
+  isLatest: boolean;
+  isCurrentDraft: boolean;
   stats: SnapshotHistoryStat[];
   addedCount: number;
   modifiedCount: number;
@@ -312,7 +314,9 @@ export class ReleaseTrackPageComponent implements OnInit {
   }
 
   public get hasCurrentDraftSnapshot(): boolean {
-    return this.snapshotHistory.some(item => !item.isTagged);
+    return this.snapshotHistory.some((item, index) =>
+      this.isCurrentDraftHistoryItem(item, index)
+    );
   }
 
   public get taggedSnapshotCount(): number {
@@ -498,7 +502,23 @@ export class ReleaseTrackPageComponent implements OnInit {
   }
 
   private get latestDraftSnapshot(): SnapshotHistoryViewModel | undefined {
-    return this.snapshotHistory.find(snapshot => !snapshot.isTagged);
+    return this.snapshotHistory.find((snapshot, index) =>
+      this.isCurrentDraftHistoryItem(snapshot, index)
+    );
+  }
+
+  private isCurrentDraftHistoryItem(
+    item: SnapshotHistoryViewModel,
+    index: number
+  ): boolean {
+    return (
+      !item.isTagged &&
+      (typeof item.isCurrentDraft === 'boolean'
+        ? item.isCurrentDraft
+        : typeof item.isLatest === 'boolean'
+          ? item.isLatest
+          : index === 0)
+    );
   }
 
   public get canEditReleaseTrack(): boolean {
@@ -2473,9 +2493,14 @@ export class ReleaseTrackPageComponent implements OnInit {
     const sorted = [...snapshots].sort(
       (a, b) => this.getSnapshotTime(b) - this.getSnapshotTime(a)
     );
+    const latestSnapshot =
+      sorted.find(snapshot => this.isLatestHistorySnapshot(snapshot)) ??
+      sorted[0];
 
     return sorted.map((snapshot, index) => {
       const previousSnapshot = sorted[index + 1];
+      const isTagged = this.isTaggedSnapshot(snapshot);
+      const isLatest = snapshot === latestSnapshot;
       const currentMembers = this.getSnapshotMembers(snapshot);
       const previousMembers = previousSnapshot
         ? this.getSnapshotMembers(previousSnapshot)
@@ -2501,7 +2526,9 @@ export class ReleaseTrackPageComponent implements OnInit {
         created: this.getSnapshotDate(snapshot),
         modified: this.getSnapshotModified(snapshot),
         taggedAt: this.getSnapshotTaggedAt(snapshot),
-        isTagged: this.isTaggedSnapshot(snapshot),
+        isTagged,
+        isLatest,
+        isCurrentDraft: !isTagged && isLatest,
         stats: this.getSnapshotStats(snapshot, addedCount, modifiedCount),
         addedCount,
         modifiedCount,

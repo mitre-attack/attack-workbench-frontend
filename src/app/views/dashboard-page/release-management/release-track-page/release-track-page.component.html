@@ -652,12 +652,15 @@
                       </ng-container>
                     </ng-template>
                   </h3>
-                  <span
-                    class="snapshot-history-type"
-                    [class.snapshot-history-type-tagged]="item.isTagged"
-                    [class.snapshot-history-type-draft]="!item.isTagged">
-                    {{ item.isTagged ? 'Tagged release' : 'Current draft' }}
-                  </span>
+                  <div class="snapshot-history-chips">
+                    <app-workbench-chip
+                      [variant]="
+                        item.isTagged ? 'tagged' : 'draft'
+                      "></app-workbench-chip>
+                    <app-workbench-chip
+                      *ngIf="item.isLatest"
+                      variant="latest"></app-workbench-chip>
+                  </div>
                 </div>
                 <p *ngIf="item.isTagged; else draftSubtitle">
                   <ng-container *ngIf="item.taggedAt; else taggedSnapshotDate">
@@ -672,7 +675,7 @@
                   </ng-template>
                 </p>
                 <ng-template #draftSubtitle>
-                  <p>Current draft snapshot</p>
+                  <p>Draft release snapshot</p>
                 </ng-template>
                 <p
                   *ngIf="item.isTagged && item.taggedAt && item.modified"

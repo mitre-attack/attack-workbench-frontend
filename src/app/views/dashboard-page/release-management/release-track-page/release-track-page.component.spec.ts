@@ -767,6 +767,95 @@ describe('ReleaseTrackPageComponent', () => {
     ]);
   });
 
+  it('should only mark the latest draft snapshot as current', () => {
+    mockReleaseTrackApiConnector.listSnapshots.mockReturnValue(
+      of([
+        {
+          modified: '2024-05-21T07:00:00.000Z',
+          version: null,
+          type: ReleaseTrackType.Standard,
+        },
+        {
+          modified: '2024-05-20T07:00:00.000Z',
+          version: null,
+          type: ReleaseTrackType.Standard,
+        },
+        {
+          modified: '2024-05-19T07:00:00.000Z',
+          version: '1.0',
+          type: ReleaseTrackType.Standard,
+        },
+      ])
+    );
+    component.id = 'release-track--123';
+
+    component.getSnapshotHistory();
+
+    expect(component.snapshotHistory[0]).toEqual(
+      expect.objectContaining({
+        modified: '2024-05-21T07:00:00.000Z',
+        isTagged: false,
+        isLatest: true,
+        isCurrentDraft: true,
+      })
+    );
+    expect(component.snapshotHistory[1]).toEqual(
+      expect.objectContaining({
+        modified: '2024-05-20T07:00:00.000Z',
+        isTagged: false,
+        isLatest: false,
+        isCurrentDraft: false,
+      })
+    );
+    expect(component.snapshotHistory[2]).toEqual(
+      expect.objectContaining({
+        modified: '2024-05-19T07:00:00.000Z',
+        isTagged: true,
+        isLatest: false,
+        isCurrentDraft: false,
+      })
+    );
+    expect(component.hasCurrentDraftSnapshot).toBe(true);
+  });
+
+  it('should mark a tagged current snapshot as latest', () => {
+    mockReleaseTrackApiConnector.listSnapshots.mockReturnValue(
+      of([
+        {
+          modified: '2024-05-21T07:00:00.000Z',
+          version: '1.1',
+          type: ReleaseTrackType.Standard,
+        },
+        {
+          modified: '2024-05-20T07:00:00.000Z',
+          version: null,
+          type: ReleaseTrackType.Standard,
+        },
+      ])
+    );
+    component.id = 'release-track--123';
+
+    component.getSnapshotHistory();
+
+    expect(component.snapshotHistory[0]).toEqual(
+      expect.objectContaining({
+        modified: '2024-05-21T07:00:00.000Z',
+        isTagged: true,
+        isLatest: true,
+        isCurrentDraft: false,
+      })
+    );
+    expect(component.snapshotHistory[1]).toEqual(
+      expect.objectContaining({
+        modified: '2024-05-20T07:00:00.000Z',
+        isTagged: false,
+        isLatest: false,
+        isCurrentDraft: false,
+      })
+    );
+    expect(component.hasCurrentDraftSnapshot).toBe(false);
+  });
+
   it('should create a draft snapshot and refresh the release track', () => {
     const refreshSpy = vi
       .spyOn(component, 'getReleaseTrack')

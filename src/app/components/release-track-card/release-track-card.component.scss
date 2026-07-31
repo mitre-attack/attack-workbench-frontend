@@ -1,8 +1,6 @@
 @use 'sass:color';
 @use '../../../style/colors';
 
-$virtual-light: #5c4fa3;
-$virtual-dark: #c7b9ff;
 $candidate-dark: colors.color(mitre-light-blue);
 $staged-dark: color.mix(white, colors.color(success), 28%);
 $description-line-height: 1.25rem;
@@ -36,46 +34,6 @@ $description-lines: 4;
 
 .release-track-type-chip {
   flex: none;
-}
-
-.release-track-type-chip.mat-mdc-standard-chip {
-  font-size: 12px;
-  font-weight: 700;
-  min-height: 24px;
-
-  &.standard-chip {
-    --mdc-chip-elevated-container-color: #{rgba(colors.color(secondary), 0.16)};
-    --mdc-chip-label-text-color: #{colors.color(secondary)};
-  }
-
-  &.virtual-chip {
-    --mdc-chip-elevated-container-color: #{rgba($virtual-light, 0.16)};
-    --mdc-chip-label-text-color: #{$virtual-light};
-  }
-}
-
-:host ::ng-deep .release-track-type-chip.mat-mdc-standard-chip {
-  background: var(--mdc-chip-elevated-container-color) !important;
-  color: var(--mdc-chip-label-text-color) !important;
-
-  .mdc-evolution-chip__action--primary {
-    border: 1px solid transparent;
-    border-radius: 999px;
-    background: var(--mdc-chip-elevated-container-color);
-  }
-
-  .mat-mdc-chip-action-label,
-  .mdc-evolution-chip__text-label {
-    color: inherit !important;
-  }
-
-  &.standard-chip .mdc-evolution-chip__action--primary {
-    border-color: rgba(colors.color(secondary), 0.38);
-  }
-
-  &.virtual-chip .mdc-evolution-chip__action--primary {
-    border-color: rgba($virtual-light, 0.38);
-  }
 }
 
 .card-body {
@@ -192,28 +150,6 @@ $description-lines: 4;
 :host-context(.dark) {
   .list-card {
     color: colors.on-color-emphasis(dark);
-  }
-
-  .release-track-type-chip.mat-mdc-standard-chip {
-    &.standard-chip {
-      --mdc-chip-elevated-container-color: #{rgba($candidate-dark, 0.18)};
-      --mdc-chip-label-text-color: #{$candidate-dark};
-    }
-
-    &.virtual-chip {
-      --mdc-chip-elevated-container-color: #{rgba($virtual-dark, 0.18)};
-      --mdc-chip-label-text-color: #{$virtual-dark};
-    }
-  }
-
-  ::ng-deep .release-track-type-chip.mat-mdc-standard-chip {
-    &.standard-chip .mdc-evolution-chip__action--primary {
-      border-color: rgba($candidate-dark, 0.44);
-    }
-
-    &.virtual-chip .mdc-evolution-chip__action--primary {
-      border-color: rgba($virtual-dark, 0.44);
-    }
   }
 
   .card-stats {

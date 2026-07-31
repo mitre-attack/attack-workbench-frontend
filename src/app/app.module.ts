@@ -242,6 +242,7 @@ import { ReleaseTrackObjectCardComponent } from './components/release-track-obje
 import { NewTrackDialogComponent } from './components/new-track-dialog/new-track-dialog.component';
 import { ReleaseTrackPageComponent } from './views/dashboard-page/release-management/release-track-page/release-track-page.component';
 import { StatusChipComponent } from './components/status-chip/status-chip.component';
+import { WorkbenchChipComponent } from './components/workbench-chip/workbench-chip.component';
 
 export function initConfig(appConfigService: AppConfigService) {
   return () => appConfigService.loadAppConfig();
@@ -483,6 +484,7 @@ export function initConfig(appConfigService: AppConfigService) {
     OverlayModule,
     MatAutocompleteModule,
     UserAvatarComponent,
+    WorkbenchChipComponent,
     ReleaseTrackCardComponent,
     ReleaseTrackObjectCardComponent,
   ],
