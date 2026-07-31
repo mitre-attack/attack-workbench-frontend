@@ -834,7 +834,9 @@ export class ReleaseTrackPageComponent implements OnInit {
             this.findStagedEntry(item.object_ref) ??
             this.findMemberEntry(item.object_ref)
           )?.object_modified
-        : undefined;
+        : tier === 'staged'
+          ? this.findMemberEntry(item.object_ref)?.object_modified
+          : undefined;
     diff.pipe(take(1)).subscribe(({ current, prior, expectedBaseline }) => {
       if (!current) {
         this.snackbar.open(
