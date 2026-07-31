@@ -1758,79 +1758,80 @@ export class ReleaseTrackPageComponent implements OnInit {
   ): Observable<StixObject | null> {
     const stixType = objectRef.split('--')[0] as StixType;
     const attackType = StixTypeToAttackType[stixType];
+    const requestedModified = modified === 'latest' ? undefined : modified;
 
     let requestObject: Observable<StixObject[]>;
     switch (attackType) {
       case 'technique':
         requestObject = this.restApiConnectorService.getTechnique(
           objectRef,
-          modified
+          requestedModified
         );
         break;
       case 'tactic':
         requestObject = this.restApiConnectorService.getTactic(
           objectRef,
-          modified
+          requestedModified
         );
         break;
       case 'group':
         requestObject = this.restApiConnectorService.getGroup(
           objectRef,
-          modified
+          requestedModified
         );
         break;
       case 'campaign':
         requestObject = this.restApiConnectorService.getCampaign(
           objectRef,
-          modified
+          requestedModified
         );
         break;
       case 'asset':
         requestObject = this.restApiConnectorService.getAsset(
           objectRef,
-          modified
+          requestedModified
         );
         break;
       case 'software':
         requestObject = this.restApiConnectorService.getSoftware(
           objectRef,
-          modified
+          requestedModified
         );
         break;
       case 'mitigation':
         requestObject = this.restApiConnectorService.getMitigation(
           objectRef,
-          modified
+          requestedModified
         );
         break;
       case 'matrix':
         requestObject = this.restApiConnectorService.getMatrix(
           objectRef,
-          modified
+          requestedModified
         );
         break;
       case 'data-source':
         requestObject = this.restApiConnectorService.getDataSource(
           objectRef,
-          modified
+          requestedModified
         );
         break;
       case 'data-component':
         requestObject = this.restApiConnectorService.getDataComponent(
           objectRef,
-          modified
+          requestedModified
         );
         break;
       case 'detection-strategy':
         requestObject = this.restApiConnectorService.getDetectionStrategy(
           objectRef,
-          modified
+          requestedModified
         );
         break;
       case 'analytic':
         requestObject = this.restApiConnectorService.getAnalytic(
           objectRef,
-          modified
+          requestedModified
         );
         break;
       default:
