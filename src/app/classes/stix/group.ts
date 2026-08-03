@@ -9,6 +9,7 @@ export class Group extends StixObject {
   public name = '';
   public aliases: string[] = [];
   public contributors: string[] = [];
+  public domains: string[] = [];
 
   public readonly supportsAttackID = true;
   protected get attackIDValidator() {
@@ -38,6 +39,7 @@ export class Group extends StixObject {
     rep.stix.name = this.name.trim();
     rep.stix.aliases = this.aliases.map(x => x.trim());
     rep.stix.x_mitre_contributors = this.contributors.map(x => x.trim());
+    rep.stix.x_mitre_domains = this.domains;
 
     // Strip properties that are empty strs + lists
     rep.stix = this.filterObject(rep.stix);
@@ -90,6 +92,12 @@ export class Group extends StixObject {
             ')'
           );
       } else this.contributors = [];
+
+      if ('x_mitre_domains' in sdo) {
+        if (this.isStringArray(sdo.x_mitre_domains))
+          this.domains = sdo.x_mitre_domains;
+        else logger.error('TypeError: domains field is not a string array.');
+      } else this.domains = [];
     }
   }
 

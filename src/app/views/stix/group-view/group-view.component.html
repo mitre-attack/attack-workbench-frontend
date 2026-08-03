@@ -44,6 +44,19 @@
       </div>
       <div class="row">
         <div class="col">
+          <!-- DOMAINS -->
+          <app-list-property
+            class="grow-to-row"
+            [config]="{
+              mode: config.mode,
+              object: config.object,
+              field: 'domains',
+              editType: 'select',
+            }"></app-list-property>
+        </div>
+      </div>
+      <div class="row">
+        <div class="col">
           <!-- CONTRIBUTORS -->
           <app-list-property
             class="grow-to-row"

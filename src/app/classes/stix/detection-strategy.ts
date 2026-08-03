@@ -9,6 +9,7 @@ export class DetectionStrategy extends StixObject {
   public name = '';
   public contributors: string[] = [];
   public analytics: string[] = []; // list of x-mitre-analytic uuids
+  public domains: string[] = [];
 
   public readonly supportsAttackID = true;
   protected get attackIDValidator() {
@@ -37,6 +38,7 @@ export class DetectionStrategy extends StixObject {
     rep.stix.name = this.name.trim();
     rep.stix.x_mitre_contributors = this.contributors.map(x => x.trim());
     if (this.analytics) rep.stix.x_mitre_analytic_refs = this.analytics;
+    rep.stix.x_mitre_domains = this.domains;
 
     // Strip properties that are empty strs + lists
     rep.stix = this.filterObject(rep.stix);
@@ -78,6 +80,12 @@ export class DetectionStrategy extends StixObject {
             `TypeError: x_mitre_analytic_refs field is not a string array: ${sdo.x_mitre_analytic_refs} (${typeof sdo.x_mitre_analytic_refs})`
           );
       } else this.analytics = [];
+
+      if ('x_mitre_domains' in sdo) {
+        if (this.isStringArray(sdo.x_mitre_domains))
+          this.domains = sdo.x_mitre_domains;
+        else logger.error('TypeError: domains field is not a string array.');
+      } else this.domains = [];
     }
   }
 

@@ -226,6 +226,8 @@ When creating and/or editing an object, you can add multiple statements and sele
 
 Any object in the knowledge base, except for marking definitions, can be edited, even those imported from collections. Clicking the "edit" button in the toolbar, or the "edit" link in an object list, will bring you to the edit interface for the object. While editing an object, relationships cannot be viewed or created since they are saved independently of the objects they connect.
 
+Domain-bearing ATT&CK objects expose a Domain field that reads and writes the STIX `x_mitre_domains` list. This includes techniques, campaigns, mitigations, groups, software, analytics, assets, data components, data sources, detection strategies, matrices, and tactics. When an existing object is revised, its domains are retained unless the editor explicitly changes them.
+
 #### Editing Matrices
 
 Matrices share the typical fields on objects, including a description supporting markdown, LinkByIds, and citations. Unlike other object types, their IDs serve as identifier for their domain:

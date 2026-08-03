@@ -9,6 +9,7 @@ import { WorkflowStatusType } from 'src/app/utils/types';
 export class Matrix extends StixObject {
   public name = '';
   public tactic_refs: string[] = [];
+  public domains: string[] = [];
   // NOTE: this is only populated in the matrix view when calling getTechniquesInMatrix() NOT getMatrix()
   public tactic_objects: Tactic[] = [];
 
@@ -40,6 +41,7 @@ export class Matrix extends StixObject {
 
     rep.stix.name = this.name.trim();
     rep.stix.tactic_refs = this.tactic_refs;
+    rep.stix.x_mitre_domains = this.domains;
 
     // Strip properties that are empty strs + lists
     rep.stix = this.filterObject(rep.stix);
@@ -80,6 +82,12 @@ export class Matrix extends StixObject {
             ')'
           );
       } else this.tactic_refs = [];
+
+      if ('x_mitre_domains' in sdo) {
+        if (this.isStringArray(sdo.x_mitre_domains))
+          this.domains = sdo.x_mitre_domains;
+        else logger.error('TypeError: domains field is not a string array.');
+      } else this.domains = [];
     }
   }
 
@@ -116,6 +124,7 @@ export class Matrix extends StixObject {
 
   public delete(_restAPIService: RestApiConnectorService): Observable<object> {
     // deletion is not supported on Matrix objects
+    void _restAPIService;
     return of({});
   }
 
