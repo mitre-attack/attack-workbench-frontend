@@ -1,3 +1,4 @@
+import { Clipboard } from '@angular/cdk/clipboard';
 import { SelectionModel } from '@angular/cdk/collections';
 import { Component, OnInit } from '@angular/core';
 import { FormBuilder, FormGroup } from '@angular/forms';
@@ -57,6 +58,7 @@ import { ALL_OBJECTS_STIX_LIST_CONFIG } from 'src/app/views/stix/all-objects-pag
 import { StixDialogComponent } from 'src/app/views/stix/stix-dialog/stix-dialog.component';
 
 type ReleaseTrackLaneType = 'candidate' | 'staged' | 'member';
+type SnapshotExportChoice = ExportFormatType | 'copy-summary';
 
 interface ReleaseTrackWorkspaceLane {
   key: string;
@@ -229,6 +231,7 @@ export class ReleaseTrackPageComponent implements OnInit {
     private snackbar: MatSnackBar,
     private restApiConnectorService: RestApiConnectorService,
     private authenticationService: AuthenticationService,
+    private clipboard: Clipboard,
     private fb: FormBuilder
   ) {
     this.configForm = this.fb.group({
@@ -1463,33 +1466,52 @@ export class ReleaseTrackPageComponent implements OnInit {
     this.openExportFormatDialog('Export latest release snapshot')
       .pipe(take(1))
       .subscribe(format => {
-        if (!format) return;
+        if (!format || format === 'copy-summary') return;
         this.downloadLatestReleaseTrack(format);
       });
   }
 
   private openExportFormatDialog(
-    title: string
-  ): Observable<ExportFormatType | null> {
+    title: string,
+    includeSummary = false
+  ): Observable<SnapshotExportChoice | null> {
+    const choices: {
+      label: string;
+      value: SnapshotExportChoice;
+      description: string;
+    }[] = [
+      {
+        label: 'Bundle',
+        value: ExportFormat.Bundle,
+        description:
+          'Download a standard STIX 2.1 JSON bundle for publication or interchange.',
+      },
+      {
+        label: 'Workbench',
+        value: ExportFormat.Workbench,
+        description:
+          'Download the snapshot with workflow tiers, metadata, and other Workbench-specific data.',
+      },
+    ];
+
+    if (includeSummary) {
+      choices.push({
+        label: 'Copy summary',
+        value: 'copy-summary',
+        description:
+          'Copy lightweight snapshot metadata, object counts, and graph-cache statistics to the clipboard.',
+      });
+    }
+
     const formatRef = this.dialog.open(MultipleChoiceDialogComponent, {
       width: '30em',
       autoFocus: false,
       data: {
         title,
-        choices: [
-          {
-            label: 'Bundle',
-            value: ExportFormat.Bundle,
-            description:
-              'A standard STIX 2.1 JSON bundle containing all member objects of the release.',
-          },
-          {
-            label: 'Workbench',
-            value: ExportFormat.Workbench,
-            description:
-              'A richer format including workflow statuses, metadata, and other Workbench-specific data.',
-          },
-        ],
+        description: includeSummary
+          ? 'Choose a downloadable snapshot format or copy its concise history summary.'
+          : 'Choose a downloadable snapshot format.',
+        choices,
       },
     });
 
@@ -1497,7 +1519,9 @@ export class ReleaseTrackPageComponent implements OnInit {
       .afterClosed()
       .pipe(
         map(format =>
-          format === ExportFormat.Bundle || format === ExportFormat.Workbench
+          format === ExportFormat.Bundle ||
+          format === ExportFormat.Workbench ||
+          (includeSummary && format === 'copy-summary')
             ? format
             : null
         )
@@ -1795,12 +1819,72 @@ export class ReleaseTrackPageComponent implements OnInit {
     if (!this.id || !item.modified) return;
     const modified = item.modified;
 
-    this.openExportFormatDialog('Export release track snapshot')
+    this.openExportFormatDialog('Export release track snapshot', true)
       .pipe(take(1))
-      .subscribe(format => {
-        if (!format) return;
-        this.downloadSnapshot(item, modified, format);
+      .subscribe(choice => {
+        if (!choice) return;
+        if (choice === 'copy-summary') {
+          this.copySnapshotSummary(item);
+          return;
+        }
+        this.downloadSnapshot(item, modified, choice);
       });
+  }
+
+  private copySnapshotSummary(item: SnapshotHistoryViewModel): void {
+    const copied = this.clipboard.copy(
+      JSON.stringify(this.getSnapshotClipboardSummary(item), null, 2)
+    );
+
+    this.snackbar.open(
+      copied
+        ? 'Snapshot summary copied to the clipboard.'
+        : 'Unable to copy the snapshot summary.',
+      null,
+      copied ? { duration: 3000 } : { duration: 5000, panelClass: 'error' }
+    );
+  }
+
+  private getSnapshotClipboardSummary(
+    item: SnapshotHistoryViewModel
+  ): Record<string, any> {
+    const snapshot = item.snapshot;
+    const type = this.getSnapshotType(snapshot);
+    const counts =
+      type === ReleaseTrackType.Virtual
+        ? {
+            members: this.getSnapshotCount(snapshot, 'members_count') ?? 0,
+            quarantine:
+              this.getSnapshotCount(
+                snapshot,
+                'quarantine_count',
+                'quarantined_count'
+              ) ?? 0,
+          }
+        : {
+            members: this.getSnapshotCount(snapshot, 'members_count') ?? 0,
+            staged: this.getSnapshotCount(snapshot, 'staged_count') ?? 0,
+            candidates:
+              this.getSnapshotCount(snapshot, 'candidates_count') ?? 0,
+          };
+
+    return {
+      id: snapshot.id || this.id,
+      name: snapshot.name || this.releaseTrackName,
+      type,
+      version: snapshot.version ?? null,
+      modified: item.modified,
+      tagged: item.isTagged,
+      latest: item.isLatest,
+      counts,
+      graph_cache: item.isBundleCached
+        ? {
+            cached: true,
+            manifest_id: snapshot.graph_manifest_id,
+            statistics: snapshot.graph_statistics,
+          }
+        : { cached: false },
+    };
   }
 
   public isCachingSnapshot(item: SnapshotHistoryViewModel): boolean {

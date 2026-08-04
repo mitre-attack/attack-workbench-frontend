@@ -1,4 +1,5 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { Clipboard } from '@angular/cdk/clipboard';
 
 import { ReleaseTrackPageComponent } from './release-track-page.component';
 import { ReleaseTracksConnectorService } from 'src/app/services/connectors/rest-api/release-tracks.service';
@@ -41,6 +42,7 @@ describe('ReleaseTrackPageComponent', () => {
   let mockRouter: any;
   let mockAuthenticationService: any;
   let mockSnackbar: any;
+  let mockClipboard: any;
 
   beforeEach(async () => {
     mockReleaseTrackApiConnector = createMockReleaseTrackApiConnector({
@@ -74,6 +76,9 @@ describe('ReleaseTrackPageComponent', () => {
     };
     mockSnackbar = {
       open: vi.fn(),
+    };
+    mockClipboard = {
+      copy: vi.fn(() => true),
     };
     mockRestApiConnector = {
       getAllObjects: vi.fn(() => of(createPaginatedResponse([]))),
@@ -112,6 +117,10 @@ describe('ReleaseTrackPageComponent', () => {
         {
           provide: MatSnackBar,
           useValue: mockSnackbar,
+        },
+        {
+          provide: Clipboard,
+          useValue: mockClipboard,
         },
         {
           provide: BreadcrumbService,
@@ -445,6 +454,123 @@ describe('ReleaseTrackPageComponent', () => {
     expect(mockRestApiConnector.triggerBrowserDownload).toHaveBeenCalledWith(
       exportPayload,
       'enterprise-release-draft-workbench.json'
+    );
+  });
+
+  it('should copy a concise snapshot summary without requesting an export', () => {
+    mockDialog.open.mockReturnValue({
+      afterClosed: () => of('copy-summary'),
+    });
+    component.id = 'release-track--123';
+    component.releaseTrack = {
+      name: 'Enterprise Release',
+      type: ReleaseTrackType.Standard,
+    } as any;
+
+    component.onExportSnapshot({
+      snapshot: {
+        id: 'release-track--123',
+        name: 'Enterprise Release',
+        modified: '2024-04-15T06:00:00.000Z',
+        type: ReleaseTrackType.Standard,
+        version: '1.3',
+        members_count: 120,
+        staged_count: 4,
+        candidates_count: 9,
+        graph_manifest_id: 'release-track-graph-manifest--cached',
+        graph_statistics: {
+          primary_count: 120,
+          secondary_count: 18,
+          relationship_count: 42,
+          supporting_count: 3,
+          link_target_count: 2,
+          total_count: 185,
+        },
+      },
+      title: 'v1.3',
+      created: new Date('2024-04-15T06:00:00.000Z'),
+      modified: '2024-04-15T06:00:00.000Z',
+      taggedAt: new Date('2024-04-15T06:30:00.000Z'),
+      isTagged: true,
+      isLatest: false,
+      isBundleCached: true,
+      stats: [],
+      graphCacheStats: [],
+      graphCacheTotal: 185,
+      addedCount: 0,
+      modifiedCount: 0,
+      totalObjects: 120,
+    } as any);
+
+    const choices = mockDialog.open.mock.calls[0][1].data.choices;
+    expect(choices.map((choice: any) => choice.value)).toEqual([
+      'bundle',
+      'workbench',
+      'copy-summary',
+    ]);
+    expect(
+      mockReleaseTrackApiConnector.exportSnapshotByModified
+    ).not.toHaveBeenCalled();
+    expect(mockClipboard.copy).toHaveBeenCalledOnce();
+    expect(JSON.parse(mockClipboard.copy.mock.calls[0][0])).toEqual({
+      id: 'release-track--123',
+      name: 'Enterprise Release',
+      type: 'standard',
+      version: '1.3',
+      modified: '2024-04-15T06:00:00.000Z',
+      tagged: true,
+      latest: false,
+      counts: {
+        members: 120,
+        staged: 4,
+        candidates: 9,
+      },
+      graph_cache: {
+        cached: true,
+        manifest_id: 'release-track-graph-manifest--cached',
+        statistics: {
+          primary_count: 120,
+          secondary_count: 18,
+          relationship_count: 42,
+          supporting_count: 3,
+          link_target_count: 2,
+          total_count: 185,
+        },
+      },
+    });
+    expect(mockSnackbar.open).toHaveBeenCalledWith(
+      'Snapshot summary copied to the clipboard.',
+      null,
+      { duration: 3000 }
+    );
+  });
+
+  it('should report when a snapshot summary cannot be copied', () => {
+    mockDialog.open.mockReturnValue({
+      afterClosed: () => of('copy-summary'),
+    });
+    mockClipboard.copy.mockReturnValue(false);
+    component.id = 'release-track--123';
+
+    component.onExportSnapshot({
+      snapshot: {
+        modified: '2024-05-21T07:00:00.000Z',
+        type: ReleaseTrackType.Virtual,
+        version: null,
+        members_count: 8,
+        quarantine_count: 2,
+      },
+      title: 'Draft Snapshot',
+      modified: '2024-05-21T07:00:00.000Z',
+      isTagged: false,
+      isLatest: true,
+      isBundleCached: false,
+    } as any);
+
+    expect(mockSnackbar.open).toHaveBeenCalledWith(
+      'Unable to copy the snapshot summary.',
+      null,
+      { duration: 5000, panelClass: 'error' }
     );
   });
 
