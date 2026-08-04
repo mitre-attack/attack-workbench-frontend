@@ -57,7 +57,10 @@ describe('ReleaseTracksConnectorService', () => {
     http.get.mockReturnValue(of(exportPayload));
 
     const result = await firstValueFrom(
-      service.exportLatestSnapshot(trackId, 'bundle', { include: 'all' })
+      service.exportLatestSnapshot(trackId, 'bundle', {
+        include: 'all',
+        stixVersion: '2.0',
+      })
     );
 
     expect(http.get).toHaveBeenCalledWith(
@@ -68,6 +71,7 @@ describe('ReleaseTracksConnectorService', () => {
     );
     expect(http.get.mock.calls[0][1].params.get('format')).toBe('bundle');
     expect(http.get.mock.calls[0][1].params.get('include')).toBe('all');
+    expect(http.get.mock.calls[0][1].params.get('stixVersion')).toBe('2.0');
     expect(result).toEqual(exportPayload);
   });
 

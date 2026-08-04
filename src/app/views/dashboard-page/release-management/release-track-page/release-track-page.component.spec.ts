@@ -238,7 +238,7 @@ describe('ReleaseTrackPageComponent', () => {
   it('should download the release track in the selected export format', () => {
     const exportPayload = { type: 'bundle', objects: [] };
     mockDialog.open.mockReturnValue({
-      afterClosed: () => of('bundle'),
+      afterClosed: () => of('bundle-stix-2.1'),
     });
     mockReleaseTrackApiConnector.exportLatestSnapshot.mockReturnValue(
       of(exportPayload)
@@ -254,19 +254,24 @@ describe('ReleaseTrackPageComponent', () => {
       expect.anything()
     );
     expect(choices.map((choice: any) => choice.value)).toEqual([
-      'bundle',
+      'bundle-stix-2.0',
+      'bundle-stix-2.1',
       'workbench',
     ]);
     expect(choices.map((choice: any) => choice.label)).toEqual([
-      'Bundle',
+      'Bundle (STIX 2.0)',
+      'Bundle (STIX 2.1)',
       'Workbench',
     ]);
     expect(
       mockReleaseTrackApiConnector.exportLatestSnapshot
-    ).toHaveBeenCalledWith('release-track--123', 'bundle', { include: 'all' });
+    ).toHaveBeenCalledWith('release-track--123', 'bundle', {
+      include: 'all',
+      stixVersion: '2.1',
+    });
     expect(mockRestApiConnector.triggerBrowserDownload).toHaveBeenCalledWith(
       exportPayload,
-      'enterprise-release-latest-bundle.json'
+      'enterprise-release-latest-bundle-stix-2.1.json'
     );
   });
 
@@ -294,7 +299,7 @@ describe('ReleaseTrackPageComponent', () => {
   it('should export a standard draft snapshot with staged content', () => {
     const exportPayload = { type: 'bundle', objects: [] };
     mockDialog.open.mockReturnValue({
-      afterClosed: () => of('bundle'),
+      afterClosed: () => of('bundle-stix-2.0'),
     });
     mockReleaseTrackApiConnector.exportSnapshotByModified.mockReturnValue(
       of(exportPayload)
@@ -328,57 +333,69 @@ describe('ReleaseTrackPageComponent', () => {
       'release-track--123',
       '2024-05-21T07:00:00.000Z',
       'bundle',
-      { include: 'staged' }
+      { include: 'staged', stixVersion: '2.0' }
     );
     expect(mockRestApiConnector.triggerBrowserDownload).toHaveBeenCalledWith(
       exportPayload,
-      'enterprise-release-draft-bundle.json'
+      'enterprise-release-draft-bundle-stix-2.0.json'
     );
   });
 
-  it('should export a tagged standard snapshot without staged content', () => {
-    mockDialog.open.mockReturnValue({
-      afterClosed: () => of('bundle'),
-    });
-    mockReleaseTrackApiConnector.exportSnapshotByModified.mockReturnValue(
-      of({ type: 'bundle', objects: [] })
-    );
-    component.id = 'release-track--123';
-    component.releaseTrack = {
-      type: ReleaseTrackType.Standard,
-    } as any;
-
-    component.onExportSnapshot({
-      snapshot: {
-        modified: '2024-04-15T06:00:00.000Z',
+  it.each([
+    ['2.0', 'bundle-stix-2.0'],
+    ['2.1', 'bundle-stix-2.1'],
+  ] as const)(
+    'should export a cached tagged standard snapshot as STIX %s without staged content',
+    (stixVersion, choice) => {
+      mockDialog.open.mockReturnValue({
+        afterClosed: () => of(choice),
+      });
+      mockReleaseTrackApiConnector.exportSnapshotByModified.mockReturnValue(
+        of({ type: 'bundle', objects: [] })
+      );
+      component.id = 'release-track--123';
+      component.releaseTrack = {
+        name: 'Enterprise Release',
         type: ReleaseTrackType.Standard,
-        version: '1.3',
-        snapshot_description: 'Published analyst context',
-      },
-      title: 'v1.3',
-      created: new Date('2024-04-15T06:00:00.000Z'),
-      modified: '2024-04-15T06:00:00.000Z',
-      taggedAt: new Date('2024-04-15T06:30:00.000Z'),
-      isTagged: true,
-      stats: [],
-      addedCount: 0,
-      modifiedCount: 0,
-      totalObjects: 0,
-    } as any);
+      } as any;
 
-    expect(
-      mockReleaseTrackApiConnector.exportSnapshotByModified
-    ).toHaveBeenCalledWith(
-      'release-track--123',
-      '2024-04-15T06:00:00.000Z',
-      'bundle',
-      undefined
-    );
-  });
+      component.onExportSnapshot({
+        snapshot: {
+          modified: '2024-04-15T06:00:00.000Z',
+          type: ReleaseTrackType.Standard,
+          version: '1.3',
+          snapshot_description: 'Published analyst context',
+        },
+        title: 'v1.3',
+        created: new Date('2024-04-15T06:00:00.000Z'),
+        modified: '2024-04-15T06:00:00.000Z',
+        taggedAt: new Date('2024-04-15T06:30:00.000Z'),
+        isTagged: true,
+        isBundleCached: true,
+        stats: [],
+        addedCount: 0,
+        modifiedCount: 0,
+        totalObjects: 0,
+      } as any);
+
+      expect(
+        mockReleaseTrackApiConnector.exportSnapshotByModified
+      ).toHaveBeenCalledWith(
+        'release-track--123',
+        '2024-04-15T06:00:00.000Z',
+        'bundle',
+        { stixVersion }
+      );
+      expect(mockRestApiConnector.triggerBrowserDownload).toHaveBeenCalledWith(
+        { type: 'bundle', objects: [] },
+        `enterprise-release-v1.3-bundle-stix-${stixVersion}.json`
+      );
+    }
+  );
 
   it('should export a virtual draft snapshot without staged content', () => {
     mockDialog.open.mockReturnValue({
-      afterClosed: () => of('bundle'),
+      afterClosed: () => of('bundle-stix-2.0'),
     });
     mockReleaseTrackApiConnector.exportSnapshotByModified.mockReturnValue(
       of({ type: 'bundle', objects: [] })
@@ -411,7 +428,7 @@ describe('ReleaseTrackPageComponent', () => {
       'release-track--virtual',
       '2024-05-21T07:00:00.000Z',
       'bundle',
-      undefined
+      { stixVersion: '2.0' }
     );
   });
 
@@ -508,9 +525,16 @@ describe('ReleaseTrackPageComponent', () => {
 
     const choices = mockDialog.open.mock.calls[0][1].data.choices;
     expect(choices.map((choice: any) => choice.value)).toEqual([
-      'bundle',
+      'bundle-stix-2.0',
+      'bundle-stix-2.1',
       'workbench',
       'copy-summary',
+    ]);
+    expect(choices.map((choice: any) => choice.label)).toEqual([
+      'Bundle (STIX 2.0)',
+      'Bundle (STIX 2.1)',
+      'Workbench',
+      'Summary',
     ]);
     expect(
       mockReleaseTrackApiConnector.exportSnapshotByModified
