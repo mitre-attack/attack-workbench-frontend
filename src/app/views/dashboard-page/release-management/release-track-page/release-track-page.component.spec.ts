@@ -9,7 +9,7 @@ import {
   createPaginatedResponse,
 } from 'src/app/testing/mocks/rest-api-connector.mock';
 import { ActivatedRoute, Router } from '@angular/router';
-import { of, throwError } from 'rxjs';
+import { of, Subject, throwError } from 'rxjs';
 import { MatDialog } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { BreadcrumbService } from 'src/app/services/helpers/breadcrumb.service';
@@ -59,6 +59,8 @@ describe('ReleaseTrackPageComponent', () => {
       previewRelease: vi.fn(() => createAsyncObservable({})),
       releaseLatest: vi.fn(() => createAsyncObservable({})),
       releaseSnapshot: vi.fn(() => createAsyncObservable({})),
+      createSnapshotGraph: vi.fn(() => createAsyncObservable({})),
+      deleteSnapshotGraph: vi.fn(() => createAsyncObservable(undefined)),
       getConfig: vi.fn(() => createAsyncObservable(null)),
       updateConfig: vi.fn(() => createAsyncObservable({})),
       updateComposition: vi.fn(() => createAsyncObservable({})),
@@ -680,12 +682,21 @@ describe('ReleaseTrackPageComponent', () => {
           {
             id: 'release-track--456',
             version: '1.3',
+            graph_manifest_id: 'release-track-graph-manifest--cached',
             tagged_at: '2024-04-15T06:30:00.000Z',
             modified: '2024-04-15T06:00:00.000Z',
             type: ReleaseTrackType.Virtual,
             name: 'Combined',
             members_count: 5,
             quarantine_count: 1,
+            graph_statistics: {
+              primary_count: 5,
+              secondary_count: 8,
+              relationship_count: 12,
+              supporting_count: 2,
+              link_target_count: 1,
+              total_count: 28,
+            },
           },
         ],
         pagination: { total: 2, limit: 50, offset: 0 },
@@ -705,6 +716,8 @@ describe('ReleaseTrackPageComponent', () => {
         modifiedCount: 1,
         totalObjects: 27,
         isTagged: false,
+        isBundleCached: false,
+        canCacheBundle: false,
         stats: [
           expect.objectContaining({ label: 'Added', value: '+2' }),
           expect.objectContaining({ label: 'Modified', value: 1 }),
@@ -722,6 +735,15 @@ describe('ReleaseTrackPageComponent', () => {
         totalObjects: 6,
         taggedAt: new Date('2024-04-15T06:30:00.000Z'),
         isTagged: true,
+        isBundleCached: true,
+        canCacheBundle: false,
+        graphCacheTotal: 28,
+        graphCacheStats: [
+          expect.objectContaining({ label: 'Primary', value: 5 }),
+          expect.objectContaining({ label: 'Secondary', value: 8 }),
+          expect.objectContaining({ label: 'Relationships', value: 12 }),
+          expect.objectContaining({ label: 'Dependencies', value: 3 }),
+        ],
         stats: [
           expect.objectContaining({ label: 'Members', value: 5 }),
           expect.objectContaining({ label: 'Quarantine', value: 1 }),
@@ -730,6 +752,155 @@ describe('ReleaseTrackPageComponent', () => {
     );
     expect(component.taggedSnapshotCount).toBe(1);
     expect(component.hasCurrentDraftSnapshot).toBe(true);
+  });
+
+  it('should explain cached, uncached, and draft bundle states', () => {
+    const cached = {
+      isTagged: true,
+      isBundleCached: true,
+    } as any;
+    const uncached = {
+      isTagged: true,
+      isBundleCached: false,
+    } as any;
+    const draft = {
+      isTagged: false,
+      isBundleCached: false,
+    } as any;
+
+    expect(component.getBundleCacheTooltip(cached)).toContain(
+      'repeated exports are deterministic'
+    );
+    expect(component.getBundleCacheTooltip(uncached)).toContain(
+      'not guaranteed to be deterministic'
+    );
+    expect(component.getBundleCacheTooltip(draft)).toContain(
+      'Tag this snapshot before caching it'
+    );
+  });
+
+  it('should cache a tagged snapshot and update its history state', () => {
+    const item = {
+      snapshot: {},
+      title: 'v1.0',
+      modified: '2026-07-23T13:37:28.000Z',
+      isTagged: true,
+      isBundleCached: false,
+      canCacheBundle: true,
+      stats: [],
+    } as any;
+    mockReleaseTrackApiConnector.createSnapshotGraph.mockReturnValue(
+      of({
+        modified: item.modified,
+        version: '1.0',
+        graph_manifest_id: 'release-track-graph-manifest--cached',
+      })
+    );
+    component.id = 'release-track--123';
+
+    component.onCacheSnapshotBundle(item);
+
+    expect(
+      mockReleaseTrackApiConnector.createSnapshotGraph
+    ).toHaveBeenCalledWith('release-track--123', item.modified);
+    expect(item.snapshot.graph_manifest_id).toBe(
+      'release-track-graph-manifest--cached'
+    );
+    expect(item.isBundleCached).toBe(true);
+    expect(item.canCacheBundle).toBe(false);
+    expect(mockReleaseTrackApiConnector.listSnapshots).toHaveBeenCalledWith(
+      'release-track--123'
+    );
+    expect(mockSnackbar.open).toHaveBeenCalledWith(
+      'Bundle cached. Member-only bundle exports are now deterministic.',
+      null,
+      expect.objectContaining({ duration: 5000 })
+    );
+    expect(component.isCachingSnapshot(item)).toBe(false);
+  });
+
+  it('should expose cache materialization as in progress until it completes', () => {
+    const graphResult = new Subject<any>();
+    const item = {
+      snapshot: {},
+      title: 'v1.0',
+      modified: '2026-07-23T13:37:28.000Z',
+      isTagged: true,
+      isBundleCached: false,
+      canCacheBundle: true,
+      stats: [],
+    } as any;
+    mockReleaseTrackApiConnector.createSnapshotGraph.mockReturnValue(
+      graphResult
+    );
+    component.id = 'release-track--123';
+
+    component.onCacheSnapshotBundle(item);
+
+    expect(component.isCachingSnapshot(item)).toBe(true);
+
+    graphResult.next({
+      modified: item.modified,
+      version: '1.0',
+      graph_manifest_id: 'release-track-graph-manifest--cached',
+    });
+    graphResult.complete();
+
+    expect(component.isCachingSnapshot(item)).toBe(false);
+  });
+
+  it('should delete a cached snapshot graph after confirmation', () => {
+    const item = {
+      snapshot: {
+        graph_manifest_id: 'release-track-graph-manifest--cached',
+        graph_statistics: { total_count: 28 },
+      },
+      title: 'v1.0',
+      modified: '2026-07-23T13:37:28.000Z',
+      isTagged: true,
+      isBundleCached: true,
+      canCacheBundle: false,
+      graphCacheStats: [{ label: 'Primary', value: 5 }],
+      graphCacheTotal: 28,
+      stats: [],
+    } as any;
+    mockDialog.open.mockReturnValue({
+      afterClosed: () => of(true),
+    });
+    mockReleaseTrackApiConnector.deleteSnapshotGraph.mockReturnValue(
+      of(undefined)
+    );
+    component.id = 'release-track--123';
+
+    component.onDeleteSnapshotCache(item);
+
+    expect(mockDialog.open).toHaveBeenCalledWith(
+      ConfirmationDialogComponent,
+      expect.objectContaining({
+        data: expect.objectContaining({
+          title: 'Delete bundle cache?',
+          confirm_color: 'warn',
+        }),
+      })
+    );
+    expect(
+      mockReleaseTrackApiConnector.deleteSnapshotGraph
+    ).toHaveBeenCalledWith('release-track--123', item.modified);
+    expect(item.snapshot.graph_manifest_id).toBeUndefined();
+    expect(item.snapshot.graph_statistics).toBeUndefined();
+    expect(item.isBundleCached).toBe(false);
+    expect(item.canCacheBundle).toBe(true);
+    expect(item.graphCacheStats).toEqual([]);
+    expect(item.graphCacheTotal).toBe(0);
+    expect(mockReleaseTrackApiConnector.listSnapshots).toHaveBeenCalledWith(
+      'release-track--123'
+    );
+    expect(mockSnackbar.open).toHaveBeenCalledWith(
+      'Bundle cache deleted. Member-only bundle exports are no longer guaranteed to be deterministic.',
+      null,
+      expect.objectContaining({ duration: 5000 })
+    );
+    expect(component.isDeletingSnapshotCache(item)).toBe(false);
   });
 
   it('should use latest snapshot summary counts for the latest history row', () => {

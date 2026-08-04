@@ -83,7 +83,11 @@ interface SnapshotHistoryViewModel {
   isTagged: boolean;
   isLatest: boolean;
   isCurrentDraft: boolean;
+  isBundleCached: boolean;
+  canCacheBundle: boolean;
   stats: SnapshotHistoryStat[];
+  graphCacheStats: SnapshotHistoryStat[];
+  graphCacheTotal: number;
   addedCount: number;
   modifiedCount: number;
   totalObjects: number;
@@ -93,6 +97,7 @@ interface SnapshotHistoryStat {
   label: string;
   value: string | number;
   modifier?: string;
+  tooltip?: string;
 }
 
 interface ReleaseTrackConfigFormValue {
@@ -193,6 +198,8 @@ export class ReleaseTrackPageComponent implements OnInit {
   public virtualComponentTrackOptions: VirtualComponentTrackOption[] = [];
   public virtualConfigComponentTracks: any[] = [];
   private createdDraftSnapshot: ReleaseTrackSnapshotHistoryItem | null = null;
+  private cachingSnapshotModified = new Set<string>();
+  private deletingSnapshotCacheModified = new Set<string>();
 
   public candidacyOptions = Object.values(WorkflowStatus);
   public memberSyncStrategyOptions = Object.values(MemberSyncStrategy);
@@ -1796,6 +1803,140 @@ export class ReleaseTrackPageComponent implements OnInit {
       });
   }
 
+  public isCachingSnapshot(item: SnapshotHistoryViewModel): boolean {
+    return !!item.modified && this.cachingSnapshotModified.has(item.modified);
+  }
+
+  public isDeletingSnapshotCache(item: SnapshotHistoryViewModel): boolean {
+    return (
+      !!item.modified && this.deletingSnapshotCacheModified.has(item.modified)
+    );
+  }
+
+  public getBundleCacheTooltip(item: SnapshotHistoryViewModel): string {
+    if (item.isBundleCached) {
+      return 'Member-only bundle exports use exact object and relationship revisions, so repeated exports are deterministic. Candidate and staged content remains live.';
+    }
+    if (!item.isTagged) {
+      return 'Draft snapshots cannot be cached. Tag this snapshot before caching it for deterministic member-only bundle exports.';
+    }
+    return 'Member-only bundle exports are not guaranteed to be deterministic until this snapshot is cached.';
+  }
+
+  public onCacheSnapshotBundle(item: SnapshotHistoryViewModel): void {
+    if (
+      !this.id ||
+      !item.modified ||
+      !item.isTagged ||
+      item.isBundleCached ||
+      !this.canEditReleaseTrack ||
+      this.isCachingSnapshot(item)
+    ) {
+      return;
+    }
+
+    const modified = item.modified;
+    this.cachingSnapshotModified.add(modified);
+    this.connector
+      .createSnapshotGraph(this.id, modified)
+      .pipe(
+        take(1),
+        finalize(() => {
+          this.cachingSnapshotModified.delete(modified);
+        })
+      )
+      .subscribe({
+        next: snapshot => {
+          item.snapshot = { ...item.snapshot, ...snapshot };
+          item.isBundleCached = !!snapshot.graph_manifest_id;
+          item.canCacheBundle = item.isTagged && !item.isBundleCached;
+          this.getSnapshotHistory();
+          this.snackbar.open(
+            'Bundle cached. Member-only bundle exports are now deterministic.',
+            null,
+            { duration: 5000 }
+          );
+        },
+        error: err => {
+          console.error('Failed to cache snapshot bundle graph', err);
+          this.snackbar.open(
+            'Unable to cache this snapshot. Please try again.',
+            null,
+            { duration: 5000, panelClass: 'error' }
+          );
+        },
+      });
+  }
+
+  public onDeleteSnapshotCache(item: SnapshotHistoryViewModel): void {
+    if (
+      !this.id ||
+      !item.modified ||
+      !item.isBundleCached ||
+      !this.canEditReleaseTrack ||
+      this.isCachingSnapshot(item) ||
+      this.isDeletingSnapshotCache(item)
+    ) {
+      return;
+    }
+
+    const modified = item.modified;
+    const dialogRef = this.dialog.open(ConfirmationDialogComponent, {
+      width: '30em',
+      autoFocus: false,
+      data: {
+        title: 'Delete bundle cache?',
+        message: `Delete the bundle cache for ${item.title}? Member-only bundle exports will no longer be guaranteed to be deterministic until the cache is rebuilt.`,
+        no_label: 'Cancel',
+        yes_label: 'Delete Cache',
+        confirm_color: 'warn',
+        confirm_appearance: 'raised',
+        layout: 'simple',
+      },
+    });
+
+    dialogRef
+      .afterClosed()
+      .pipe(take(1))
+      .subscribe(confirmed => {
+        if (!confirmed || !this.id) return;
+
+        this.deletingSnapshotCacheModified.add(modified);
+        this.connector
+          .deleteSnapshotGraph(this.id, modified)
+          .pipe(
+            take(1),
+            finalize(() => {
+              this.deletingSnapshotCacheModified.delete(modified);
+            })
+          )
+          .subscribe({
+            next: () => {
+              delete item.snapshot.graph_manifest_id;
+              delete item.snapshot.graph_statistics;
+              item.isBundleCached = false;
+              item.canCacheBundle = item.isTagged;
+              item.graphCacheStats = [];
+              item.graphCacheTotal = 0;
+              this.getSnapshotHistory();
+              this.snackbar.open(
+                'Bundle cache deleted. Member-only bundle exports are no longer guaranteed to be deterministic.',
+                null,
+                { duration: 5000 }
+              );
+            },
+            error: err => {
+              console.error('Failed to delete snapshot bundle graph', err);
+              this.snackbar.open(
+                'Unable to delete this bundle cache. Please try again.',
+                null,
+                { duration: 5000, panelClass: 'error' }
+              );
+            },
+          });
+      });
+  }
+
   private downloadSnapshot(
     item: SnapshotHistoryViewModel,
     modified: string,
@@ -2500,6 +2641,7 @@ export class ReleaseTrackPageComponent implements OnInit {
     return sorted.map((snapshot, index) => {
       const previousSnapshot = sorted[index + 1];
       const isTagged = this.isTaggedSnapshot(snapshot);
+      const isBundleCached = !!snapshot.graph_manifest_id;
       const isLatest = snapshot === latestSnapshot;
       const currentMembers = this.getSnapshotMembers(snapshot);
       const previousMembers = previousSnapshot
@@ -2529,7 +2671,11 @@ export class ReleaseTrackPageComponent implements OnInit {
         isTagged,
         isLatest,
         isCurrentDraft: !isTagged && isLatest,
+        isBundleCached,
+        canCacheBundle: isTagged && !isBundleCached,
         stats: this.getSnapshotStats(snapshot, addedCount, modifiedCount),
+        graphCacheStats: this.getGraphCacheStats(snapshot),
+        graphCacheTotal: snapshot.graph_statistics?.total_count ?? 0,
         addedCount,
         modifiedCount,
         totalObjects,
@@ -2652,6 +2798,37 @@ export class ReleaseTrackPageComponent implements OnInit {
           snapshot,
           this.getSnapshotMembers(snapshot)
         ),
+      },
+    ];
+  }
+
+  private getGraphCacheStats(
+    snapshot: ReleaseTrackSnapshotHistoryItem
+  ): SnapshotHistoryStat[] {
+    const statistics = snapshot.graph_statistics;
+    if (!snapshot.graph_manifest_id || !statistics) return [];
+
+    return [
+      {
+        label: 'Primary',
+        value: statistics.primary_count,
+        tooltip: 'Objects deliberately included as snapshot members.',
+      },
+      {
+        label: 'Secondary',
+        value: statistics.secondary_count,
+        tooltip: 'Related objects pulled in while resolving the member graph.',
+      },
+      {
+        label: 'Relationships',
+        value: statistics.relationship_count,
+        tooltip: 'Connections pinned between cached graph objects.',
+      },
+      {
+        label: 'Dependencies',
+        value: statistics.supporting_count + statistics.link_target_count,
+        tooltip:
+          'Supporting identities, markings, and LinkById targets used by the cache.',
       },
     ];
   }

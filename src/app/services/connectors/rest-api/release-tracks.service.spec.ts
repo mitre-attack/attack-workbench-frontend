@@ -125,6 +125,44 @@ describe('ReleaseTracksConnectorService', () => {
     expect(options.params.get('offset')).toBe('50');
   });
 
+  it('should create a deterministic graph for an exact snapshot', async () => {
+    const snapshot = {
+      modified: '2026-07-23T13:37:28.000Z',
+      version: '1.0',
+      graph_manifest_id: 'release-track-graph-manifest--123',
+    };
+    http.post.mockReturnValue(of(snapshot));
+
+    const result = await firstValueFrom(
+      service.createSnapshotGraph(
+        'release-track--standard',
+        '2026-07-23T13:37:28.000Z'
+      )
+    );
+
+    expect(http.post).toHaveBeenCalledWith(
+      `${environment.integrations.rest_api.url}/release-tracks/release-track--standard/snapshots/2026-07-23T13%3A37%3A28.000Z/graph`,
+      {}
+    );
+    expect(result).toEqual(snapshot);
+  });
+
+  it('should delete a deterministic graph for an exact snapshot', async () => {
+    http.delete.mockReturnValue(of(undefined));
+
+    const result = await firstValueFrom(
+      service.deleteSnapshotGraph(
+        'release-track--standard',
+        '2026-07-23T13:37:28.000Z'
+      )
+    );
+
+    expect(http.delete).toHaveBeenCalledWith(
+      `${environment.integrations.rest_api.url}/release-tracks/release-track--standard/snapshots/2026-07-23T13%3A37%3A28.000Z/graph`
+    );
+    expect(result).toBeUndefined();
+  });
+
   it('should create virtual snapshots through the virtual namespace', () => {
     service
       .createVirtualSnapshot('release-track--virtual', {

@@ -660,6 +660,19 @@
                     <app-workbench-chip
                       *ngIf="item.isLatest"
                       variant="latest"></app-workbench-chip>
+                    <span
+                      class="snapshot-cache-status"
+                      [class.snapshot-cache-status-cached]="item.isBundleCached"
+                      [matTooltip]="getBundleCacheTooltip(item)"
+                      matTooltipPosition="above"
+                      tabindex="0">
+                      <mat-icon aria-hidden="true">{{
+                        item.isBundleCached ? 'verified' : 'warning_amber'
+                      }}</mat-icon>
+                      <span>{{
+                        item.isBundleCached ? 'Bundle cached' : 'Not cached'
+                      }}</span>
+                    </span>
                   </div>
                 </div>
                 <p *ngIf="item.isTagged; else draftSubtitle">
@@ -686,6 +699,51 @@
               </div>
 
               <div class="snapshot-history-actions small-buttons">
+                <button
+                  *ngIf="item.canCacheBundle && canEditReleaseTrack"
+                  class="cache-color"
+                  mat-stroked-button
+                  [disabled]="isCachingSnapshot(item) || !item.modified"
+                  [attr.aria-label]="'Cache bundle for ' + item.title"
+                  matTooltip="Pin exact member and relationship revisions so future member-only bundle exports are deterministic."
+                  (click)="onCacheSnapshotBundle(item)">
+                  <mat-spinner
+                    *ngIf="isCachingSnapshot(item)"
+                    class="snapshot-action-spinner"
+                    diameter="18"></mat-spinner>
+                  <mat-icon *ngIf="!isCachingSnapshot(item)">
+                    inventory_2
+                  </mat-icon>
+                  {{
+                    isCachingSnapshot(item) ? 'Caching bundle' : 'Cache bundle'
+                  }}
+                </button>
+                <button
+                  *ngIf="item.isBundleCached && canEditReleaseTrack"
+                  color="warn"
+                  mat-stroked-button
+                  [disabled]="
+                    isDeletingSnapshotCache(item) ||
+                    isCachingSnapshot(item) ||
+                    !item.modified
+                  "
+                  [attr.aria-label]="'Delete bundle cache for ' + item.title"
+                  matTooltip="Remove the pinned member graph. Future member-only bundle exports will not be guaranteed deterministic until it is cached again."
+                  (click)="onDeleteSnapshotCache(item)">
+                  <mat-spinner
+                    *ngIf="isDeletingSnapshotCache(item)"
+                    class="snapshot-action-spinner"
+                    color="warn"
+                    diameter="18"></mat-spinner>
+                  <mat-icon *ngIf="!isDeletingSnapshotCache(item)">
+                    delete
+                  </mat-icon>
+                  {{
+                    isDeletingSnapshotCache(item)
+                      ? 'Deleting cache'
+                      : 'Delete cache'
+                  }}
+                </button>
                 <button
                   *ngIf="!item.isTagged"
                   class="view-color"
@@ -717,6 +775,34 @@
                 <div class="snapshot-history-stat-label">{{ stat.label }}</div>
               </div>
             </div>
+
+            <section
+              *ngIf="item.graphCacheStats.length"
+              class="snapshot-graph-cache"
+              aria-label="Graph cache statistics">
+              <div class="snapshot-graph-cache-header">
+                <div class="snapshot-graph-cache-title">
+                  <mat-icon aria-hidden="true">account_tree</mat-icon>
+                  <span>Graph cache</span>
+                </div>
+                <span>{{ item.graphCacheTotal }} cached items</span>
+              </div>
+              <div class="snapshot-graph-cache-stats">
+                <div
+                  *ngFor="let stat of item.graphCacheStats"
+                  class="snapshot-graph-cache-stat"
+                  [matTooltip]="stat.tooltip || ''"
+                  matTooltipPosition="above"
+                  tabindex="0">
+                  <div class="snapshot-graph-cache-stat-value">
+                    {{ stat.value }}
+                  </div>
+                  <div class="snapshot-history-stat-label">
+                    {{ stat.label }}
+                  </div>
+                </div>
+              </div>
+            </section>
           </div>
         </article>
       </div>

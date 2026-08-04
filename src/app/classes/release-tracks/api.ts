@@ -72,6 +72,15 @@ export interface SnapshotHistoryOptions {
   offset?: number;
 }
 
+export interface SnapshotGraphStatistics {
+  primary_count: number;
+  secondary_count: number;
+  relationship_count: number;
+  supporting_count: number;
+  link_target_count: number;
+  total_count: number;
+}
+
 export type ReleasePreviewOptions = ReleasePayload & {
   format?: ReleasePreviewFormatType;
 };
@@ -131,6 +140,8 @@ export interface ReleaseTrackSnapshotHistoryItem {
   id?: string;
   modified?: string | Date;
   version?: string | null;
+  graph_manifest_id?: string;
+  graph_statistics?: SnapshotGraphStatistics;
   type?: ReleaseTrackType;
   name?: string;
   description?: string;
@@ -166,9 +177,7 @@ export interface ReleaseTrackSnapshotHistoryItem {
     quarantined_count?: number;
     [key: string]: any;
   };
-  statistics?: {
-    [key: string]: any;
-  };
+  statistics?: Record<string, any>;
   composition_resolution?: {
     total_objects?: number;
     [key: string]: any;
