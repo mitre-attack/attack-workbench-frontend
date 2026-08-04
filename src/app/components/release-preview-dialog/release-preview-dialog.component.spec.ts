@@ -139,6 +139,49 @@ describe('ReleasePreviewDialogComponent', () => {
     });
   });
 
+  it('should return a normalized exact version within the backend bounds', () => {
+    data.previewSummary = {
+      version_bounds: {
+        lower: { version: '1.0', modified: '2026-07-01T00:00:00.000Z' },
+        upper: { version: '3.0', modified: '2026-07-05T00:00:00.000Z' },
+      },
+    };
+    component.snapshotDescription = '  Retroactive release  ';
+    component.exactVersion = ' v2.7 ';
+
+    expect(component.exactVersionValidationMessage).toBeNull();
+    expect(component.exactVersionBoundsHint).toContain(
+      'greater than v1.0 and less than v3.0'
+    );
+    component.tagExactVersion();
+
+    expect(dialogRef.close).toHaveBeenCalledWith({
+      version: '2.7',
+      description: 'Retroactive release',
+    });
+  });
+
+  it('should reject malformed and out-of-bounds exact versions', () => {
+    data.previewSummary = {
+      version_bounds: {
+        lower: { version: '1.0', modified: '2026-07-01T00:00:00.000Z' },
+        upper: { version: '3.0', modified: '2026-07-05T00:00:00.000Z' },
+      },
+    };
+
+    component.exactVersion = '2.0.1';
+    expect(component.exactVersionValidationMessage).toContain('MAJOR.MINOR');
+    component.tagExactVersion();
+
+    component.exactVersion = '3.0';
+    expect(component.exactVersionValidationMessage).toBe(
+      'Version must be less than v3.0.'
+    );
+    component.tagExactVersion();
+
+    expect(dialogRef.close).not.toHaveBeenCalled();
+  });
+
   it('should close without selecting a release version', () => {
     component.close();
 

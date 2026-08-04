@@ -351,6 +351,7 @@
     padding: 14px 20px;
     border-top: 1px solid;
     @include colors.theme-border-color;
+    flex-wrap: wrap;
   }
 
   .release-blocked-message {
@@ -373,6 +374,28 @@
     flex: 0 0 auto;
     gap: 12px;
     margin-left: auto;
+  }
+
+  .release-preview-exact-version {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+
+    .mat-mdc-form-field {
+      width: 132px;
+    }
+  }
+
+  .release-exact-version-guidance {
+    width: 100%;
+    margin: -6px 0 0;
+    text-align: right;
+    font-size: 12px;
+    @include colors.theme-text-deemphasis;
+  }
+
+  .release-exact-version-guidance--error {
+    color: colors.color(error);
   }
 }
 

@@ -84,7 +84,7 @@
           rows="4"
           placeholder="Summarize this release for analysts viewing its history."></textarea>
         <mat-hint align="start">
-          Shown on this snapshot in release history
+          Shown in history and exported as the collection description
         </mat-hint>
         <mat-hint align="end">
           {{ snapshotDescription.length }}/{{ snapshotDescriptionMaxLength }}
@@ -270,6 +270,38 @@
         (click)="tagVersion('major')">
         Tag Major ({{ majorVersion }})
       </button>
+      <div class="release-preview-exact-version">
+        <mat-form-field appearance="outline" subscriptSizing="dynamic">
+          <mat-label>Exact version</mat-label>
+          <input
+            matInput
+            [(ngModel)]="exactVersion"
+            aria-describedby="release-exact-version-guidance"
+            placeholder="19.2"
+            (keyup.enter)="tagExactVersion()" />
+        </mat-form-field>
+        <button
+          mat-raised-button
+          class="release-preview-tag-exact-button"
+          type="button"
+          color="primary"
+          [disabled]="isReleaseBlocked || !!exactVersionValidationMessage"
+          (click)="tagExactVersion()">
+          Tag Exact
+        </button>
+      </div>
     </div>
+    <p
+      id="release-exact-version-guidance"
+      class="release-exact-version-guidance"
+      [class.release-exact-version-guidance--error]="
+        exactVersion.length > 0 && !!exactVersionValidationMessage
+      ">
+      {{
+        exactVersion.length > 0 && exactVersionValidationMessage
+          ? exactVersionValidationMessage
+          : exactVersionBoundsHint
+      }}
+    </p>
   </footer>
 </div>

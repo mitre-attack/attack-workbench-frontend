@@ -18,6 +18,10 @@ Objects may exist in multiple collections simultaneously, and objects can exist 
 
 You can read more about the technical specifications for a collection, such as the STIX representation of a collection object, in our [collections](/docs/collections.md) document. MITRE's ATT&CK collections and collection index can be found on our [attack-stix-data GitHub repository](https://github.com/mitre-attack/attack-stix-data).
 
+#### Releasing a Release-Track Snapshot
+
+The release preview offers minor and major relative tags as well as an exact `MAJOR.MINOR` version. Relative tags are calculated from the tagged snapshot immediately before the selected draft. When releasing an older draft, the exact version must also remain below the next tagged snapshot; the dialog shows these exclusive bounds. Optional release notes are stored on that snapshot and become the `x-mitre-collection` description in exported STIX bundles.
+
 #### Adding a Collection Index
 
 Collection indexes can be added from the collections page. To add a collection index, specify the URL at which the index is found. The application will then provide a preview of the index for you to review before you save. You can also choose from the provided "recommended collection indexes" to quickly connect your Workbench instance to a data provider without having to find the URL yourself. The ATT&CK Workbench is pre-configured to recommend the MITRE ATT&CK collection index in the "add a collection index" interface.

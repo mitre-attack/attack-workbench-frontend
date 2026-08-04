@@ -92,6 +92,10 @@ export interface ReleasePreviewSummaryBase {
   type: ReleaseTrackType;
   source_snapshot_modified: string;
   version: string;
+  version_bounds: {
+    lower: { version: string; modified: string } | null;
+    upper: { version: string; modified: string } | null;
+  };
   releasable: boolean;
   conflicts: any[];
 }

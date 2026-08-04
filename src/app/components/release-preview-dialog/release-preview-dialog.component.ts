@@ -10,10 +10,10 @@ export interface ReleasePreviewDialogData {
   previewSummary?: any;
 }
 
-export interface ReleasePreviewSelection {
-  increment: 'minor' | 'major';
-  description: string;
-}
+export type ReleasePreviewSelection = (
+  | { increment: 'minor' | 'major'; version?: never }
+  | { increment?: never; version: string }
+) & { description: string };
 
 interface ReleaseTrackObject {
   object_ref?: string;
@@ -45,6 +45,7 @@ export interface IncludedReleaseObject {
 export class ReleasePreviewDialogComponent {
   public readonly snapshotDescriptionMaxLength = 4000;
   public snapshotDescription: string;
+  public exactVersion = '';
 
   constructor(
     public dialogRef: MatDialogRef<ReleasePreviewDialogComponent>,
@@ -60,7 +61,10 @@ export class ReleasePreviewDialogComponent {
   public get currentVersion(): string {
     const history = this.asArray(this.data.track?.version_history);
     const version =
-      this.data.track?.version ?? history[history.length - 1]?.version ?? '0.1';
+      this.data.previewSummary?.version_bounds?.lower?.version ??
+      this.data.track?.version ??
+      history[history.length - 1]?.version ??
+      '0.1';
 
     return this.formatVersion(version);
   }
@@ -203,6 +207,45 @@ export class ReleasePreviewDialogComponent {
     } satisfies ReleasePreviewSelection);
   }
 
+  public get exactVersionValidationMessage(): string | null {
+    const version = this.normalizedExactVersion;
+    if (!version) return 'Enter a version in MAJOR.MINOR format.';
+    if (!/^\d+\.\d+$/.test(version)) {
+      return 'Use MAJOR.MINOR format, for example 19.2.';
+    }
+
+    const selected = new VersionNumber(version);
+    const lower = this.data.previewSummary?.version_bounds?.lower?.version;
+    const upper = this.data.previewSummary?.version_bounds?.upper?.version;
+    if (lower && selected.compareTo(new VersionNumber(lower)) <= 0) {
+      return `Version must be greater than ${this.formatVersion(lower)}.`;
+    }
+    if (upper && selected.compareTo(new VersionNumber(upper)) >= 0) {
+      return `Version must be less than ${this.formatVersion(upper)}.`;
+    }
+    return null;
+  }
+
+  public get exactVersionBoundsHint(): string {
+    const lower = this.data.previewSummary?.version_bounds?.lower?.version;
+    const upper = this.data.previewSummary?.version_bounds?.upper?.version;
+    if (lower && upper) {
+      return `Must be greater than ${this.formatVersion(lower)} and less than ${this.formatVersion(upper)}.`;
+    }
+    if (lower) return `Must be greater than ${this.formatVersion(lower)}.`;
+    if (upper) return `Must be less than ${this.formatVersion(upper)}.`;
+    return 'Use MAJOR.MINOR format.';
+  }
+
+  public tagExactVersion(): void {
+    if (this.isReleaseBlocked || this.exactVersionValidationMessage) return;
+
+    this.dialogRef.close({
+      version: this.normalizedExactVersion,
+      description: this.snapshotDescription.trim(),
+    } satisfies ReleasePreviewSelection);
+  }
+
   public getObjectName(item: ReleaseTrackObject): string {
     return item?.name || item?.attack_id || item?.object_ref || 'ATT&CK object';
   }
@@ -295,6 +338,10 @@ export class ReleasePreviewDialogComponent {
   private formatVersion(value: unknown): string {
     const version = String(value);
     return version.toLowerCase().startsWith('v') ? version : `v${version}`;
+  }
+
+  private get normalizedExactVersion(): string {
+    return this.exactVersion.trim().replace(/^v/i, '');
   }
 
   private getObjectRef(item: ReleaseTrackObject): string {

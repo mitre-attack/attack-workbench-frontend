@@ -1508,7 +1508,7 @@ describe('ReleaseTrackPageComponent', () => {
     );
     mockDialog.open.mockReturnValue({
       afterClosed: () =>
-        of({ increment: 'major', description: 'Major release context' }),
+        of({ version: '1.5', description: 'Exact release context' }),
     });
     component.id = 'release-track--123';
 
@@ -1556,7 +1556,7 @@ describe('ReleaseTrackPageComponent', () => {
     expect(mockReleaseTrackApiConnector.releaseSnapshot).toHaveBeenCalledWith(
       'release-track--123',
       '2026-07-23T13:37:28.000Z',
-      { increment: 'major', description: 'Major release context' }
+      { version: '1.5', description: 'Exact release context' }
     );
     expect(mockReleaseTrackApiConnector.releaseLatest).not.toHaveBeenCalled();
     expect(refreshSpy).toHaveBeenCalled();
