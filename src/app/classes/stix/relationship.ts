@@ -689,8 +689,8 @@ export class Relationship extends StixObject {
   }
 
   /**
-   * Updates a related object in place as WIP. The backend release-track
-   * change-capture service updates its track entry in response to this PUT.
+   * Creates a WIP revision of a related object. Existing revisions may be
+   * pinned by deterministic snapshot graphs and must remain immutable.
    * @param restAPIService the rest api service
    * @param object the relationship source object
    */
@@ -704,6 +704,6 @@ export class Relationship extends StixObject {
       object.workflow = { state: WorkflowStatus.WorkInProgress };
     }
     object.workflow.state = WorkflowStatus.WorkInProgress;
-    return object.update(restAPIService);
+    return object.save(restAPIService);
   }
 }

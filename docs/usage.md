@@ -431,6 +431,7 @@ The source and target objects can be changed after the relationship has been cre
 
 Relationships also have a description to provide additional context or to hold citations of relevant reporting. Like all descriptions, those on relationships support citations, LinkByIds, and markdown formatting. Relationships between sub-techniques and techniques however are purely structural and do not support descriptions.
 
+Saving a relationship creates a new relationship revision and returns its connected source and target objects to the *work in progress* workflow state through new SDO revisions. Previously published or snapshot-pinned SDO revisions remain unchanged.
 
 ### Revoking and Deprecating Objects
 
