@@ -112,6 +112,16 @@
     margin: 28px auto;
   }
 
+  .release-snapshot-description-field {
+    display: block;
+    width: min(760px, calc(100% - 48px));
+    margin: 0 auto 28px;
+
+    textarea {
+      resize: vertical;
+    }
+  }
+
   .release-stat {
     display: flex;
     min-height: 132px;

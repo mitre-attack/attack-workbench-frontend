@@ -72,6 +72,24 @@
           <span>Quarantined objects</span>
         </article>
       </section>
+
+      <mat-form-field
+        appearance="outline"
+        class="release-snapshot-description-field">
+        <mat-label>Release notes</mat-label>
+        <textarea
+          matInput
+          [(ngModel)]="snapshotDescription"
+          [maxlength]="snapshotDescriptionMaxLength"
+          rows="4"
+          placeholder="Summarize this release for analysts viewing its history."></textarea>
+        <mat-hint align="start">
+          Shown on this snapshot in release history
+        </mat-hint>
+        <mat-hint align="end">
+          {{ snapshotDescription.length }}/{{ snapshotDescriptionMaxLength }}
+        </mat-hint>
+      </mat-form-field>
     </mat-tab>
 
     <mat-tab>

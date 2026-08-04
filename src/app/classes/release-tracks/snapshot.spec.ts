@@ -1,6 +1,22 @@
 import { ReleaseTrackSnapshot } from './snapshot';
 
 describe('ReleaseTrackSnapshot', () => {
+  it('should preserve snapshot-local notes separately from track metadata', () => {
+    const snapshot = new ReleaseTrackSnapshot({
+      description: 'Long-lived track purpose',
+      snapshot_description: 'Context for this release',
+    });
+
+    expect(snapshot.description).toBe('Long-lived track purpose');
+    expect(snapshot.snapshot_description).toBe('Context for this release');
+    expect(snapshot.serialize()).toEqual(
+      expect.objectContaining({
+        description: 'Long-lived track purpose',
+        snapshot_description: 'Context for this release',
+      })
+    );
+  });
+
   it('should preserve candidate and staged display fields', () => {
     const snapshot = new ReleaseTrackSnapshot({
       candidates: [

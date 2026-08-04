@@ -432,6 +432,27 @@ export class ReleaseTracksConnectorService extends ApiConnector {
   }
 
   /**
+   * PUT /api/release-tracks/:id/snapshots/:modified/description
+   * Replace or clear the user-authored notes on one snapshot.
+   */
+  public updateSnapshotDescription(
+    id: string,
+    modified: string,
+    body: { description: string }
+  ): Observable<ReleaseTrackSnapshotHistoryItem> {
+    const url = `${this.apiUrl}/release-tracks/${id}/snapshots/${encodeURIComponent(modified)}/description`;
+    return this.http.put<ReleaseTrackSnapshotHistoryItem>(url, body).pipe(
+      tap(result =>
+        logger.log(`updated snapshot notes for ${modified}`, result)
+      ),
+      catchError(
+        this.handleError_raise<ReleaseTrackSnapshotHistoryItem>(false)
+      ),
+      share()
+    );
+  }
+
+  /**
    * POST /api/release-tracks/:id/snapshots/:modified/release
    * Tag/release a specific snapshot.
    * @param id Release track id

@@ -26,6 +26,23 @@
         placeholder="A brief description of the track's purpose..."></textarea>
     </mat-form-field>
 
+    <mat-form-field appearance="outline">
+      <mat-label>Initial snapshot notes</mat-label>
+      <textarea
+        matInput
+        id="snapshot-description"
+        formControlName="snapshotDescription"
+        maxlength="4000"
+        rows="3"
+        placeholder="What should analysts know about this initial snapshot?"></textarea>
+      <mat-hint align="start">
+        Shown only on the initial snapshot in release history
+      </mat-hint>
+      <mat-hint align="end">
+        {{ form.get('snapshotDescription')?.value?.length || 0 }}/4000
+      </mat-hint>
+    </mat-form-field>
+
     <mat-divider></mat-divider>
 
     <!-- Standard track -->

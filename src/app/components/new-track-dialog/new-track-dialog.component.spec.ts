@@ -236,6 +236,7 @@ describe('NewTrackDialogComponent', () => {
     component.form.patchValue({
       name: 'Enterprise Content',
       description: 'Tracks Enterprise content',
+      snapshotDescription: 'Initial analyst context',
       memberSync: 'track_latest',
       supplantBehavior: 'replace',
     });
@@ -246,6 +247,7 @@ describe('NewTrackDialogComponent', () => {
       type: ReleaseTrackType.Standard,
       name: 'Enterprise Content',
       description: 'Tracks Enterprise content',
+      snapshot_description: 'Initial analyst context',
       config: {
         auto_promote: false,
         member_sync: {

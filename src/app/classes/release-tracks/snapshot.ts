@@ -18,6 +18,7 @@ export class ReleaseTrackSnapshot {
   public version?: string | null;
   public name = '';
   public description?: string;
+  public snapshot_description?: string;
   public created: Date = new Date();
   public created_by_ref?: string;
   public object_marking_refs?: string[];
@@ -91,6 +92,8 @@ export class ReleaseTrackSnapshot {
     if ('version' in raw) this.version = raw.version;
     if ('name' in raw) this.name = raw.name;
     if ('description' in raw) this.description = raw.description;
+    if ('snapshot_description' in raw)
+      this.snapshot_description = raw.snapshot_description;
     if ('created' in raw) this.created = new Date(raw.created);
     if ('created_by_ref' in raw) this.created_by_ref = raw.created_by_ref;
     if ('object_marking_refs' in raw && Array.isArray(raw.object_marking_refs))
@@ -190,6 +193,7 @@ export class ReleaseTrackSnapshot {
       version: this.version,
       name: this.name,
       description: this.description,
+      snapshot_description: this.snapshot_description,
       created: this.created ? this.created.toISOString() : undefined,
       created_by_ref: this.created_by_ref,
       object_marking_refs: this.object_marking_refs,
@@ -301,6 +305,7 @@ export class ReleaseTrackSnapshot {
       type: this.type,
       version: this.version,
       modified: this.modified,
+      snapshot_description: this.snapshot_description,
       counts: {
         members: this.memberCount,
         staged: this.stagedCount,

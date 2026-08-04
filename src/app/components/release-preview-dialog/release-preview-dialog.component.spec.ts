@@ -1,8 +1,11 @@
 import { CommonModule } from '@angular/common';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
+import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
+import { MatInputModule } from '@angular/material/input';
 import { MatTabsModule } from '@angular/material/tabs';
 import { NoopAnimationsModule } from '@angular/platform-browser/animations';
 import { vi } from 'vitest';
@@ -60,8 +63,11 @@ describe('ReleasePreviewDialogComponent', () => {
       declarations: [ReleasePreviewDialogComponent],
       imports: [
         CommonModule,
+        FormsModule,
         MatButtonModule,
+        MatFormFieldModule,
         MatIconModule,
+        MatInputModule,
         MatTabsModule,
         NoopAnimationsModule,
       ],
@@ -119,11 +125,18 @@ describe('ReleasePreviewDialogComponent', () => {
   });
 
   it('should return the selected version bump when all bumps are valid', () => {
+    component.snapshotDescription = '  Analyst release context  ';
     component.tagVersion('minor');
-    expect(dialogRef.close).toHaveBeenCalledWith('minor');
+    expect(dialogRef.close).toHaveBeenCalledWith({
+      increment: 'minor',
+      description: 'Analyst release context',
+    });
 
     component.tagVersion('major');
-    expect(dialogRef.close).toHaveBeenCalledWith('major');
+    expect(dialogRef.close).toHaveBeenCalledWith({
+      increment: 'major',
+      description: 'Analyst release context',
+    });
   });
 
   it('should close without selecting a release version', () => {
@@ -166,7 +179,10 @@ describe('ReleasePreviewDialogComponent', () => {
     expect(component.hasInvalidVersionBumps).toBe(false);
     component.tagVersion('minor');
 
-    expect(dialogRef.close).toHaveBeenCalledWith('minor');
+    expect(dialogRef.close).toHaveBeenCalledWith({
+      increment: 'minor',
+      description: '',
+    });
   });
 
   it('should render the objects represented by the Included and Excluded counts', () => {

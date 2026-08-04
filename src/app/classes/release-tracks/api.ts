@@ -13,6 +13,7 @@ export type StixObjectRef = string | { id: string; modified?: string };
 export interface CreateReleaseTrackPayload {
   name: string;
   description?: string;
+  snapshot_description?: string;
   external_references?: any[];
   object_marking_refs?: string[];
   type?: ReleaseTrackType;
@@ -38,10 +39,11 @@ export interface UpdateContentsPayload {
   x_mitre_contents: string[];
 }
 
-export type ReleasePayload =
+export type ReleasePayload = (
   | { increment: 'major' | 'minor'; version?: never }
   | { increment?: never; version: string }
-  | { increment?: undefined; version?: undefined };
+  | { increment?: undefined; version?: undefined }
+) & { description?: string };
 
 export interface ClonePayload {
   name?: string;
@@ -142,6 +144,7 @@ export interface ReleaseTrackSnapshotHistoryItem {
   version?: string | null;
   graph_manifest_id?: string;
   graph_statistics?: SnapshotGraphStatistics;
+  snapshot_description?: string;
   type?: ReleaseTrackType;
   name?: string;
   description?: string;

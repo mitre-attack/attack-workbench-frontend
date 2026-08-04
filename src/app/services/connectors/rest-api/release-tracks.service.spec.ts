@@ -235,12 +235,15 @@ describe('ReleaseTracksConnectorService', () => {
 
   it('should release the latest snapshot with the current request body', () => {
     service
-      .releaseLatest('release-track--standard', { increment: 'minor' })
+      .releaseLatest('release-track--standard', {
+        increment: 'minor',
+        description: 'Analyst release context',
+      })
       .subscribe();
 
     expect(http.post).toHaveBeenCalledWith(
       `${environment.integrations.rest_api.url}/release-tracks/release-track--standard/snapshots/latest/release`,
-      { increment: 'minor' }
+      { increment: 'minor', description: 'Analyst release context' }
     );
   });
 
@@ -304,6 +307,21 @@ describe('ReleaseTracksConnectorService', () => {
     const [url] = http.get.mock.calls[0];
     expect(url).toBe(
       `${environment.integrations.rest_api.url}/release-tracks/release-track--standard/snapshots/2026-07-23T13%3A37%3A28.000Z`
+    );
+  });
+
+  it('should update notes on an exact snapshot', () => {
+    service
+      .updateSnapshotDescription(
+        'release-track--standard',
+        '2026-07-23T13:37:28.000Z',
+        { description: 'Updated analyst context' }
+      )
+      .subscribe();
+
+    expect(http.put).toHaveBeenCalledWith(
+      `${environment.integrations.rest_api.url}/release-tracks/release-track--standard/snapshots/2026-07-23T13%3A37%3A28.000Z/description`,
+      { description: 'Updated analyst context' }
     );
   });
 });

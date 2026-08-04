@@ -628,6 +628,30 @@ $released-members-disabled-dark: colors.on-color-deemphasis(dark);
       margin-top: 2px;
       font-size: 12px;
     }
+
+    .snapshot-history-description {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      max-width: 720px;
+      margin-top: 12px;
+
+      .mat-icon {
+        flex: 0 0 auto;
+        width: 18px;
+        height: 18px;
+        margin-top: 1px;
+        font-size: 18px;
+        line-height: 18px;
+        color: colors.color(secondary);
+      }
+
+      p {
+        margin: 0;
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+      }
+    }
   }
 
   .snapshot-history-actions {

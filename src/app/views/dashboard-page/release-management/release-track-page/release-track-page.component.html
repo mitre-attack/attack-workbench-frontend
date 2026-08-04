@@ -696,9 +696,42 @@
                   Snapshot:
                   {{ item.modified | date: 'MMM d, y, h:mm:ss a' }}
                 </p>
+                <div
+                  *ngIf="item.snapshot.snapshot_description"
+                  class="snapshot-history-description">
+                  <mat-icon aria-hidden="true">notes</mat-icon>
+                  <p>{{ item.snapshot.snapshot_description }}</p>
+                </div>
               </div>
 
               <div class="snapshot-history-actions small-buttons">
+                <button
+                  *ngIf="canEditReleaseTrack"
+                  mat-stroked-button
+                  [disabled]="
+                    isUpdatingSnapshotDescription(item) || !item.modified
+                  "
+                  [attr.aria-label]="
+                    (item.snapshot.snapshot_description ? 'Edit' : 'Add') +
+                    ' notes for ' +
+                    item.title
+                  "
+                  (click)="onEditSnapshotDescription(item)">
+                  <mat-spinner
+                    *ngIf="isUpdatingSnapshotDescription(item)"
+                    class="snapshot-action-spinner"
+                    diameter="18"></mat-spinner>
+                  <mat-icon *ngIf="!isUpdatingSnapshotDescription(item)">
+                    edit_note
+                  </mat-icon>
+                  {{
+                    isUpdatingSnapshotDescription(item)
+                      ? 'Saving notes'
+                      : item.snapshot.snapshot_description
+                        ? 'Edit notes'
+                        : 'Add notes'
+                  }}
+                </button>
                 <button
                   *ngIf="item.canCacheBundle && canEditReleaseTrack"
                   class="cache-color"

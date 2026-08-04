@@ -80,6 +80,7 @@ export class NewTrackDialogComponent implements OnInit {
     this.form = this.fb.group({
       name: ['', [Validators.required]],
       description: [''],
+      snapshotDescription: ['', [Validators.maxLength(4000)]],
       autoPromote: [false],
       candidacyThreshold: [{ value: WorkflowStatus.Reviewed, disabled: true }],
       memberSync: [MemberSyncStrategy.TrackLatest],
@@ -189,6 +190,9 @@ export class NewTrackDialogComponent implements OnInit {
     if (!this.isFormValid() || this.loading) return;
 
     let payload: any;
+    const snapshotDescription = String(
+      this.form.get('snapshotDescription')?.value || ''
+    ).trim();
     if (this.isVirtual) {
       payload = {
         name: this.form.get('name')?.value,
@@ -218,6 +222,10 @@ export class NewTrackDialogComponent implements OnInit {
         payload.config.candidacy_threshold =
           this.form.get('candidacyThreshold')?.value;
       }
+    }
+
+    if (snapshotDescription) {
+      payload.snapshot_description = snapshotDescription;
     }
 
     this.loading = true;

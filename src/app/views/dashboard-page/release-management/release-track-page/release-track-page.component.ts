@@ -38,8 +38,12 @@ import { AddDialogComponent } from 'src/app/components/add-dialog/add-dialog.com
 import { ConfirmationDialogComponent } from 'src/app/components/confirmation-dialog/confirmation-dialog.component';
 import { DeleteDialogComponent } from 'src/app/components/delete-dialog/delete-dialog.component';
 import { MultipleChoiceDialogComponent } from 'src/app/components/multiple-choice-dialog/multiple-choice-dialog.component';
-import { ReleasePreviewDialogComponent } from 'src/app/components/release-preview-dialog/release-preview-dialog.component';
+import {
+  ReleasePreviewDialogComponent,
+  ReleasePreviewSelection,
+} from 'src/app/components/release-preview-dialog/release-preview-dialog.component';
 import { ReleaseTrackObjectItem } from 'src/app/components/release-track-object-card/release-track-object-card.component';
+import { SnapshotDescriptionDialogComponent } from 'src/app/components/snapshot-description-dialog/snapshot-description-dialog.component';
 import { AuthenticationService } from 'src/app/services/connectors/authentication/authentication.service';
 import { ReleaseTracksConnectorService } from 'src/app/services/connectors/rest-api/release-tracks.service';
 import { RestApiConnectorService } from 'src/app/services/connectors/rest-api/rest-api-connector.service';
@@ -202,6 +206,7 @@ export class ReleaseTrackPageComponent implements OnInit {
   private createdDraftSnapshot: ReleaseTrackSnapshotHistoryItem | null = null;
   private cachingSnapshotModified = new Set<string>();
   private deletingSnapshotCacheModified = new Set<string>();
+  private updatingSnapshotDescriptionModified = new Set<string>();
 
   public candidacyOptions = Object.values(WorkflowStatus);
   public memberSyncStrategyOptions = Object.values(MemberSyncStrategy);
@@ -1560,35 +1565,33 @@ export class ReleaseTrackPageComponent implements OnInit {
     if (!this.canCreateDraft) return;
 
     const trackName = this.releaseTrackName || this.id || 'this release track';
-    const dialogRef = this.dialog.open(ConfirmationDialogComponent, {
-      width: '30em',
+    const dialogRef = this.dialog.open(SnapshotDescriptionDialogComponent, {
       autoFocus: false,
       data: {
-        title: 'Create draft snapshot?',
-        message: `Are you sure you want to create a new draft snapshot for the track ${trackName}? This will create a copy of the latest snapshot as a new draft.`,
-        no_label: 'Cancel',
-        yes_label: 'Create Draft',
-        confirm_color: 'primary',
-        confirm_appearance: 'raised',
-        layout: 'simple',
+        title: 'Create draft snapshot',
+        message: `Create a copy of the latest snapshot for ${trackName}. Add optional notes so other analysts can understand this draft in history.`,
+        description: this.releaseTrack?.snapshot_description || '',
+        confirmLabel: 'Create draft',
       },
     });
 
-    dialogRef.afterClosed().subscribe(confirmed => {
-      if (!confirmed || !this.id || !this.isVirtualReleaseTrack) {
+    dialogRef.afterClosed().subscribe(description => {
+      if (
+        description === undefined ||
+        !this.id ||
+        !this.isVirtualReleaseTrack
+      ) {
         return;
       }
-      this.createVirtualDraftSnapshot();
+      this.createVirtualDraftSnapshot(description);
     });
   }
 
-  private createVirtualDraftSnapshot(): void {
+  private createVirtualDraftSnapshot(description: string): void {
     this.isCreatingDraft = true;
     this.connector
       .createVirtualSnapshot(this.id, {
-        description: this.snapshotHistory.length
-          ? 'Virtual snapshot'
-          : 'Initial virtual snapshot',
+        description,
       })
       .pipe(
         take(1),
@@ -1873,6 +1876,7 @@ export class ReleaseTrackPageComponent implements OnInit {
       name: snapshot.name || this.releaseTrackName,
       type,
       version: snapshot.version ?? null,
+      notes: snapshot.snapshot_description ?? null,
       modified: item.modified,
       tagged: item.isTagged,
       latest: item.isLatest,
@@ -1895,6 +1899,97 @@ export class ReleaseTrackPageComponent implements OnInit {
     return (
       !!item.modified && this.deletingSnapshotCacheModified.has(item.modified)
     );
+  }
+
+  public isUpdatingSnapshotDescription(
+    item: SnapshotHistoryViewModel
+  ): boolean {
+    return (
+      !!item.modified &&
+      this.updatingSnapshotDescriptionModified.has(item.modified)
+    );
+  }
+
+  public onEditSnapshotDescription(item: SnapshotHistoryViewModel): void {
+    if (
+      !this.id ||
+      !item.modified ||
+      !this.canEditReleaseTrack ||
+      this.isUpdatingSnapshotDescription(item)
+    ) {
+      return;
+    }
+
+    const modified = item.modified;
+    const dialogRef = this.dialog.open(SnapshotDescriptionDialogComponent, {
+      autoFocus: false,
+      data: {
+        title: item.snapshot.snapshot_description
+          ? 'Edit snapshot notes'
+          : 'Add snapshot notes',
+        description: item.snapshot.snapshot_description || '',
+        message:
+          'These notes are visible on this snapshot in history and can be changed later without changing its release version or contents.',
+        confirmLabel: 'Save notes',
+      },
+    });
+
+    dialogRef
+      .afterClosed()
+      .pipe(take(1))
+      .subscribe((description: string | undefined) => {
+        if (description === undefined) return;
+
+        this.updatingSnapshotDescriptionModified.add(modified);
+        this.connector
+          .updateSnapshotDescription(this.id, modified, { description })
+          .pipe(
+            take(1),
+            finalize(() => {
+              this.updatingSnapshotDescriptionModified.delete(modified);
+            })
+          )
+          .subscribe({
+            next: snapshot => {
+              const updatedDescription = snapshot.snapshot_description;
+              if (updatedDescription) {
+                item.snapshot.snapshot_description = updatedDescription;
+              } else {
+                delete item.snapshot.snapshot_description;
+              }
+
+              if (
+                this.releaseTrack &&
+                this.getSnapshotModified(this.releaseTrack) === modified
+              ) {
+                this.releaseTrack.snapshot_description = updatedDescription;
+              }
+              if (
+                this.createdDraftSnapshot &&
+                this.getSnapshotModified(this.createdDraftSnapshot) === modified
+              ) {
+                this.createdDraftSnapshot.snapshot_description =
+                  updatedDescription;
+              }
+
+              this.snackbar.open(
+                updatedDescription
+                  ? 'Snapshot notes saved.'
+                  : 'Snapshot notes cleared.',
+                null,
+                { duration: 3000 }
+              );
+            },
+            error: err => {
+              console.error('Failed to update snapshot notes', err);
+              this.snackbar.open(
+                'Unable to save snapshot notes. Please try again.',
+                null,
+                { duration: 5000, panelClass: 'error' }
+              );
+            },
+          });
+      });
   }
 
   public getBundleCacheTooltip(item: SnapshotHistoryViewModel): string {
@@ -2601,9 +2696,9 @@ export class ReleaseTrackPageComponent implements OnInit {
     releaseRef
       .afterClosed()
       .pipe(take(1))
-      .subscribe((action: 'major' | 'minor' | undefined) => {
-        if (action !== 'major' && action !== 'minor') return;
-        this.releaseSnapshot({ increment: action }, item);
+      .subscribe((selection: ReleasePreviewSelection | undefined) => {
+        if (!selection) return;
+        this.releaseSnapshot(selection, item);
       });
   }
 

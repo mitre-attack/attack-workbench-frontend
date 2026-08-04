@@ -20,6 +20,7 @@ import { AddDialogComponent } from 'src/app/components/add-dialog/add-dialog.com
 import { DeleteDialogComponent } from 'src/app/components/delete-dialog/delete-dialog.component';
 import { ReleasePreviewDialogComponent } from 'src/app/components/release-preview-dialog/release-preview-dialog.component';
 import { ConfirmationDialogComponent } from 'src/app/components/confirmation-dialog/confirmation-dialog.component';
+import { SnapshotDescriptionDialogComponent } from 'src/app/components/snapshot-description-dialog/snapshot-description-dialog.component';
 import { AuthenticationService } from 'src/app/services/connectors/authentication/authentication.service';
 import { FormsModule, ReactiveFormsModule } from '@angular/forms';
 import {
@@ -57,6 +58,7 @@ describe('ReleaseTrackPageComponent', () => {
       exportLatestSnapshot: vi.fn(() => createAsyncObservable({})),
       exportSnapshotByModified: vi.fn(() => createAsyncObservable({})),
       retrieveSnapshotByModified: vi.fn(() => createAsyncObservable(null)),
+      updateSnapshotDescription: vi.fn(() => createAsyncObservable({})),
       createVirtualSnapshot: vi.fn(() => createAsyncObservable({})),
       previewRelease: vi.fn(() => createAsyncObservable({})),
       releaseLatest: vi.fn(() => createAsyncObservable({})),
@@ -351,6 +353,7 @@ describe('ReleaseTrackPageComponent', () => {
         modified: '2024-04-15T06:00:00.000Z',
         type: ReleaseTrackType.Standard,
         version: '1.3',
+        snapshot_description: 'Published analyst context',
       },
       title: 'v1.3',
       created: new Date('2024-04-15T06:00:00.000Z'),
@@ -474,6 +477,7 @@ describe('ReleaseTrackPageComponent', () => {
         modified: '2024-04-15T06:00:00.000Z',
         type: ReleaseTrackType.Standard,
         version: '1.3',
+        snapshot_description: 'Published analyst context',
         members_count: 120,
         staged_count: 4,
         candidates_count: 9,
@@ -517,6 +521,7 @@ describe('ReleaseTrackPageComponent', () => {
       name: 'Enterprise Release',
       type: 'standard',
       version: '1.3',
+      notes: 'Published analyst context',
       modified: '2024-04-15T06:00:00.000Z',
       tagged: true,
       latest: false,
@@ -975,6 +980,55 @@ describe('ReleaseTrackPageComponent', () => {
     expect(component.isCachingSnapshot(item)).toBe(false);
   });
 
+  it('should edit snapshot notes without changing the history row identity', () => {
+    const modified = '2026-07-23T13:37:28.000Z';
+    const item = {
+      snapshot: { snapshot_description: 'Original context' },
+      title: 'v1.0',
+      modified,
+      isTagged: true,
+    } as any;
+    mockDialog.open.mockReturnValue({
+      afterClosed: () => of('Updated analyst context'),
+    });
+    mockReleaseTrackApiConnector.updateSnapshotDescription.mockReturnValue(
+      of({ modified, snapshot_description: 'Updated analyst context' })
+    );
+    component.id = 'release-track--123';
+    component.releaseTrack = {
+      modified: new Date(modified),
+      snapshot_description: 'Original context',
+    } as any;
+
+    component.onEditSnapshotDescription(item);
+
+    expect(mockDialog.open).toHaveBeenCalledWith(
+      SnapshotDescriptionDialogComponent,
+      expect.objectContaining({
+        data: expect.objectContaining({
+          title: 'Edit snapshot notes',
+          description: 'Original context',
+        }),
+      })
+    );
+    expect(
+      mockReleaseTrackApiConnector.updateSnapshotDescription
+    ).toHaveBeenCalledWith('release-track--123', modified, {
+      description: 'Updated analyst context',
+    });
+    expect(item.modified).toBe(modified);
+    expect(item.snapshot.snapshot_description).toBe('Updated analyst context');
+    expect(component.releaseTrack?.snapshot_description).toBe(
+      'Updated analyst context'
+    );
+    expect(component.isUpdatingSnapshotDescription(item)).toBe(false);
+    expect(mockSnackbar.open).toHaveBeenCalledWith(
+      'Snapshot notes saved.',
+      null,
+      { duration: 3000 }
+    );
+  });
+
   it('should delete a cached snapshot graph after confirmation', () => {
     const item = {
       snapshot: {
@@ -1161,7 +1215,7 @@ describe('ReleaseTrackPageComponent', () => {
       .spyOn(component, 'getSnapshotHistory')
       .mockImplementation(() => undefined);
     mockDialog.open.mockReturnValue({
-      afterClosed: () => of(true),
+      afterClosed: () => of('Draft analyst context'),
     });
     mockReleaseTrackApiConnector.createVirtualSnapshot.mockReturnValue(
       of({
@@ -1185,25 +1239,21 @@ describe('ReleaseTrackPageComponent', () => {
     component.onDraft();
 
     expect(mockDialog.open).toHaveBeenCalledWith(
-      ConfirmationDialogComponent,
+      SnapshotDescriptionDialogComponent,
       expect.objectContaining({
         data: expect.objectContaining({
-          title: 'Create draft snapshot?',
+          title: 'Create draft snapshot',
           message: expect.stringContaining(
-            'create a new draft snapshot for the track Virtual Release'
+            'Create a copy of the latest snapshot for Virtual Release'
           ),
-          no_label: 'Cancel',
-          yes_label: 'Create Draft',
-          confirm_color: 'primary',
-          confirm_appearance: 'raised',
-          layout: 'simple',
+          confirmLabel: 'Create draft',
         }),
       })
     );
     expect(
       mockReleaseTrackApiConnector.createVirtualSnapshot
     ).toHaveBeenCalledWith('release-track--123', {
-      description: 'Initial virtual snapshot',
+      description: 'Draft analyst context',
     });
     expect(refreshSpy).toHaveBeenCalled();
     expect(historySpy).toHaveBeenCalled();
@@ -1341,7 +1391,8 @@ describe('ReleaseTrackPageComponent', () => {
       ],
     } as any;
     mockDialog.open.mockReturnValue({
-      afterClosed: () => of('minor'),
+      afterClosed: () =>
+        of({ increment: 'minor', description: 'First release context' }),
     });
     component.id = 'release-track--123';
 
@@ -1376,7 +1427,7 @@ describe('ReleaseTrackPageComponent', () => {
     );
     expect(mockReleaseTrackApiConnector.releaseLatest).toHaveBeenCalledWith(
       'release-track--123',
-      { increment: 'minor' }
+      { increment: 'minor', description: 'First release context' }
     );
     expect(refreshSpy).toHaveBeenCalled();
     expect(historySpy).toHaveBeenCalled();
@@ -1456,7 +1507,8 @@ describe('ReleaseTrackPageComponent', () => {
       )
     );
     mockDialog.open.mockReturnValue({
-      afterClosed: () => of('major'),
+      afterClosed: () =>
+        of({ increment: 'major', description: 'Major release context' }),
     });
     component.id = 'release-track--123';
 
@@ -1504,7 +1556,7 @@ describe('ReleaseTrackPageComponent', () => {
     expect(mockReleaseTrackApiConnector.releaseSnapshot).toHaveBeenCalledWith(
       'release-track--123',
       '2026-07-23T13:37:28.000Z',
-      { increment: 'major' }
+      { increment: 'major', description: 'Major release context' }
     );
     expect(mockReleaseTrackApiConnector.releaseLatest).not.toHaveBeenCalled();
     expect(refreshSpy).toHaveBeenCalled();

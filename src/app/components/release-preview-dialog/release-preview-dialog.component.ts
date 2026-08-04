@@ -10,6 +10,11 @@ export interface ReleasePreviewDialogData {
   previewSummary?: any;
 }
 
+export interface ReleasePreviewSelection {
+  increment: 'minor' | 'major';
+  description: string;
+}
+
 interface ReleaseTrackObject {
   object_ref?: string;
   object_modified?: string;
@@ -38,10 +43,15 @@ export interface IncludedReleaseObject {
   standalone: false,
 })
 export class ReleasePreviewDialogComponent {
+  public readonly snapshotDescriptionMaxLength = 4000;
+  public snapshotDescription: string;
+
   constructor(
     public dialogRef: MatDialogRef<ReleasePreviewDialogComponent>,
     @Inject(MAT_DIALOG_DATA) public data: ReleasePreviewDialogData
-  ) {}
+  ) {
+    this.snapshotDescription = data.track?.snapshot_description || '';
+  }
 
   public get trackName(): string {
     return this.data.track?.name || 'Release Track';
@@ -187,7 +197,10 @@ export class ReleasePreviewDialogComponent {
       return;
     }
 
-    this.dialogRef.close(type);
+    this.dialogRef.close({
+      increment: type,
+      description: this.snapshotDescription.trim(),
+    } satisfies ReleasePreviewSelection);
   }
 
   public getObjectName(item: ReleaseTrackObject): string {
