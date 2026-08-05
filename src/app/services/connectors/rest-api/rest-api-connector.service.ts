@@ -49,6 +49,7 @@ import { AttackTypeToPlural } from 'src/app/utils/type-mappings';
 import { AttackType } from 'src/app/utils/types';
 import { environment } from '../../../../environments/environment';
 import { logger } from '../../../utils/logger';
+import { serializeJsonForDownload } from '../../../utils/json-download';
 import { ApiConnector } from '../api-connector';
 import {
   CollectionStreamService,
@@ -2978,7 +2979,7 @@ export class RestApiConnectorService extends ApiConnector {
    */
   public triggerBrowserDownload(data: any, filename: string) {
     const url = URL.createObjectURL(
-      new Blob([JSON.stringify(data, null, 4)], { type: 'text/json' })
+      new Blob([serializeJsonForDownload(data)], { type: 'text/json' })
     );
     const downloadLink = document.createElement('a');
     downloadLink.href = url;

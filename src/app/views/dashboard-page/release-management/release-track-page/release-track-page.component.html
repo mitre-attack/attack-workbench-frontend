@@ -709,7 +709,14 @@
                   *ngIf="canEditReleaseTrack"
                   mat-stroked-button
                   [disabled]="
-                    isUpdatingSnapshotDescription(item) || !item.modified
+                    item.isBundleCached ||
+                    isUpdatingSnapshotDescription(item) ||
+                    !item.modified
+                  "
+                  [matTooltip]="
+                    item.isBundleCached
+                      ? 'Delete the bundle cache before editing snapshot notes.'
+                      : ''
                   "
                   [attr.aria-label]="
                     (item.snapshot.snapshot_description ? 'Edit' : 'Add') +
@@ -835,6 +842,56 @@
                     {{ stat.label }}
                   </div>
                 </div>
+              </div>
+            </section>
+
+            <section
+              *ngIf="item.isBundleCached"
+              class="snapshot-bundle-hashes"
+              aria-label="STIX bundle SHA-256 hashes">
+              <div class="snapshot-bundle-hashes-header">
+                <mat-icon aria-hidden="true">fingerprint</mat-icon>
+                <span>Bundle SHA-256</span>
+              </div>
+
+              <div class="snapshot-bundle-hash-row">
+                <span class="snapshot-bundle-hash-label">STIX 2.0</span>
+                <code *ngIf="getSnapshotBundleHash(item, '2.0') as hash">
+                  {{ hash }}
+                </code>
+                <span
+                  *ngIf="!getSnapshotBundleHash(item, '2.0')"
+                  class="snapshot-bundle-hash-error">
+                  Unavailable
+                </span>
+                <button
+                  mat-icon-button
+                  [disabled]="!getSnapshotBundleHash(item, '2.0')"
+                  aria-label="Copy STIX 2.0 bundle SHA-256"
+                  matTooltip="Copy STIX 2.0 bundle SHA-256"
+                  (click)="copySnapshotBundleHash(item, '2.0')">
+                  <mat-icon>content_copy</mat-icon>
+                </button>
+              </div>
+
+              <div class="snapshot-bundle-hash-row">
+                <span class="snapshot-bundle-hash-label">STIX 2.1</span>
+                <code *ngIf="getSnapshotBundleHash(item, '2.1') as hash">
+                  {{ hash }}
+                </code>
+                <span
+                  *ngIf="!getSnapshotBundleHash(item, '2.1')"
+                  class="snapshot-bundle-hash-error">
+                  Unavailable
+                </span>
+                <button
+                  mat-icon-button
+                  [disabled]="!getSnapshotBundleHash(item, '2.1')"
+                  aria-label="Copy STIX 2.1 bundle SHA-256"
+                  matTooltip="Copy STIX 2.1 bundle SHA-256"
+                  (click)="copySnapshotBundleHash(item, '2.1')">
+                  <mat-icon>content_copy</mat-icon>
+                </button>
               </div>
             </section>
           </div>

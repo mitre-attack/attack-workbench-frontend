@@ -949,6 +949,11 @@ describe('ReleaseTrackPageComponent', () => {
         modified: item.modified,
         version: '1.0',
         graph_manifest_id: 'release-track-graph-manifest--cached',
+        bundle_hashes: {
+          manifest_id: 'release-track-graph-manifest--cached',
+          stix_2_0: 'a'.repeat(64),
+          stix_2_1: 'b'.repeat(64),
+        },
       })
     );
     component.id = 'release-track--123';
@@ -961,6 +966,8 @@ describe('ReleaseTrackPageComponent', () => {
     expect(item.snapshot.graph_manifest_id).toBe(
       'release-track-graph-manifest--cached'
     );
+    expect(component.getSnapshotBundleHash(item, '2.0')).toBe('a'.repeat(64));
+    expect(component.getSnapshotBundleHash(item, '2.1')).toBe('b'.repeat(64));
     expect(item.isBundleCached).toBe(true);
     expect(item.canCacheBundle).toBe(false);
     expect(mockReleaseTrackApiConnector.listSnapshots).toHaveBeenCalledWith(
@@ -1004,19 +1011,25 @@ describe('ReleaseTrackPageComponent', () => {
     expect(component.isCachingSnapshot(item)).toBe(false);
   });
 
-  it('should edit snapshot notes without changing the history row identity', () => {
+  it('should edit notes on a snapshot without a bundle cache', () => {
     const modified = '2026-07-23T13:37:28.000Z';
     const item = {
-      snapshot: { snapshot_description: 'Original context' },
+      snapshot: {
+        snapshot_description: 'Original context',
+      },
       title: 'v1.0',
       modified,
       isTagged: true,
+      isBundleCached: false,
     } as any;
     mockDialog.open.mockReturnValue({
       afterClosed: () => of('Updated analyst context'),
     });
     mockReleaseTrackApiConnector.updateSnapshotDescription.mockReturnValue(
-      of({ modified, snapshot_description: 'Updated analyst context' })
+      of({
+        modified,
+        snapshot_description: 'Updated analyst context',
+      })
     );
     component.id = 'release-track--123';
     component.releaseTrack = {
@@ -1053,11 +1066,63 @@ describe('ReleaseTrackPageComponent', () => {
     );
   });
 
+  it('should not open the notes editor for a cached snapshot', () => {
+    const item = {
+      snapshot: {
+        graph_manifest_id: 'release-track-graph-manifest--cached',
+        snapshot_description: 'Frozen release notes',
+      },
+      title: 'v1.0',
+      modified: '2026-07-23T13:37:28.000Z',
+      isTagged: true,
+      isBundleCached: true,
+    } as any;
+    component.id = 'release-track--123';
+
+    component.onEditSnapshotDescription(item);
+
+    expect(mockDialog.open).not.toHaveBeenCalled();
+    expect(
+      mockReleaseTrackApiConnector.updateSnapshotDescription
+    ).not.toHaveBeenCalled();
+  });
+
+  it('should copy a server-provided bundle hash to the clipboard', () => {
+    const modified = '2026-07-23T13:37:28.000Z';
+    const item = {
+      snapshot: {
+        graph_manifest_id: 'release-track-graph-manifest--cached',
+        bundle_hashes: {
+          manifest_id: 'release-track-graph-manifest--cached',
+          stix_2_0: 'a'.repeat(64),
+          stix_2_1: 'b'.repeat(64),
+        },
+      },
+      title: 'v1.0',
+      modified,
+      isTagged: true,
+    } as any;
+
+    component.copySnapshotBundleHash(item, '2.1');
+
+    expect(mockClipboard.copy).toHaveBeenCalledWith('b'.repeat(64));
+    expect(mockSnackbar.open).toHaveBeenCalledWith(
+      'STIX 2.1 bundle SHA-256 copied to the clipboard.',
+      null,
+      { duration: 3000 }
+    );
+  });
+
   it('should delete a cached snapshot graph after confirmation', () => {
     const item = {
       snapshot: {
         graph_manifest_id: 'release-track-graph-manifest--cached',
         graph_statistics: { total_count: 28 },
+        bundle_hashes: {
+          manifest_id: 'release-track-graph-manifest--cached',
+          stix_2_0: 'a'.repeat(64),
+          stix_2_1: 'b'.repeat(64),
+        },
       },
       title: 'v1.0',
       modified: '2026-07-23T13:37:28.000Z',
@@ -1092,6 +1157,7 @@ describe('ReleaseTrackPageComponent', () => {
     ).toHaveBeenCalledWith('release-track--123', item.modified);
     expect(item.snapshot.graph_manifest_id).toBeUndefined();
     expect(item.snapshot.graph_statistics).toBeUndefined();
+    expect(item.snapshot.bundle_hashes).toBeUndefined();
     expect(item.isBundleCached).toBe(false);
     expect(item.canCacheBundle).toBe(true);
     expect(item.graphCacheStats).toEqual([]);

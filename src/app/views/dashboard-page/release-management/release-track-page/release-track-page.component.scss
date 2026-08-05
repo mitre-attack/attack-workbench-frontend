@@ -770,6 +770,69 @@ $released-members-disabled-dark: colors.on-color-deemphasis(dark);
     line-height: 26px;
   }
 
+  .snapshot-bundle-hashes {
+    margin: 0 16px 16px;
+    padding: 10px 12px;
+    border: 1px solid;
+    border-radius: 5px;
+
+    .dark & {
+      border-color: colors.border-color(dark);
+      background: rgba(colors.color(mitre-silver), 0.025);
+    }
+
+    .light & {
+      border-color: colors.border-color(light);
+      background: rgba(colors.color(mitre-navy), 0.025);
+    }
+  }
+
+  .snapshot-bundle-hashes-header {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 8px;
+    font-size: 12px;
+    font-weight: 700;
+    color: colors.color(secondary);
+
+    .mat-icon {
+      width: 18px;
+      height: 18px;
+      font-size: 18px;
+      line-height: 18px;
+    }
+  }
+
+  .snapshot-bundle-hash-row {
+    display: grid;
+    grid-template-columns: 64px minmax(0, 1fr) 40px;
+    align-items: center;
+    gap: 8px;
+    min-height: 40px;
+
+    code {
+      min-width: 0;
+      overflow-wrap: anywhere;
+      font-size: 12px;
+      line-height: 18px;
+    }
+
+    button {
+      justify-self: end;
+    }
+  }
+
+  .snapshot-bundle-hash-label {
+    font-size: 12px;
+    font-weight: 700;
+  }
+
+  .snapshot-bundle-hash-error {
+    font-size: 12px;
+    color: colors.color(warn);
+  }
+
   .modified-color {
     color: color.mix(colors.color(spark-yellow), colors.color(warn), 72%);
   }

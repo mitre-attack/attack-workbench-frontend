@@ -142,11 +142,18 @@ export interface VirtualReleasePreviewSummary extends ReleasePreviewSummaryBase 
 export type ReleasePreviewSummary =
   StandardReleasePreviewSummary | VirtualReleasePreviewSummary;
 
+export interface SnapshotBundleHashes {
+  manifest_id: string;
+  stix_2_0: string;
+  stix_2_1: string;
+}
+
 export interface ReleaseTrackSnapshotHistoryItem {
   id?: string;
   modified?: string | Date;
   version?: string | null;
   graph_manifest_id?: string;
+  bundle_hashes?: SnapshotBundleHashes;
   graph_statistics?: SnapshotGraphStatistics;
   snapshot_description?: string;
   type?: ReleaseTrackType;

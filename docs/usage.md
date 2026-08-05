@@ -24,6 +24,8 @@ The release preview offers minor and major relative tags as well as an exact `MA
 
 The release-track page can export the latest snapshot or a selected historical snapshot as a STIX 2.0 bundle, a STIX 2.1 bundle, or Workbench JSON. Historical snapshot exports can also copy a concise summary. Tagged snapshots with a bundle cache use that pinned member graph for deterministic member-only exports in either STIX version.
 
+Each cached snapshot card displays server-generated SHA-256 hashes for the exact UTF-8 JSON files produced by its STIX 2.0 and STIX 2.1 bundle downloads. The adjacent copy buttons copy a hash for external file-integrity verification. Snapshot notes are locked while the bundle is cached; delete the cache, edit the notes, and cache the bundle again to generate matching hashes.
+
 #### Adding a Collection Index
 
 Collection indexes can be added from the collections page. To add a collection index, specify the URL at which the index is found. The application will then provide a preview of the index for you to review before you save. You can also choose from the provided "recommended collection indexes" to quickly connect your Workbench instance to a data provider without having to find the URL yourself. The ATT&CK Workbench is pre-configured to recommend the MITRE ATT&CK collection index in the "add a collection index" interface.

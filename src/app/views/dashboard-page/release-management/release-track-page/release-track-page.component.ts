@@ -1954,6 +1954,8 @@ export class ReleaseTrackPageComponent implements OnInit {
       !this.id ||
       !item.modified ||
       !this.canEditReleaseTrack ||
+      item.isBundleCached ||
+      !!item.snapshot.graph_manifest_id ||
       this.isUpdatingSnapshotDescription(item)
     ) {
       return;
@@ -1968,7 +1970,7 @@ export class ReleaseTrackPageComponent implements OnInit {
           : 'Add snapshot notes',
         description: item.snapshot.snapshot_description || '',
         message:
-          'These notes are visible on this snapshot in history and can be changed later without changing its release version or contents.',
+          'These notes are visible on this snapshot in history and in its STIX bundles. Notes cannot be changed while the bundle is cached.',
         confirmLabel: 'Save notes',
       },
     });
@@ -1991,24 +1993,19 @@ export class ReleaseTrackPageComponent implements OnInit {
           .subscribe({
             next: snapshot => {
               const updatedDescription = snapshot.snapshot_description;
-              if (updatedDescription) {
-                item.snapshot.snapshot_description = updatedDescription;
-              } else {
-                delete item.snapshot.snapshot_description;
-              }
+              item.snapshot = { ...item.snapshot, ...snapshot };
 
               if (
                 this.releaseTrack &&
                 this.getSnapshotModified(this.releaseTrack) === modified
               ) {
-                this.releaseTrack.snapshot_description = updatedDescription;
+                Object.assign(this.releaseTrack, snapshot);
               }
               if (
                 this.createdDraftSnapshot &&
                 this.getSnapshotModified(this.createdDraftSnapshot) === modified
               ) {
-                this.createdDraftSnapshot.snapshot_description =
-                  updatedDescription;
+                Object.assign(this.createdDraftSnapshot, snapshot);
               }
 
               this.snackbar.open(
@@ -2131,6 +2128,7 @@ export class ReleaseTrackPageComponent implements OnInit {
           .subscribe({
             next: () => {
               delete item.snapshot.graph_manifest_id;
+              delete item.snapshot.bundle_hashes;
               delete item.snapshot.graph_statistics;
               item.isBundleCached = false;
               item.canCacheBundle = item.isTagged;
@@ -2179,6 +2177,34 @@ export class ReleaseTrackPageComponent implements OnInit {
           console.error('Failed to export release track snapshot', err);
         },
       });
+  }
+
+  public getSnapshotBundleHash(
+    item: SnapshotHistoryViewModel,
+    stixVersion: StixVersion
+  ): string | null {
+    const hashes = item.snapshot.bundle_hashes;
+    if (!hashes || hashes.manifest_id !== item.snapshot.graph_manifest_id) {
+      return null;
+    }
+    return stixVersion === '2.0' ? hashes.stix_2_0 : hashes.stix_2_1;
+  }
+
+  public copySnapshotBundleHash(
+    item: SnapshotHistoryViewModel,
+    stixVersion: StixVersion
+  ): void {
+    const hash = this.getSnapshotBundleHash(item, stixVersion);
+    if (!hash) return;
+
+    const copied = this.clipboard.copy(hash);
+    this.snackbar.open(
+      copied
+        ? `STIX ${stixVersion} bundle SHA-256 copied to the clipboard.`
+        : `Unable to copy the STIX ${stixVersion} bundle SHA-256.`,
+      null,
+      copied ? { duration: 3000 } : { duration: 5000, panelClass: 'error' }
+    );
   }
 
   private getSnapshotExportOptions(
