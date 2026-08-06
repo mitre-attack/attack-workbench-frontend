@@ -50,6 +50,10 @@ export class SaveDialogComponent implements OnInit {
     );
   }
 
+  public get workflowEnabled(): boolean {
+    return this.config.showWorkflow !== false;
+  }
+
   public get validationStatus(): ValidationStatus {
     if (!this.validation) return 'success';
     if (this.validation.errors.length) return 'error';
@@ -74,7 +78,11 @@ export class SaveDialogComponent implements OnInit {
   }
 
   public get validationReviewStatus(): WorkflowStatusType | undefined {
-    if (this.config.object.attackType === 'relationship') return undefined;
+    if (
+      !this.workflowEnabled ||
+      this.config.object.attackType === 'relationship'
+    )
+      return undefined;
     return this.resetWorkflowStatus;
   }
 
@@ -96,8 +104,9 @@ export class SaveDialogComponent implements OnInit {
   }
 
   ngOnInit(): void {
-    this.newState =
-      this.config.initialWorkflowState || WorkflowStatus.WorkInProgress;
+    this.newState = this.workflowEnabled
+      ? this.config.initialWorkflowState || WorkflowStatus.WorkInProgress
+      : undefined;
     if (this.config.object.attackType === 'relationship') {
       this.newState = undefined;
     }
@@ -290,9 +299,7 @@ export class SaveDialogComponent implements OnInit {
    * Save the object with the current version and check for patches
    */
   public saveCurrentVersion() {
-    this.config.object.workflow = this.newState
-      ? { state: this.newState }
-      : undefined;
+    this.applyWorkflowState();
     if (this.config.patchId || this.config.patchAnalytics) this.parse_patches();
     else this.save();
   }
@@ -302,9 +309,7 @@ export class SaveDialogComponent implements OnInit {
    */
   public saveNextMinorVersion() {
     this.config.object.version = new VersionNumber(this.nextMinorVersion);
-    this.config.object.workflow = this.newState
-      ? { state: this.newState }
-      : undefined;
+    this.applyWorkflowState();
     if (this.config.patchId || this.config.patchAnalytics) this.parse_patches();
     else this.save();
   }
@@ -314,15 +319,20 @@ export class SaveDialogComponent implements OnInit {
    */
   public saveNextMajorVersion() {
     this.config.object.version = new VersionNumber(this.nextMajorVersion);
-    this.config.object.workflow = this.newState
-      ? { state: this.newState }
-      : undefined;
+    this.applyWorkflowState();
     if (this.config.patchId || this.config.patchAnalytics) this.parse_patches();
     else this.save();
   }
 
   private saveObject() {
     return this.config.object.save(this.restApiService); // save this object
+  }
+
+  private applyWorkflowState(): void {
+    this.config.object.workflow =
+      this.workflowEnabled && this.newState
+        ? { state: this.newState }
+        : undefined;
   }
 
   /**
@@ -332,9 +342,7 @@ export class SaveDialogComponent implements OnInit {
     if (!this.saveEnabled) {
       return;
     }
-    this.config.object.workflow = this.newState
-      ? { state: this.newState }
-      : undefined;
+    this.applyWorkflowState();
     const sub = this.saveObject()
       .pipe(switchMap(() => this.syncTracks()))
       .subscribe({
@@ -347,6 +355,7 @@ export class SaveDialogComponent implements OnInit {
 
   private loadTrackRows(): void {
     if (
+      !this.workflowEnabled ||
       !this.config.object?.stixID ||
       this.config.object.attackType === 'relationship'
     ) {
@@ -684,4 +693,5 @@ export interface SaveDialogConfig {
   patchAnalytics?: Set<string>; // previous list of analytics related to a detection strategy
   versionAlreadyIncremented: boolean;
   initialWorkflowState?: WorkflowStatusType;
+  showWorkflow?: boolean;
 }

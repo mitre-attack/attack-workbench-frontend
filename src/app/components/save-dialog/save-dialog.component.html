@@ -61,7 +61,7 @@
       </section>
     </div>
 
-    <section class="save-section track-section">
+    <section *ngIf="workflowEnabled" class="save-section track-section">
       <div class="track-section-header">
         <h4>Object Review Status</h4>
         <span *ngIf="loadingTracks" class="track-loading">

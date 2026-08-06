@@ -27,6 +27,10 @@ export class StringPropertyComponent implements OnInit, OnChanges {
   public allowedValues: any;
   public channels: Set<string>;
   public loading = false;
+  private fieldToAllowedValuesProperty = {
+    identity_class: 'identity_class',
+    platform: 'x_mitre_platforms',
+  };
 
   // prevent async issues
   private subscription: Subscription = new Subscription();
@@ -47,7 +51,7 @@ export class StringPropertyComponent implements OnInit, OnChanges {
         disabled: this.config.disabled ?? false,
       });
 
-      if (this.config.field === 'platform') {
+      if (this.fieldToAllowedValuesProperty[this.config.field]) {
         this.loading = true;
         const data$ = this.apiService.getAllAllowedValues();
         this.subscription = data$.subscribe({
@@ -79,16 +83,21 @@ export class StringPropertyComponent implements OnInit, OnChanges {
   public getOptions(): Set<string> {
     const options = new Set<string>();
     if (this.loading) return options;
-    if (this.config.field === 'platform') {
+    const allowedValuesProperty =
+      this.fieldToAllowedValuesProperty[this.config.field];
+    if (allowedValuesProperty) {
       const obj = this.config.object as any;
-      const properties = this.allowedValues.properties.find(p => {
-        return p.propertyName == 'x_mitre_platforms';
+      const properties = this.allowedValues?.properties?.find(p => {
+        return p.propertyName == allowedValuesProperty;
       });
       properties?.domains?.forEach(d => {
-        if (obj?.domains?.includes(d.domainName)) {
+        if (!obj?.domains || obj.domains.includes(d.domainName)) {
           d.allowedValues.forEach(options.add, options);
         }
       });
+      if (this.config.object[this.config.field]) {
+        options.add(this.config.object[this.config.field]);
+      }
     }
     return options;
   }

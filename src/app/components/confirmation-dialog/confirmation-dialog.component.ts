@@ -46,4 +46,6 @@ export interface ConfirmationDialogConfig {
   confirm_color?: 'primary' | 'accent' | 'warn';
   confirm_appearance?: 'raised' | 'stroked';
   layout?: 'default' | 'simple';
+  alternate_label?: string; //optional label for a third button
+  alternate_value?: string; //optional value returned by the third button
 }

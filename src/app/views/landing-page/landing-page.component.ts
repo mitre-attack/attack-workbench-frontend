@@ -16,6 +16,10 @@ import { stixRoutes } from '../../app-routing-stix.module';
   standalone: false,
 })
 export class LandingPageComponent implements OnInit, OnDestroy {
+  private readonly placeholderIdentityName =
+    'Placeholder Organization Identity';
+  private readonly placeholderIdentityReminderKey =
+    'attack-workbench.placeholder-organization-identity-reminder-dismissed';
   private loginSubscription: Subscription;
   public routes: any[] = [];
 
@@ -54,15 +58,16 @@ export class LandingPageComponent implements OnInit, OnDestroy {
 
   // bug the admin about editing their organization identity
   private openOrgIdentityDialog(): void {
+    if (localStorage.getItem(this.placeholderIdentityReminderKey) === 'true') {
+      return;
+    }
+
     if (this.authenticationService.isAuthorized([Role.ADMIN])) {
       const subscription = this.restApiConnector
         .getOrganizationIdentity()
         .subscribe({
           next: identity => {
-            if (
-              identity &&
-              identity.name == 'Placeholder Organization Identity'
-            ) {
+            if (identity && identity.name == this.placeholderIdentityName) {
               const prompt = this.dialog.open(ConfirmationDialogComponent, {
                 maxWidth: '35em',
                 data: {
@@ -70,13 +75,23 @@ export class LandingPageComponent implements OnInit, OnDestroy {
                     '### Your organization identity has not yet been set.\n\nYour organization identity is used for attribution of edits you make to objects in the knowledge base and is attached to published collections. Currently, a placeholder is being used.\n\nUpdate your organization identity now?',
                   yes_suffix: 'edit my identity now',
                   no_suffix: 'edit my identity later',
+                  alternate_label: 'No, and stop reminding me',
+                  alternate_value: 'dismiss',
                 },
                 autoFocus: false, // prevents auto focus on buttons
               });
               const prompt_subscription = prompt.afterClosed().subscribe({
                 next: prompt_result => {
-                  if (prompt_result)
-                    this.router.navigate(['/dashboard/org-settings']);
+                  if (prompt_result === true) {
+                    this.router.navigate(['/identity', identity.stixID], {
+                      queryParams: { editing: true },
+                    });
+                  } else if (prompt_result === 'dismiss') {
+                    localStorage.setItem(
+                      this.placeholderIdentityReminderKey,
+                      'true'
+                    );
+                  }
                 },
                 complete: () => {
                   prompt_subscription.unsubscribe();

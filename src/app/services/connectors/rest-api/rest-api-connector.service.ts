@@ -84,6 +84,10 @@ export interface ValidationBypassRule {
   __v?: number;
 }
 
+export interface MitreIdentityWrites {
+  enabled: boolean;
+}
+
 @Injectable({
   providedIn: 'root',
 })
@@ -1192,6 +1196,20 @@ export class RestApiConnectorService extends ApiConnector {
               warnings: error.error.warnings || [],
             });
           }
+          if (error.status === 400) {
+            return of({
+              errors: [
+                {
+                  path: ['request'],
+                  message:
+                    typeof error.error === 'string'
+                      ? error.error
+                      : error.error?.message || 'Validation failed.',
+                },
+              ],
+              warnings: [],
+            });
+          }
           // Non-validation errors: re-raise
           return throwError(error);
         }),
@@ -1623,6 +1641,14 @@ export class RestApiConnectorService extends ApiConnector {
    */
   public get deleteMatrix() {
     return this.deleteStixObjectFactory('matrix');
+  }
+  /**
+   * DELETE an identity
+   * @param {string} id the STIX ID of the object to delete
+   * @returns {Observable<{}>} observable of the response body
+   */
+  public get deleteIdentity() {
+    return this.deleteStixObjectFactory('identity');
   }
   /**
    * REVOKE a technique
@@ -2560,6 +2586,21 @@ export class RestApiConnectorService extends ApiConnector {
   }
 
   /**
+   * Set the organization identity to an existing identity object.
+   * @param identityId the STIX ID of the identity to use as the organization identity
+   * @returns {Observable<any>} the update response
+   */
+  public setOrganizationIdentityRef(identityId: string): Observable<any> {
+    return this.http
+      .post(`${this.apiUrl}/config/organization-identity`, { id: identityId })
+      .pipe(
+        tap(this.handleSuccess('Organization Identity Updated')),
+        catchError(this.handleError_raise<any>()),
+        share()
+      );
+  }
+
+  /**
    * Get the organization namespace configurations
    * @returns {Observable<Namespace>} the organization namespace configurations
    */
@@ -2599,6 +2640,37 @@ export class RestApiConnectorService extends ApiConnector {
         }),
         catchError(this.handleError_raise<any>()),
         share() // multicast so that multiple subscribers don't trigger the call twice. THIS MUST BE THE LAST LINE OF THE PIPE
+      );
+  }
+
+  /**
+   * Get whether protected MITRE identity writes are enabled.
+   * @returns {Observable<MitreIdentityWrites>} the MITRE identity write setting
+   */
+  public getMitreIdentityWrites(): Observable<MitreIdentityWrites> {
+    return this.http
+      .get<MitreIdentityWrites>(`${this.apiUrl}/config/mitre-identity-writes`)
+      .pipe(
+        tap(() => logger.log('retrieved MITRE identity write setting')),
+        catchError(
+          this.handleError_continue<MitreIdentityWrites>({ enabled: false })
+        ),
+        share()
+      );
+  }
+
+  /**
+   * Set whether protected MITRE identity writes are enabled.
+   * @param enabled true if protected MITRE identity writes should be enabled
+   * @returns {Observable<any>} the update response
+   */
+  public setMitreIdentityWrites(enabled: boolean): Observable<any> {
+    return this.http
+      .post(`${this.apiUrl}/config/mitre-identity-writes`, { enabled })
+      .pipe(
+        tap(this.handleSuccess('MITRE Identity Write Setting Updated')),
+        catchError(this.handleError_raise<any>()),
+        share()
       );
   }
 

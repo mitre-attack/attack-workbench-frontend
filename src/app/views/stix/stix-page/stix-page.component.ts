@@ -112,6 +112,7 @@ export class StixPageComponent implements OnInit, OnDestroy {
               ? this.oldAnalytics
               : undefined,
           versionAlreadyIncremented: versionChanged,
+          showWorkflow: this.editorService.hasWorkflow,
         },
         autoFocus: false, // prevent auto focus on form field
       });
@@ -340,6 +341,8 @@ export class StixPageComponent implements OnInit, OnDestroy {
         );
       else if (this.objectType == 'asset')
         objects$ = this.restApiService.getAsset(objectStixID);
+      else if (this.objectType == 'identity')
+        objects$ = this.restApiService.getIdentity(objectStixID);
       else if (this.objectType == 'marking-definition')
         objects$ = this.restApiService.getMarkingDefinition(objectStixID);
       const subscription = objects$.subscribe({

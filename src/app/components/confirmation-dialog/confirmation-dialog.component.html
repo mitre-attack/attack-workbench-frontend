@@ -8,6 +8,13 @@
       <span>{{ cancelLabel }}</span>
     </button>
     <button
+      *ngIf="config.alternate_label"
+      mat-button
+      [mat-dialog-close]="config.alternate_value || 'alternate'"
+      class="text-label">
+      <span>{{ config.alternate_label }}</span>
+    </button>
+    <button
       *ngIf="confirmAppearance === 'raised'; else strokedConfirm"
       mat-raised-button
       [color]="confirmColor"

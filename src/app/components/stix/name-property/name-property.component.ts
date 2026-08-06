@@ -76,7 +76,7 @@ export class NamePropertyComponent implements OnChanges, OnInit {
     return (
       this.config.mode === 'view' &&
       this.object instanceof StixObject &&
-      this.object.attackType !== 'collection'
+      !['collection', 'identity'].includes(this.object.attackType)
     );
   }
 

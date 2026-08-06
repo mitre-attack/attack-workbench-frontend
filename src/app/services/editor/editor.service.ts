@@ -3,11 +3,14 @@ import { ActivatedRoute, NavigationEnd, Router } from '@angular/router';
 import { SidebarService } from '../sidebar/sidebar.service';
 import { ConfirmationDialogComponent } from 'src/app/components/confirmation-dialog/confirmation-dialog.component';
 import { MatDialog } from '@angular/material/dialog';
+import { MatSnackBar } from '@angular/material/snack-bar';
 import { AuthenticationService } from '../connectors/authentication/authentication.service';
 import { RestApiConnectorService } from '../connectors/rest-api/rest-api-connector.service';
 import { map } from 'rxjs/operators';
-import { forkJoin, Observable } from 'rxjs';
+import { forkJoin, Observable, of } from 'rxjs';
 import { Relationship } from 'src/app/classes/stix/relationship';
+
+const MITRE_IDENTITY_STIX_ID = 'identity--c78cb6e5-0c4b-4611-8297-d1b8b55e40b5';
 
 @Injectable({
   providedIn: 'root',
@@ -47,7 +50,8 @@ export class EditorService {
     private sidebarService: SidebarService,
     private authenticationService: AuthenticationService,
     private apiService: RestApiConnectorService,
-    private dialog: MatDialog
+    private dialog: MatDialog,
+    private snackbar: MatSnackBar
   ) {
     this.router.events.subscribe(event => {
       if (event instanceof NavigationEnd) {
@@ -62,7 +66,7 @@ export class EditorService {
           editable.length > 0 &&
           editable.every(x => x) &&
           this.authenticationService.canEdit(attackType);
-        this.hasWorkflow = attackType !== 'home';
+        this.hasWorkflow = attackType !== 'home' && this.type !== 'identity';
         if (!(this.editable && this.hasWorkflow))
           this.sidebarService.currentTab = 'search';
         this.isGroup = false;
@@ -96,13 +100,50 @@ export class EditorService {
       }
     });
     this.route.queryParams.subscribe(params => {
-      this.editing = params['editing'] && this.authenticationService.canEdit();
+      const editingRequested =
+        params['editing'] && this.authenticationService.canEdit();
+      if (!editingRequested) {
+        this.editing = false;
+        return;
+      }
+
+      this.canEditCurrentObject().subscribe(canEdit => {
+        this.editing = canEdit;
+        if (!canEdit) this.blockProtectedMitreIdentityEdit();
+      });
     });
   }
 
   public startEditing() {
-    if (this.editable)
-      this.router.navigate([], { queryParams: { editing: true } });
+    if (this.editable) {
+      this.canEditCurrentObject().subscribe(canEdit => {
+        if (canEdit)
+          this.router.navigate([], { queryParams: { editing: true } });
+        else this.blockProtectedMitreIdentityEdit();
+      });
+    }
+  }
+
+  private canEditCurrentObject(): Observable<boolean> {
+    if (!this.isProtectedMitreIdentityRoute()) return of(true);
+
+    return this.apiService
+      .getMitreIdentityWrites()
+      .pipe(map(config => config.enabled));
+  }
+
+  private isProtectedMitreIdentityRoute(): boolean {
+    return this.type === 'identity' && this.stixId === MITRE_IDENTITY_STIX_ID;
+  }
+
+  private blockProtectedMitreIdentityEdit(): void {
+    this.editing = false;
+    this.router.navigate([], { queryParams: {}, replaceUrl: true });
+    this.snackbar.open(
+      'MITRE identity edits are disabled by system configuration.',
+      'dismiss',
+      { duration: 4000, panelClass: 'warn' }
+    );
   }
 
   public stopEditing() {

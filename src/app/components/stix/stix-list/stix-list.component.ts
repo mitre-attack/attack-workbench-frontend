@@ -326,6 +326,12 @@ export class StixListComponent implements OnInit, AfterViewInit, OnDestroy {
           this.addDomainColumn();
           this.addColumn('modified', 'modified', 'timestamp');
           break;
+        case 'identity':
+          this.addStateColumnOnly();
+          this.addNameColumn(sticky_allowed);
+          this.addColumn('identity class', 'identity_class', 'plain');
+          this.addColumn('modified', 'modified', 'timestamp');
+          break;
         case 'data-source':
         case 'technique':
           this.addStateColumnOnly();
@@ -985,6 +991,8 @@ export class StixListComponent implements OnInit, AfterViewInit, OnDestroy {
     else if (this.config.type == 'marking-definition')
       this.data$ =
         this.restAPIConnectorService.getAllMarkingDefinitions(options);
+    else if (this.config.type == 'identity')
+      this.data$ = this.restAPIConnectorService.getAllIdentities(options);
     else if (this.config.type == 'note')
       this.data$ = this.restAPIConnectorService.getAllNotes(options);
     else
