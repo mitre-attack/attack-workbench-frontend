@@ -1,17 +1,22 @@
 <div [class]="'app-root ' + theme">
-  <app-header
-    (onLogin)="login()"
-    (onLogout)="logout()"
-    (onRegister)="register()"
-    [style.margin-top]="-hiddenHeaderPX + 'px'"
-    #header></app-header>
   <mat-drawer-container class="app-body">
+    <mat-drawer
+      class="app-nav-drawer"
+      mode="side"
+      position="start"
+      [opened]="true">
+      <app-navigation></app-navigation>
+    </mat-drawer>
+
     <mat-drawer-content>
       <div class="app-content">
+        <app-header
+          (onLogin)="login()"
+          (onLogout)="logout()"
+          (onRegister)="register()"></app-header>
         <app-toolbar
           (onToggleTheme)="toggleTheme()"
-          (onScrollTop)="scrollToTop()"
-          [canScroll]="hiddenHeaderPX != 0"></app-toolbar>
+          (onScrollTop)="scrollToTop()"></app-toolbar>
         <div
           *ngIf="alertStatus"
           class="banner"
@@ -26,15 +31,23 @@
             <mat-icon>close</mat-icon>
           </button>
         </div>
-        <div class="router-padding main-body" #scrollRef>
-          <router-outlet></router-outlet>
-        </div>
+        <mat-drawer-container class="page-body">
+          <mat-drawer-content class="page-content">
+            <div class="router-padding main-body" #scrollRef>
+              <router-outlet></router-outlet>
+            </div>
+          </mat-drawer-content>
+          <mat-drawer
+            mode="side"
+            position="end"
+            #sidebar
+            [opened]="sidebarOpened">
+            <div class="app-drawer">
+              <app-resources-drawer></app-resources-drawer>
+            </div>
+          </mat-drawer>
+        </mat-drawer-container>
       </div>
     </mat-drawer-content>
-    <mat-drawer mode="side" position="end" #sidebar [opened]="sidebarOpened">
-      <div class="app-drawer">
-        <app-resources-drawer></app-resources-drawer>
-      </div>
-    </mat-drawer>
   </mat-drawer-container>
 </div>

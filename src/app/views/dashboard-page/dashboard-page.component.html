@@ -1,63 +1,440 @@
-<div class="dashboard-page view-page grid spacing-20">
-  <div class="row" *ngIf="isTeamLead || isAdmin">
-    <div class="col">
-      <h1>Dashboard</h1>
+<div class="dashboard-page view-page">
+  <div class="dashboard-header">
+    <div>
+      <h1>Knowledge Base Overview</h1>
+    </div>
+    <div class="dashboard-actions">
+      <mat-checkbox
+        [checked]="includeRevoked"
+        (change)="toggleRevoked($event.checked)">
+        Include revoked
+      </mat-checkbox>
+      <mat-checkbox
+        [checked]="includeDeprecated"
+        (change)="toggleDeprecated($event.checked)">
+        Include deprecated
+      </mat-checkbox>
+      <button
+        mat-button
+        color="primary"
+        type="button"
+        routerLink="validation-bypasses">
+        ADM Validation Bypasses
+      </button>
+      <button
+        mat-icon-button
+        color="primary"
+        type="button"
+        matTooltip="Refresh dashboard"
+        aria-label="Refresh dashboard"
+        (click)="loadObjects()">
+        <mat-icon>refresh</mat-icon>
+      </button>
     </div>
   </div>
-  <div class="row" *ngIf="isTeamLead || isAdmin">
-    <div class="col center">
-      <div>
-        <button mat-raised-button color="primary" routerLink="teams">
-          <h2><br />Teams</h2>
-          <h3 class="display-icon">
-            <mat-icon>groups</mat-icon>
-          </h3>
-        </button>
-        <button mat-raised-button color="primary" routerLink="data-quality">
-          <h2><br />Data Quality</h2>
-          <h3 class="display-icon">
-            <mat-icon>fact_check</mat-icon>
-          </h3>
-        </button>
-      </div>
-    </div>
-  </div>
-  <div class="row" *ngIf="isAdmin">
-    <div class="col">
-      <h1>Admin Settings</h1>
-    </div>
-  </div>
-  <div class="row" *ngIf="isAdmin">
-    <div class="col center">
-      <div>
-        <button mat-raised-button color="primary" routerLink="org-settings">
-          <h2>Organization Settings</h2>
-          <h3 class="display-icon">
-            <mat-icon>business</mat-icon>
-          </h3>
-        </button>
 
-        <button
-          mat-raised-button
-          color="primary"
-          routerLink="default-marking-definitions">
-          <h2>Default Marking Definitions</h2>
-          <h3 class="display-icon">
-            <mat-icon>bookmark</mat-icon>
-          </h3>
-        </button>
-        <button
-          mat-raised-button
-          color="primary"
-          routerLink="user-accounts"
-          [matBadge]="pendingUsers"
-          matBadgeDescription="pending users">
-          <h2>User<br />Accounts</h2>
-          <h3 class="display-icon">
-            <mat-icon>people_alt</mat-icon>
-          </h3>
-        </button>
-      </div>
-    </div>
+  <app-loading-overlay *ngIf="loadingObjects"></app-loading-overlay>
+
+  <div class="dashboard-error" *ngIf="loadError">
+    {{ loadError }}
   </div>
+
+  <ng-container *ngIf="!loadingObjects && !loadError">
+    <section class="summary-grid" aria-label="Object summary">
+      <div class="summary-card total">
+        <div class="summary-label">All Objects</div>
+        <div class="summary-value">{{ formatCount(totalObjects) }}</div>
+      </div>
+
+      <div
+        class="summary-card object-type"
+        *ngFor="
+          let summary of objectTypeSummary;
+          trackBy: trackObjectTypeSummary
+        "
+        [style.--summary-color]="summary.color">
+        <div class="summary-label">{{ summary.label }}</div>
+        <div class="summary-value">{{ formatCount(summary.count) }}</div>
+      </div>
+    </section>
+
+    <section class="sunburst-grid" aria-label="Knowledge base visualizations">
+      <section
+        class="sunburst-card"
+        *ngIf="sunburstSegments.length; else objectEmptyState">
+        <div class="sunburst-card-heading">
+          <h2>Objects by Domain</h2>
+          <span>{{ selectedPathLabel }}</span>
+        </div>
+
+        <div class="sunburst-card-body">
+          <div class="sunburst-panel">
+            <svg
+              class="sunburst"
+              [attr.viewBox]="sunburstViewBox"
+              role="img"
+              [attr.aria-label]="'Sunburst chart for ' + selectedPathLabel">
+              <g class="sunburst-segments">
+                <path
+                  *ngFor="let segment of sunburstSegments; trackBy: trackNode"
+                  class="sunburst-segment"
+                  [class.selected]="selectedNode?.id === segment.id"
+                  [attr.d]="segment.path"
+                  [attr.fill]="segment.color"
+                  [attr.opacity]="isSegmentDimmed(segment) ? 0.32 : 1"
+                  tabindex="0"
+                  role="button"
+                  [attr.aria-label]="segmentTooltip(segment)"
+                  (click)="selectNode(segment)"
+                  (keydown.enter)="selectNode(segment)"
+                  (keydown.space)="selectNode(segment)">
+                  <title>{{ segmentTooltip(segment) }}</title>
+                </path>
+              </g>
+              <g
+                class="sunburst-center"
+                tabindex="0"
+                role="button"
+                aria-label="Show all dashboard data"
+                (click)="selectNodeById('root')"
+                (keydown.enter)="selectNodeById('root')"
+                (keydown.space)="selectNodeById('root')">
+                <circle r="45"></circle>
+                <text y="-5">
+                  {{ selectedNode?.label || 'ATT&CK Objects' }}
+                </text>
+                <text y="17" class="sunburst-center-count">
+                  {{ formatCount(selectedNode?.value || totalAssignments) }}
+                </text>
+              </g>
+            </svg>
+          </div>
+
+          <aside class="drilldown-panel">
+            <div class="drilldown-summary">
+              <nav
+                class="breadcrumb-list"
+                aria-label="Selected object drilldown path">
+                <ng-container
+                  *ngFor="
+                    let crumb of selectedBreadcrumb;
+                    let last = last;
+                    trackBy: trackNode
+                  ">
+                  <button mat-button type="button" (click)="selectNode(crumb)">
+                    {{ crumb.label }}
+                  </button>
+                  <span class="breadcrumb-separator" *ngIf="!last">/</span>
+                </ng-container>
+              </nav>
+
+              <div class="selected-total">
+                {{ formatCount(selectedNode?.value || totalAssignments) }}
+              </div>
+            </div>
+
+            <div class="drilldown-list" *ngIf="selectedChildren.length">
+              <button
+                type="button"
+                class="drilldown-item"
+                *ngFor="let child of selectedChildren; trackBy: trackNode"
+                (click)="selectNode(child)">
+                <span class="drilldown-label">
+                  <span
+                    class="drilldown-swatch"
+                    [style.background]="child.color"></span>
+                  {{ child.label }}
+                </span>
+                <strong>{{ formatCount(child.value) }}</strong>
+              </button>
+            </div>
+          </aside>
+        </div>
+      </section>
+
+      <section
+        class="sunburst-card"
+        *ngIf="
+          relationshipSunburstSegments.length;
+          else relationshipEmptyState
+        ">
+        <div class="sunburst-card-heading">
+          <h2>Relationships by Type</h2>
+          <span>{{ selectedRelationshipPathLabel }}</span>
+        </div>
+
+        <div class="sunburst-card-body">
+          <div class="sunburst-panel">
+            <svg
+              class="sunburst"
+              [attr.viewBox]="relationshipSunburstViewBox"
+              role="img"
+              [attr.aria-label]="
+                'Relationship sunburst chart for ' +
+                selectedRelationshipPathLabel
+              ">
+              <g class="sunburst-segments">
+                <path
+                  *ngFor="
+                    let segment of relationshipSunburstSegments;
+                    trackBy: trackNode
+                  "
+                  class="sunburst-segment"
+                  [class.selected]="selectedRelationshipNode?.id === segment.id"
+                  [attr.d]="segment.path"
+                  [attr.fill]="segment.color"
+                  [attr.opacity]="
+                    isRelationshipSegmentDimmed(segment) ? 0.32 : 1
+                  "
+                  tabindex="0"
+                  role="button"
+                  [attr.aria-label]="segmentTooltip(segment)"
+                  (click)="selectRelationshipNode(segment)"
+                  (keydown.enter)="selectRelationshipNode(segment)"
+                  (keydown.space)="selectRelationshipNode(segment)">
+                  <title>{{ segmentTooltip(segment) }}</title>
+                </path>
+              </g>
+              <g
+                class="sunburst-center"
+                tabindex="0"
+                role="button"
+                aria-label="Show all relationship dashboard data"
+                (click)="selectRelationshipNodeById('relationships-root')"
+                (keydown.enter)="
+                  selectRelationshipNodeById('relationships-root')
+                "
+                (keydown.space)="
+                  selectRelationshipNodeById('relationships-root')
+                ">
+                <circle r="45"></circle>
+                <text y="-5">
+                  {{ selectedRelationshipNode?.label || 'Relationships' }}
+                </text>
+                <text y="17" class="sunburst-center-count">
+                  {{
+                    formatCount(
+                      selectedRelationshipNode?.value || totalRelationships
+                    )
+                  }}
+                </text>
+              </g>
+            </svg>
+          </div>
+
+          <aside class="drilldown-panel">
+            <div class="drilldown-summary">
+              <nav
+                class="breadcrumb-list"
+                aria-label="Selected relationship drilldown path">
+                <ng-container
+                  *ngFor="
+                    let crumb of selectedRelationshipBreadcrumb;
+                    let last = last;
+                    trackBy: trackNode
+                  ">
+                  <button
+                    mat-button
+                    type="button"
+                    (click)="selectRelationshipNode(crumb)">
+                    {{ crumb.label }}
+                  </button>
+                  <span class="breadcrumb-separator" *ngIf="!last">/</span>
+                </ng-container>
+              </nav>
+
+              <div class="selected-total">
+                {{
+                  formatCount(
+                    selectedRelationshipNode?.value || totalRelationships
+                  )
+                }}
+              </div>
+            </div>
+
+            <div
+              class="drilldown-list"
+              *ngIf="selectedRelationshipChildren.length">
+              <button
+                type="button"
+                class="drilldown-item"
+                *ngFor="
+                  let child of selectedRelationshipChildren;
+                  trackBy: trackNode
+                "
+                (click)="selectRelationshipNode(child)">
+                <span class="drilldown-label">
+                  <span
+                    class="drilldown-swatch"
+                    [style.background]="child.color"></span>
+                  {{ child.label }}
+                </span>
+                <strong>{{ formatCount(child.value) }}</strong>
+              </button>
+            </div>
+          </aside>
+        </div>
+      </section>
+    </section>
+
+    <section class="timeline-section" aria-label="Timeline dashboard charts">
+      <div class="timeline-heading">
+        <h2>Timeline Analytics</h2>
+      </div>
+
+      <div class="timeline-grid">
+        <section class="timeline-card">
+          <div class="timeline-card-heading growth-heading">
+            <div>
+              <h3>Object Growth Over Time</h3>
+              <div
+                class="domain-filter"
+                aria-label="Object growth domain filter">
+                <button
+                  type="button"
+                  [class.selected]="selectedObjectGrowthDomain === 'all'"
+                  (click)="selectObjectGrowthDomain('all')">
+                  All Domains
+                </button>
+                <button
+                  type="button"
+                  *ngFor="
+                    let option of timelineDomainOptions;
+                    trackBy: trackDomainFilter
+                  "
+                  [class.selected]="selectedObjectGrowthDomain === option.key"
+                  (click)="selectObjectGrowthDomain(option.key)">
+                  {{ option.label }}
+                </button>
+              </div>
+            </div>
+            <strong>{{ formatCount(objectGrowthTotal) }}</strong>
+          </div>
+
+          <ng-container
+            *ngIf="objectGrowthLineSeries.length; else noTimelineData">
+            <div class="timeline-chart-layout">
+              <div>
+                <svg
+                  class="timeline-chart"
+                  [attr.viewBox]="chartViewBox"
+                  role="img"
+                  aria-label="Line chart of object growth by object type">
+                  <line
+                    class="chart-grid-line"
+                    x1="30"
+                    y1="12"
+                    x2="310"
+                    y2="12" />
+                  <line
+                    class="chart-grid-line"
+                    x1="30"
+                    y1="81"
+                    x2="310"
+                    y2="81" />
+                  <line
+                    class="chart-grid-line"
+                    x1="30"
+                    y1="150"
+                    x2="310"
+                    y2="150" />
+                  <line class="chart-axis" x1="30" y1="12" x2="30" y2="150" />
+                  <line class="chart-axis" x1="30" y1="150" x2="310" y2="150" />
+                  <g
+                    class="chart-year-tick"
+                    *ngFor="let tick of objectGrowthYearTicks">
+                    <line
+                      class="chart-year-line"
+                      [attr.x1]="tick.x"
+                      y1="12"
+                      [attr.x2]="tick.x"
+                      y2="150" />
+                    <line
+                      class="chart-axis-tick"
+                      [attr.x1]="tick.x"
+                      y1="150"
+                      [attr.x2]="tick.x"
+                      y2="156" />
+                    <text
+                      class="chart-axis-label chart-year-label"
+                      [attr.x]="tick.x"
+                      y="172">
+                      {{ tick.label }}
+                    </text>
+                  </g>
+                  <text class="chart-axis-label" x="5" y="16">
+                    {{ objectGrowthYAxisLabels[0] }}
+                  </text>
+                  <text class="chart-axis-label" x="5" y="85">
+                    {{ objectGrowthYAxisLabels[1] }}
+                  </text>
+                  <text class="chart-axis-label" x="20" y="154">
+                    {{ objectGrowthYAxisLabels[2] }}
+                  </text>
+                  <polyline
+                    *ngFor="
+                      let series of objectGrowthLineSeriesForDisplay;
+                      trackBy: trackTimelineSeries
+                    "
+                    class="timeline-line"
+                    [class.selected]="isObjectGrowthSeriesSelected(series)"
+                    [class.dimmed]="isObjectGrowthSeriesDimmed(series)"
+                    fill="none"
+                    [attr.points]="series.points"
+                    [attr.stroke]="series.color"
+                    tabindex="0"
+                    role="button"
+                    [attr.aria-label]="
+                      'Highlight ' + series.label + ' timeline series'
+                    "
+                    (click)="selectObjectGrowthType(series.key)"
+                    (keydown.enter)="selectObjectGrowthType(series.key)"
+                    (keydown.space)="selectObjectGrowthType(series.key)">
+                    <title>
+                      {{ series.label }}: {{ formatCount(series.total) }}
+                    </title>
+                  </polyline>
+                </svg>
+              </div>
+
+              <div class="timeline-legend">
+                <button
+                  type="button"
+                  class="timeline-legend-item"
+                  *ngFor="
+                    let series of objectGrowthLineSeries;
+                    trackBy: trackTimelineSeries
+                  "
+                  [class.selected]="isObjectGrowthSeriesSelected(series)"
+                  [class.dimmed]="isObjectGrowthSeriesDimmed(series)"
+                  [attr.aria-pressed]="isObjectGrowthSeriesSelected(series)"
+                  [attr.aria-label]="
+                    'Highlight ' + series.label + ' timeline series'
+                  "
+                  (click)="selectObjectGrowthType(series.key)">
+                  <span
+                    class="timeline-swatch"
+                    [style.background]="series.color"></span>
+                  <span>{{ series.label }}</span>
+                  <strong>{{ formatCount(series.total) }}</strong>
+                </button>
+              </div>
+            </div>
+          </ng-container>
+        </section>
+      </div>
+    </section>
+  </ng-container>
 </div>
+
+<ng-template #objectEmptyState>
+  <div class="empty-state">No domain-scoped ATT&amp;CK objects were found.</div>
+</ng-template>
+
+<ng-template #relationshipEmptyState>
+  <div class="empty-state">No relationships were found.</div>
+</ng-template>
+
+<ng-template #noTimelineData>
+  <div class="chart-empty">No dated objects found.</div>
+</ng-template>

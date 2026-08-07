@@ -8,6 +8,7 @@ import { of } from 'rxjs';
 
 import { StixDialogComponent } from './stix-dialog.component';
 import { RestApiConnectorService } from 'src/app/services/connectors/rest-api/rest-api-connector.service';
+import { AuthenticationService } from 'src/app/services/connectors/authentication/authentication.service';
 import {
   createAsyncObservable,
   createMockRestApiConnector,
@@ -28,6 +29,10 @@ describe('StixDialogComponent', () => {
       schemas: [NO_ERRORS_SCHEMA],
       providers: [
         { provide: RestApiConnectorService, useValue: mockRestApiConnector },
+        {
+          provide: AuthenticationService,
+          useValue: { canEdit: () => true },
+        },
         provideHttpClient(),
         provideRouter([]),
         {
@@ -53,5 +58,15 @@ describe('StixDialogComponent', () => {
 
   it('should create', () => {
     expect(component).toBeTruthy();
+  });
+
+  it('keeps diff dialogs read-only even when marked editable', () => {
+    component._config = {
+      mode: 'diff',
+      object: [{} as any, {} as any],
+      editable: true,
+    };
+
+    expect(component.config.editable).toBe(false);
   });
 });

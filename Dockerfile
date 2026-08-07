@@ -7,6 +7,14 @@ COPY . .
 
 ARG TARGETOS
 ARG TARGETARCH
+ARG VERSION=dev
+ARG BUILDTIME=unknown
+ARG REVISION=unknown
+
+# Make the OCI build metadata available while Angular's static assets are built.
+ENV APP_VERSION=${VERSION} \
+    GIT_COMMIT=${REVISION} \
+    BUILD_DATE=${BUILDTIME}
 
 # Install dependencies
 RUN npm install --cpu ${TARGETARCH} --os ${TARGETOS}

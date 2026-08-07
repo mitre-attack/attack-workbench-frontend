@@ -16,11 +16,11 @@ import { stixRoutes } from '../../app-routing-stix.module';
   standalone: false,
 })
 export class LandingPageComponent implements OnInit, OnDestroy {
-  private readonly placeholderIdentityName = 'Placeholder Organization Identity';
+  private readonly placeholderIdentityName =
+    'Placeholder Organization Identity';
   private readonly placeholderIdentityReminderKey =
     'attack-workbench.placeholder-organization-identity-reminder-dismissed';
   private loginSubscription: Subscription;
-  public pendingUsers;
   public routes: any[] = [];
 
   constructor(
@@ -30,7 +30,7 @@ export class LandingPageComponent implements OnInit, OnDestroy {
     private router: Router
   ) {
     this.routes = stixRoutes.filter(
-      route => route.data.headerSection !== 'more' && !route.data.deprecated
+      route => route.data.group !== 'more' && !route.data.deprecated
     );
   }
 
@@ -48,28 +48,12 @@ export class LandingPageComponent implements OnInit, OnDestroy {
     this.loginSubscription = this.authenticationService.onLogin.subscribe({
       // called on initial user login
       next: event => {
-        this.getPendingUsers();
         this.openOrgIdentityDialog();
       },
     });
     setTimeout(() => {
-      this.getPendingUsers();
       this.openOrgIdentityDialog();
     }, 500); // called on page refresh or re-route
-  }
-
-  private getPendingUsers(): void {
-    if (this.authenticationService.isAuthorized([Role.ADMIN])) {
-      const userSubscription = this.restApiConnector
-        .getAllUserAccounts({ status: ['pending'] })
-        .subscribe({
-          next: results => {
-            const users = results as any;
-            if (users && users.length) this.pendingUsers = users.length;
-          },
-          complete: () => userSubscription.unsubscribe(),
-        });
-    }
   }
 
   // bug the admin about editing their organization identity

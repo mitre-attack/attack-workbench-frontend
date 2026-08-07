@@ -49,6 +49,7 @@ import { AttackTypeToPlural } from 'src/app/utils/type-mappings';
 import { AttackType } from 'src/app/utils/types';
 import { environment } from '../../../../environments/environment';
 import { logger } from '../../../utils/logger';
+import { serializeJsonForDownload } from '../../../utils/json-download';
 import { ApiConnector } from '../api-connector';
 import {
   CollectionStreamService,
@@ -67,6 +68,20 @@ export interface Paginated<T> {
 export interface Namespace {
   prefix: string;
   range_start: string;
+}
+
+export interface ValidationBypassRule {
+  _id?: string;
+  id?: string;
+  fieldPath: string[];
+  errorCode: string;
+  stixType: string;
+  suppressError: boolean;
+  autoCreated?: boolean;
+  autoCreatedReason?: string | null;
+  triggerEvent?: string | null;
+  warningMessage?: string | null;
+  __v?: number;
 }
 
 export interface MitreIdentityWrites {
@@ -517,6 +532,7 @@ export class RestApiConnectorService extends ApiConnector {
     revoked?: boolean;
     deprecated?: boolean;
     deserialize?: boolean;
+    versions?: 'all' | 'latest';
     lastUpdatedBy?: string[];
     search?: string;
   }) {
@@ -540,6 +556,7 @@ export class RestApiConnectorService extends ApiConnector {
         'includeDeprecated',
         options.deprecated ? 'true' : 'false'
       );
+    if (options?.versions) query = query.set('versions', options.versions);
     // searching
     if (options?.search) query = query.set('search', options.search);
     // lastUpdatedBy
@@ -2634,7 +2651,7 @@ export class RestApiConnectorService extends ApiConnector {
     return this.http
       .get<MitreIdentityWrites>(`${this.apiUrl}/config/mitre-identity-writes`)
       .pipe(
-        tap(_ => logger.log('retrieved MITRE identity write setting')),
+        tap(() => logger.log('retrieved MITRE identity write setting')),
         catchError(
           this.handleError_continue<MitreIdentityWrites>({ enabled: false })
         ),
@@ -2653,6 +2670,94 @@ export class RestApiConnectorService extends ApiConnector {
       .pipe(
         tap(this.handleSuccess('MITRE Identity Write Setting Updated')),
         catchError(this.handleError_raise<any>()),
+        share()
+      );
+  }
+
+  /**
+   * Get all ADM validation bypass rules.
+   * @returns {Observable<ValidationBypassRule[]>} validation bypass rules
+   */
+  public getValidationBypassRules(): Observable<ValidationBypassRule[]> {
+    return this.http
+      .get<ValidationBypassRule[]>(`${this.apiUrl}/config/validation-bypasses`)
+      .pipe(
+        tap(() => logger.log('retrieved validation bypass rules')),
+        catchError(this.handleError_continue<ValidationBypassRule[]>([])),
+        share()
+      );
+  }
+
+  /**
+   * Get one ADM validation bypass rule.
+   * @param id validation bypass rule id
+   * @returns {Observable<ValidationBypassRule>} validation bypass rule
+   */
+  public getValidationBypassRule(id: string): Observable<ValidationBypassRule> {
+    return this.http
+      .get<ValidationBypassRule>(
+        `${this.apiUrl}/config/validation-bypasses/${id}`
+      )
+      .pipe(
+        tap(() => logger.log('retrieved validation bypass rule')),
+        catchError(this.handleError_continue<ValidationBypassRule>()),
+        share()
+      );
+  }
+
+  /**
+   * Create an ADM validation bypass rule.
+   * @param rule validation bypass rule to create
+   * @returns {Observable<ValidationBypassRule>} created validation bypass rule
+   */
+  public postValidationBypassRule(
+    rule: ValidationBypassRule
+  ): Observable<ValidationBypassRule> {
+    return this.http
+      .post<ValidationBypassRule>(
+        `${this.apiUrl}/config/validation-bypasses`,
+        rule
+      )
+      .pipe(
+        tap(this.handleSuccess('validation bypass rule saved')),
+        catchError(this.handleError_raise<ValidationBypassRule>()),
+        share()
+      );
+  }
+
+  /**
+   * Update an ADM validation bypass rule.
+   * @param id validation bypass rule id
+   * @param rule validation bypass rule updates
+   * @returns {Observable<ValidationBypassRule>} updated validation bypass rule
+   */
+  public putValidationBypassRule(
+    id: string,
+    rule: ValidationBypassRule
+  ): Observable<ValidationBypassRule> {
+    return this.http
+      .put<ValidationBypassRule>(
+        `${this.apiUrl}/config/validation-bypasses/${id}`,
+        rule
+      )
+      .pipe(
+        tap(this.handleSuccess('validation bypass rule saved')),
+        catchError(this.handleError_raise<ValidationBypassRule>()),
+        share()
+      );
+  }
+
+  /**
+   * Delete an ADM validation bypass rule.
+   * @param id validation bypass rule id
+   * @returns {Observable<object>} observable of the response body
+   */
+  public deleteValidationBypassRule(id: string): Observable<object> {
+    return this.http
+      .delete<object>(`${this.apiUrl}/config/validation-bypasses/${id}`)
+      .pipe(
+        tap(this.handleSuccess('validation bypass rule deleted')),
+        catchError(this.handleError_raise<object>()),
         share()
       );
   }
@@ -2946,7 +3051,7 @@ export class RestApiConnectorService extends ApiConnector {
    */
   public triggerBrowserDownload(data: any, filename: string) {
     const url = URL.createObjectURL(
-      new Blob([JSON.stringify(data, null, 4)], { type: 'text/json' })
+      new Blob([serializeJsonForDownload(data)], { type: 'text/json' })
     );
     const downloadLink = document.createElement('a');
     downloadLink.href = url;

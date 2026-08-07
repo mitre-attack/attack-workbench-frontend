@@ -1,6 +1,7 @@
 @use '../../../style/globals';
 .profile-page {
   .profile-icon {
+    display: flex;
     height: 150px;
     width: 150px;
     margin: auto;

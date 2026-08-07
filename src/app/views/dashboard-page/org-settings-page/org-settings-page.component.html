@@ -28,7 +28,10 @@
       </div>
     </div>
     <div
-      *ngIf="organizationIdentity && organizationIdentities; else loadingIdentity"
+      *ngIf="
+        organizationIdentity && organizationIdentities;
+        else loadingIdentity
+      "
       class="identity-edit grid">
       <hr />
       <div class="row">

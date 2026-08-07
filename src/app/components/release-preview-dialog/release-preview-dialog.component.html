@@ -1,0 +1,307 @@
+<div class="release-preview-dialog">
+  <header class="release-preview-header">
+    <div>
+      <h2 id="release-preview-dialog-title">
+        Release Preview: {{ trackName }}
+      </h2>
+      <p class="release-version-summary">
+        <span
+          >Current: <strong>{{ currentVersion }}</strong></span
+        >
+        <span
+          >Minor Bump: <strong>{{ minorVersion }}</strong></span
+        >
+        <span
+          >Major Bump: <strong>{{ majorVersion }}</strong></span
+        >
+      </p>
+    </div>
+
+    <button
+      mat-icon-button
+      type="button"
+      aria-label="Close draft snapshot preview"
+      (click)="close()">
+      <mat-icon>close</mat-icon>
+    </button>
+  </header>
+
+  <mat-tab-group
+    class="release-preview-tabs"
+    animationDuration="0ms"
+    mat-stretch-tabs="false">
+    <mat-tab>
+      <ng-template mat-tab-label>
+        <mat-icon aria-hidden="true">info_outline</mat-icon>
+        <span>Summary</span>
+      </ng-template>
+
+      <section class="release-summary" aria-label="Draft snapshot summary">
+        <article class="release-stat release-stat--included">
+          <strong>{{ totalIncludedCount }}</strong>
+          <span>Total objects included</span>
+        </article>
+        <article class="release-stat release-stat--new">
+          <strong>{{ newObjectCount }}</strong>
+          <span>New objects</span>
+        </article>
+        <article class="release-stat release-stat--updated">
+          <strong>{{ updatedMemberCount }}</strong>
+          <span>Updated members</span>
+        </article>
+        <article class="release-stat release-stat--unchanged">
+          <strong>{{ unchangedObjectCount }}</strong>
+          <span>Unchanged objects</span>
+        </article>
+        <article
+          *ngIf="!isVirtualTrack"
+          class="release-stat release-stat--excluded">
+          <strong>{{ excludedCandidates.length }}</strong>
+          <span>Candidates not included</span>
+        </article>
+        <article
+          *ngIf="isVirtualTrack"
+          class="release-stat release-stat--excluded">
+          <strong>{{ removedObjectCount }}</strong>
+          <span>Removed objects</span>
+        </article>
+        <article
+          *ngIf="isVirtualTrack"
+          class="release-stat release-stat--excluded">
+          <strong>{{ quarantinedObjectCount }}</strong>
+          <span>Quarantined objects</span>
+        </article>
+      </section>
+
+      <mat-form-field
+        appearance="outline"
+        class="release-snapshot-description-field">
+        <mat-label>Release notes</mat-label>
+        <textarea
+          matInput
+          [(ngModel)]="snapshotDescription"
+          [maxlength]="snapshotDescriptionMaxLength"
+          rows="4"
+          placeholder="Summarize this release for analysts viewing its history."></textarea>
+        <mat-hint align="start">
+          Shown in history and exported as the collection description
+        </mat-hint>
+        <mat-hint align="end">
+          {{ snapshotDescription.length }}/{{ snapshotDescriptionMaxLength }}
+        </mat-hint>
+      </mat-form-field>
+    </mat-tab>
+
+    <mat-tab>
+      <ng-template mat-tab-label>
+        <mat-icon aria-hidden="true">verified</mat-icon>
+        <span>Included ({{ includedObjects.length }})</span>
+      </ng-template>
+
+      <section class="release-object-list" aria-label="Included objects">
+        <p *ngIf="includedObjects.length === 0" class="release-object-empty">
+          No members or staged objects will be included.
+        </p>
+        <div *ngIf="includedObjects.length" class="release-table-wrapper">
+          <table class="release-preview-table">
+            <thead>
+              <tr>
+                <th scope="col">Name / ID</th>
+                <th scope="col">Type</th>
+                <th scope="col">Version</th>
+                <th scope="col">Source</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr
+                *ngFor="
+                  let item of includedObjects;
+                  trackBy: trackByIncludedObject
+                ">
+                <td>
+                  <strong>{{ getObjectName(item.object) }}</strong>
+                  <small>
+                    {{ item.object.attack_id || item.object.object_ref }}
+                  </small>
+                </td>
+                <td>{{ getObjectType(item.object) }}</td>
+                <td>{{ getObjectVersion(item.object) }}</td>
+                <td>
+                  <span
+                    class="source-chip"
+                    [class.source-chip--staged]="
+                      getIncludedSource(item) === 'staged'
+                    ">
+                    {{ getIncludedSource(item) }}
+                  </span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </mat-tab>
+
+    <mat-tab>
+      <ng-template mat-tab-label>
+        <mat-icon aria-hidden="true">cancel</mat-icon>
+        <span>Excluded ({{ excludedCandidates.length }})</span>
+      </ng-template>
+
+      <section class="release-object-list" aria-label="Excluded candidates">
+        <p *ngIf="excludedCandidates.length === 0" class="release-object-empty">
+          No candidates are excluded from this snapshot.
+        </p>
+        <div *ngIf="excludedCandidates.length" class="release-table-wrapper">
+          <table class="release-preview-table release-preview-table--excluded">
+            <thead>
+              <tr>
+                <th scope="col">Name / ID</th>
+                <th scope="col">Workflow State</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr
+                *ngFor="let item of excludedCandidates; trackBy: trackByObject">
+                <td>
+                  <strong>{{ getObjectName(item) }}</strong>
+                  <small>{{ item.attack_id || item.object_ref }}</small>
+                </td>
+                <td>
+                  <span class="workflow-chip">
+                    {{ getWorkflowState(item) }}
+                  </span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </mat-tab>
+
+    <mat-tab>
+      <ng-template mat-tab-label>
+        <mat-icon aria-hidden="true">swap_horiz</mat-icon>
+        <span>Replacements ({{ replacements.length }})</span>
+      </ng-template>
+
+      <section class="release-object-list" aria-label="Replaced members">
+        <p *ngIf="replacements.length === 0" class="release-object-empty">
+          No existing members will be replaced.
+        </p>
+        <div *ngIf="replacements.length" class="release-table-wrapper">
+          <table
+            class="release-preview-table release-preview-table--replacements">
+            <thead>
+              <tr>
+                <th scope="col">Name / ID</th>
+                <th scope="col">Current Member Version</th>
+                <th scope="col">Incoming Staged Version</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr
+                *ngFor="
+                  let item of replacements;
+                  trackBy: trackByIncludedObject
+                "
+                [class.release-table-row--invalid]="item.invalidVersionBump">
+                <td>
+                  <strong>{{ getObjectName(item.object) }}</strong>
+                  <small>
+                    {{ item.object.attack_id || item.object.object_ref }}
+                  </small>
+                </td>
+                <td>{{ getObjectVersion(item.currentMember) }}</td>
+                <td>
+                  <strong
+                    class="incoming-version"
+                    [class.incoming-version--invalid]="item.invalidVersionBump">
+                    {{ getObjectVersion(item.incomingStaged) }}
+                  </strong>
+                  <mat-icon
+                    *ngIf="item.invalidVersionBump"
+                    class="invalid-version-icon"
+                    aria-label="Invalid version bump">
+                    warning_amber
+                  </mat-icon>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </mat-tab>
+  </mat-tab-group>
+
+  <footer class="release-preview-footer">
+    <p
+      *ngIf="hasInvalidVersionBumps"
+      class="release-blocked-message"
+      role="alert">
+      <mat-icon aria-hidden="true">warning_amber</mat-icon>
+      <span> Release is blocked by invalid incoming version bumps. </span>
+    </p>
+    <p
+      *ngIf="!hasInvalidVersionBumps && hasPromotionConflicts"
+      class="release-blocked-message"
+      role="alert">
+      <mat-icon aria-hidden="true">warning_amber</mat-icon>
+      <span> Release is blocked by promotion conflicts. </span>
+    </p>
+
+    <div class="release-preview-actions">
+      <button mat-stroked-button type="button" (click)="close()">Cancel</button>
+      <button
+        mat-raised-button
+        class="release-preview-tag-minor-button"
+        type="button"
+        color="primary"
+        [disabled]="isReleaseBlocked"
+        (click)="tagVersion('minor')">
+        Tag Minor ({{ minorVersion }})
+      </button>
+      <button
+        mat-raised-button
+        class="release-preview-tag-major-button"
+        type="button"
+        color="primary"
+        [disabled]="isReleaseBlocked"
+        (click)="tagVersion('major')">
+        Tag Major ({{ majorVersion }})
+      </button>
+      <div class="release-preview-exact-version">
+        <mat-form-field appearance="outline" subscriptSizing="dynamic">
+          <mat-label>Exact version</mat-label>
+          <input
+            matInput
+            [(ngModel)]="exactVersion"
+            aria-describedby="release-exact-version-guidance"
+            placeholder="19.2"
+            (keyup.enter)="tagExactVersion()" />
+        </mat-form-field>
+        <button
+          mat-raised-button
+          class="release-preview-tag-exact-button"
+          type="button"
+          color="primary"
+          [disabled]="isReleaseBlocked || !!exactVersionValidationMessage"
+          (click)="tagExactVersion()">
+          Tag Exact
+        </button>
+      </div>
+    </div>
+    <p
+      id="release-exact-version-guidance"
+      class="release-exact-version-guidance"
+      [class.release-exact-version-guidance--error]="
+        exactVersion.length > 0 && !!exactVersionValidationMessage
+      ">
+      {{
+        exactVersion.length > 0 && exactVersionValidationMessage
+          ? exactVersionValidationMessage
+          : exactVersionBoundsHint
+      }}
+    </p>
+  </footer>
+</div>

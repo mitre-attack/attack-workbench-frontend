@@ -1,0 +1,22 @@
+:host {
+  display: inline-flex;
+  flex: 0 0 auto;
+  line-height: 1;
+  vertical-align: middle;
+}
+
+.user-avatar {
+  border-radius: 50%;
+  display: block;
+  flex: 0 0 auto;
+  overflow: hidden;
+  user-select: none;
+}
+
+.user-avatar text {
+  dominant-baseline: central;
+  font-family: Roboto, Arial, sans-serif;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}

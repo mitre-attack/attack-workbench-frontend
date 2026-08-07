@@ -1,0 +1,210 @@
+@use 'sass:color';
+@use '../../../style/colors' as colors;
+
+.release-track-object-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  overflow: hidden;
+  border-radius: 6px;
+  box-shadow: none;
+  transition:
+    border-color 120ms ease,
+    box-shadow 120ms ease,
+    transform 120ms ease;
+
+  .light & {
+    background: color.mix(white, colors.color(light), 76%);
+    border-color: colors.border-color(light);
+  }
+
+  .dark & {
+    background: colors.color-alternate(dark);
+    border-color: colors.border-color(dark);
+  }
+
+  &:hover {
+    transform: translateY(-1px);
+
+    .light & {
+      box-shadow: 0 2px 8px rgba(colors.color(mitre-black), 0.12);
+    }
+
+    .dark & {
+      box-shadow: 0 2px 8px rgba(black, 0.3);
+    }
+  }
+
+  .mat-mdc-card-header {
+    display: block;
+    padding: 16px 16px 0;
+  }
+
+  .mat-mdc-card-content {
+    padding: 0px 16px 16px;
+  }
+
+  .mat-mdc-card-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    min-height: 50px;
+    margin-top: auto;
+    padding: 10px 16px !important;
+
+    .light & {
+      border-top: 1px solid colors.border-color(light);
+      background: rgba(colors.color(mitre-black), 0.03);
+    }
+
+    .dark & {
+      border-top: 1px solid colors.border-color(dark);
+      background: rgba(colors.color(mitre-silver), 0.04);
+    }
+  }
+}
+
+.object-card-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+  margin-bottom: 12px;
+}
+
+.object-card-title,
+.object-card-subtitle,
+.object-description {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.object-card-title {
+  display: -webkit-box;
+  font-size: 16px;
+  font-weight: 800;
+  line-height: 20px;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+
+  .light & {
+    color: colors.on-color(light);
+  }
+
+  .dark & {
+    color: colors.on-color(dark);
+  }
+}
+
+.object-card-subtitle {
+  margin-top: 2px;
+  font-size: 13px;
+  line-height: 17px;
+  white-space: nowrap;
+
+  .light & {
+    color: colors.on-color-deemphasis(light);
+  }
+
+  .dark & {
+    color: colors.on-color-deemphasis(dark);
+  }
+}
+
+.object-description {
+  display: block;
+  min-height: 30px;
+  margin: 0;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 22px;
+
+  ::ng-deep p {
+    display: -webkit-box;
+    overflow: hidden;
+    margin: 0;
+    text-overflow: ellipsis;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 3;
+  }
+
+  ::ng-deep :last-child {
+    margin-bottom: 0;
+  }
+
+  ::ng-deep a {
+    font-weight: 700;
+  }
+
+  .light & {
+    color: colors.on-color(light);
+  }
+
+  .dark & {
+    color: colors.on-color(dark);
+  }
+}
+
+.object-meta,
+.object-actions,
+.object-footer-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.object-meta {
+  min-width: 0;
+  font-size: 12px;
+  line-height: 18px;
+
+  .light & {
+    color: colors.on-color-deemphasis(light);
+  }
+
+  .dark & {
+    color: colors.on-color-deemphasis(dark);
+  }
+}
+
+.object-avatar {
+  flex: 0 0 auto;
+}
+
+.object-modified {
+  min-width: 0;
+  white-space: nowrap;
+}
+
+.object-footer-right {
+  justify-content: flex-end;
+  margin-left: auto;
+  min-width: 0;
+}
+
+.object-actions {
+  .mdc-button {
+    height: 28px;
+    min-width: 0;
+    padding: 0 10px;
+  }
+
+  .mat-mdc-button-touch-target {
+    height: 32px !important;
+  }
+
+  .mat-icon {
+    width: 16px;
+    height: 16px;
+    margin-right: 4px;
+    font-size: 16px;
+    line-height: 16px;
+  }
+}
+
+.view-button {
+  color: colors.color(info) !important;
+}

@@ -1,0 +1,203 @@
+<section class="membership-section">
+  <header class="membership-header">
+    <h2>Release Track Distribution</h2>
+
+    <div class="membership-header-actions">
+      <button
+        type="button"
+        class="membership-action-button"
+        [disabled]="!hasSelection"
+        (click)="clearSelection()">
+        Clear
+      </button>
+
+      <button
+        type="button"
+        class="membership-action-button membership-action-button--primary"
+        [disabled]="selectedReleaseCount !== 2"
+        (click)="compareSelectedReleases()">
+        Compare ({{ selectedReleaseCount }}/2)
+      </button>
+    </div>
+  </header>
+
+  <div *ngIf="loading" class="loading-state">
+    Loading release track membership...
+  </div>
+
+  <div
+    *ngIf="!loading && !loadError && memberships.length === 0"
+    class="empty-membership-state">
+    <h3>This object is not in any release tracks yet.</h3>
+    <p>Add it to a standard release track to begin managing its release.</p>
+
+    <button
+      *ngIf="canViewReleaseTrackDashboard"
+      type="button"
+      class="add-track-button"
+      [disabled]="addingToTrack"
+      (click)="addToReleaseTrack()">
+      {{ addingToTrack ? 'Adding...' : 'Add to Release Track' }}
+    </button>
+
+    <p *ngIf="addError" class="membership-error" role="alert">
+      {{ addError }}
+    </p>
+  </div>
+
+  <p *ngIf="!loading && loadError" class="membership-error" role="alert">
+    {{ loadError }}
+  </p>
+
+  <div *ngIf="!loading && memberships.length > 0" class="release-track-list">
+    <article
+      *ngFor="let membership of memberships; trackBy: trackByMembership"
+      class="release-track-card">
+      <header class="release-track-header">
+        <div class="release-track-heading">
+          <h3>{{ getTrackName(membership) }}</h3>
+          <p>{{ getTrackDescription(membership) }}</p>
+        </div>
+
+        <div class="release-track-actions">
+          <button
+            *ngIf="canViewReleaseTrackDashboard"
+            type="button"
+            class="view-track-button"
+            [disabled]="!hasSelectedReleaseForTrack(membership)"
+            (click)="viewTrack(membership, $event)">
+            View Track
+
+            <span class="external-link-icon" aria-hidden="true"> ↗ </span>
+          </button>
+
+          <app-workbench-chip
+            [variant]="
+              isVirtualTrack(membership) ? 'virtual' : 'standard'
+            "></app-workbench-chip>
+        </div>
+      </header>
+
+      <div class="release-track-content">
+        <section class="draft-column">
+          <h4>Current Draft Status</h4>
+
+          <p *ngIf="!hasCurrentDraft(membership)" class="no-current-draft">
+            Not in current draft.
+          </p>
+
+          <div
+            *ngIf="hasCurrentDraft(membership)"
+            class="draft-card"
+            (click)="$event.stopPropagation()">
+            <label class="release-selection">
+              <input
+                type="checkbox"
+                [checked]="
+                  isReleaseSelected(getCurrentDraft(membership), membership)
+                "
+                [disabled]="
+                  !isReleaseSelected(getCurrentDraft(membership), membership) &&
+                  selectedReleaseCount >= 2
+                "
+                (click)="$event.stopPropagation()"
+                (change)="
+                  toggleReleaseSelection(
+                    getCurrentDraft(membership),
+                    membership,
+                    $any($event.target).checked
+                  )
+                " />
+
+              <span class="release-information">
+                <strong
+                  class="draft-status"
+                  [class.draft-status--in-review]="isDraftInReview(membership)"
+                  [class.draft-status--staged]="isDraftStaged(membership)">
+                  {{ getDraftStatusLabel(membership) }}
+                </strong>
+
+                <small>
+                  {{ getDraftDateLabel(membership) }}
+                </small>
+              </span>
+            </label>
+
+            <div class="status-progress">
+              <span
+                class="status-step"
+                [class.status-step--active]="
+                  isDraftStepActive(membership, 'work-in-progress')
+                ">
+                WIP
+              </span>
+
+              <span
+                class="status-step"
+                [class.status-step--review-active]="isDraftInReview(membership)"
+                [class.status-step--active]="
+                  isDraftStepActive(membership, 'review')
+                ">
+                Review
+              </span>
+
+              <span
+                class="status-step"
+                [class.status-step--staged-active]="isDraftStaged(membership)"
+                [class.status-step--active]="
+                  isDraftStepActive(membership, 'staged')
+                ">
+                Staged
+              </span>
+            </div>
+          </div>
+        </section>
+
+        <section class="releases-column">
+          <h4>Production Releases</h4>
+
+          <p
+            *ngIf="getProductionReleases(membership).length === 0"
+            class="no-production-releases">
+            No production releases found.
+          </p>
+
+          <div
+            *ngIf="getProductionReleases(membership).length > 0"
+            class="production-release-list"
+            (click)="$event.stopPropagation()">
+            <label
+              *ngFor="
+                let release of getProductionReleases(membership);
+                trackBy: trackByRelease
+              "
+              class="production-release">
+              <input
+                type="checkbox"
+                [checked]="isReleaseSelected(release, membership)"
+                [disabled]="
+                  !isReleaseSelected(release, membership) &&
+                  selectedReleaseCount >= 2
+                "
+                (click)="$event.stopPropagation()"
+                (change)="
+                  toggleReleaseSelection(
+                    release,
+                    membership,
+                    $any($event.target).checked
+                  )
+                " />
+
+              <span class="release-tag-icon" aria-hidden="true"></span>
+
+              <span class="release-information">
+                <strong>{{ getReleaseVersion(release) }}</strong>
+                <small>{{ getReleaseDateLabel(release) }}</small>
+              </span>
+            </label>
+          </div>
+        </section>
+      </div>
+    </article>
+  </div>
+</section>

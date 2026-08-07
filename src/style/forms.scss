@@ -106,23 +106,10 @@
 }
 
 .button-group {
-  // left border removed
-  .mat-mdc-button:not(:first-child),
-  .mat-mdc-raised-button:not(:first-child),
-  .mat-mdc-outlined-button:not(:first-child),
-  .mat-mdc-unelevated-button:not(:first-child) {
-    border-top-left-radius: 0;
-    border-bottom-left-radius: 0;
-    border-left-width: 0px;
-  }
-  // right border radius removed
-  .mat-mdc-button:not(:last-child),
-  .mat-mdc-raised-button:not(:last-child),
-  .mat-mdc-outlined-button:not(:last-child),
-  .mat-mdc-unelevated-button:not(:last-child) {
-    border-top-right-radius: 0;
-    border-bottom-right-radius: 0;
-  }
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: center;
 }
 
 .mat-mdc-form-field-error {

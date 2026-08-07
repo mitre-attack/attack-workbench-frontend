@@ -1,6 +1,6 @@
 import { Observable } from 'rxjs';
 import { RestApiConnectorService } from '../services/connectors/rest-api/rest-api-connector.service';
-import { WorkflowState } from '../utils/types';
+import { WorkflowStatusType } from '../utils/types';
 
 /**
  * Objects which are serializable to the REST API implement this class
@@ -17,7 +17,7 @@ export abstract class Serializable {
    * @abstract
    * @param {*} raw the raw object to parse
    */
-  public abstract deserialize(raw: any);
+  public abstract deserialize(raw: any): any;
 
   /**
    * Validate the current object state and return information on the result of the validation
@@ -29,7 +29,7 @@ export abstract class Serializable {
   public abstract validate(
     restAPIService: RestApiConnectorService,
     options?: any,
-    tempWorkflowState?: WorkflowState
+    tempWorkflowState?: WorkflowStatusType
   ): Observable<ValidationData>;
 }
 

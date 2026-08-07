@@ -1,4 +1,4 @@
-<div class="technique-view view-page grid spacing-16">
+<div class="technique-view view-page">
   <div class="row">
     <!-- NAME -->
     <div class="col">
@@ -11,322 +11,345 @@
               ? technique.parentTechnique
               : null,
         }"></app-name-property>
-      <app-subheading
-        [config]="config"
-        (onOpenHistory)="openHistory()"
-        (onOpenNotes)="openNotes()"></app-subheading>
+      <app-subheading [config]="config"></app-subheading>
     </div>
   </div>
-  <div class="row">
-    <div class="col">
-      <!-- ATT&CK ID -->
-      <app-attackid-property
-        class="grow-to-row"
-        [config]="{
-          mode: config.mode,
-          object: config.object,
-        }"></app-attackid-property>
-    </div>
-    <div class="col">
-      <app-boolean-property
-        class="grow-to-row"
-        [config]="{
-          mode: config.mode,
-          object: config.object,
-          field: 'is_subtechnique',
-          label: 'sub-technique?',
-        }"></app-boolean-property>
-    </div>
-    <div class="col">
-      <!-- VERSION NUMBER -->
-      <app-version-property
-        class="grow-to-row"
-        [config]="{
-          mode: config.mode,
-          object: config.object,
-        }"></app-version-property>
-    </div>
-  </div>
-  <!-- PARENT SUBTECHNIQUE FIELDS -->
-  <div class="row" *ngIf="showParentField()">
-    <div class="col">
-      <app-list-property
-        class="grow-to-row"
-        [config]="{
-          mode: config.mode,
-          object: config.object,
-          field: 'parentTechnique',
-          label: 'parent technique',
-          editType: 'stixList',
-          required: true,
-        }"></app-list-property>
-    </div>
-  </div>
-  <!-- DOMAIN SPECIFIC FIELDS -->
-  <div class="row">
-    <div class="col">
-      <app-list-property
-        class="grow-to-row"
-        [config]="{
-          mode: config.mode,
-          object: config.object,
-          field: 'domains',
-          editType: 'select',
-        }"></app-list-property>
-    </div>
-    <ng-container
-      *ngIf="
-        technique.supportsDomainSpecificFields ||
-        previous?.supportsDomainSpecificFields
-      ">
-      <!-- Display only if domain specific fields exist or if in 'edit' mode -->
-      <div class="col arrow">
-        <mat-icon>arrow_forward</mat-icon>
-      </div>
-      <div class="col grid spacing-16">
-        <!-- DATA SOURCES (string array representation) -->
-        <div
-          *ngIf="technique.supportsDataSources || previous?.supportsDataSources"
-          class="row grow-to-row">
-          <app-list-property
+
+  <app-stix-page-tabs
+    [config]="config"
+    [detailsTemplate]="detailsTpl"
+    [customTabs]="[
+      { label: 'Sub-techniques', template: subtechTpl },
+      { label: 'Procedure Examples', template: proceduresTpl },
+      { label: 'Mitigations', template: mitigationsTpl },
+      { label: 'Detection Strategies', template: detectsTpl },
+      { label: 'Campaigns', template: campaignsTpl },
+      { label: 'Assets', template: assetsTpl },
+    ]">
+  </app-stix-page-tabs>
+
+  <ng-template #detailsTpl>
+    <div class="grid spacing-16">
+      <div class="row">
+        <div class="col">
+          <!-- ATT&CK ID -->
+          <app-attackid-property
             class="grow-to-row"
             [config]="{
               mode: config.mode,
               object: config.object,
-              field: 'data_sources',
-              label: 'ics data sources',
-              editType: 'select',
-            }"></app-list-property>
+            }"></app-attackid-property>
         </div>
-        <!-- SYSTEM REQUIREMENTS -->
-        <div
-          *ngIf="
-            technique.supportsSystemRequirements ||
-            previous?.supportsSystemRequirements
-          "
-          class="row grow-to-row">
-          <app-list-property
-            class="grow-to-row"
-            [config]="{
-              mode: config.mode,
-              object: config.object,
-              field: 'system_requirements',
-              label: 'system requirements',
-              editType: 'any',
-            }"></app-list-property>
-        </div>
-        <!-- TACTIC TYPES -->
-        <div
-          *ngIf="technique.supportsTacticTypes || previous?.supportsTacticTypes"
-          class="row grow-to-row">
-          <app-list-property
-            class="grow-to-row"
-            [config]="{
-              mode: config.mode,
-              object: config.object,
-              field: 'tactic_type',
-              label: 'tactic type',
-              editType: 'select',
-            }"></app-list-property>
-        </div>
-      </div>
-    </ng-container>
-  </div>
-  <div class="row">
-    <div class="col">
-      <!-- PLATFORMS -->
-      <app-list-property
-        class="grow-to-row"
-        [config]="{
-          mode: config.mode,
-          object: config.object,
-          field: 'platforms',
-          editType: 'select',
-        }"></app-list-property>
-    </div>
-    <div class="col">
-      <!-- CONTRIBUTORS -->
-      <app-list-property
-        class="grow-to-row"
-        [config]="{
-          mode: config.mode,
-          object: config.object,
-          field: 'contributors',
-          editType: 'any',
-        }"></app-list-property>
-    </div>
-  </div>
-  <!-- ADDITIONAL IDs -->
-  <div *ngIf="showCapecIdsField()" class="row">
-    <div class="col">
-      <app-list-property
-        class="grow-to-row"
-        [config]="{
-          mode: config.mode,
-          object: config.object,
-          field: 'capec_ids',
-          label: 'CAPEC IDs',
-          editType: 'any',
-        }"></app-list-property>
-    </div>
-  </div>
-  <div *ngIf="showMtcIdsField()" class="row">
-    <div class="col">
-      <app-list-property
-        class="grow-to-row"
-        [config]="{
-          mode: config.mode,
-          object: config.object,
-          field: 'mtc_ids',
-          label: 'MTC IDs',
-          editType: 'any',
-        }"></app-list-property>
-    </div>
-  </div>
-  <div class="row">
-    <div class="col">
-      <!-- DESCRIPTION -->
-      <app-descriptive-property
-        [config]="{
-          mode: config.mode,
-          object: config.object,
-          field: 'description',
-          firstParagraphOnly: false,
-          referencesField: 'external_references',
-          label: 'Description',
-        }"></app-descriptive-property>
-    </div>
-  </div>
-  <!-- TACTIC SPECIFIC FIELDS -->
-  <div class="row">
-    <div class="col">
-      <app-list-property
-        class="grow-to-row"
-        [config]="{
-          mode: config.mode,
-          object: config.object,
-          field: 'tactics',
-          editType: 'stixList',
-          disabled:
-            editing &&
-            (technique.domains.length === 0 || technique.is_subtechnique),
-        }"></app-list-property>
-    </div>
-    <ng-container
-      *ngIf="
-        technique.supportsTacticSpecificFields ||
-        previous?.supportsTacticSpecificFields
-      ">
-      <!-- Display only if tactic specific fields exist -->
-      <div class="col arrow">
-        <mat-icon>arrow_forward</mat-icon>
-      </div>
-      <div class="col grid spacing-16">
-        <!-- PERMISSIONS REQUIRED -->
-        <div
-          *ngIf="
-            technique.supportsPermissionsRequired ||
-            previous?.supportsPermissionsRequired
-          "
-          class="row grow-to-row">
-          <app-list-property
-            class="grow-to-row"
-            [config]="{
-              mode: config.mode,
-              object: config.object,
-              field: 'permissions_required',
-              label: 'permissions required',
-              editType: 'select',
-            }"></app-list-property>
-        </div>
-        <!-- EFFECTIVE PERMISSIONS -->
-        <div
-          *ngIf="
-            technique.supportsEffectivePermissions ||
-            previous?.supportsEffectivePermissions
-          "
-          class="row grow-to-row">
-          <app-list-property
-            class="grow-to-row"
-            [config]="{
-              mode: config.mode,
-              object: config.object,
-              field: 'effective_permissions',
-              label: 'effective permissions',
-              editType: 'select',
-            }"></app-list-property>
-        </div>
-        <!-- IMPACT TYPE -->
-        <div
-          *ngIf="technique.supportsImpactType || previous?.supportsImpactType"
-          class="row grow-to-row">
-          <app-list-property
-            class="grow-to-row"
-            [config]="{
-              mode: config.mode,
-              object: config.object,
-              field: 'impact_type',
-              label: 'impact type',
-              editType: 'select',
-            }"></app-list-property>
-        </div>
-        <!-- DEFENSES BYPASSED -->
-        <div
-          *ngIf="
-            technique.supportsDefensesBypassed ||
-            previous?.supportsDefensesBypassed
-          "
-          class="row grow-to-row">
-          <app-list-property
-            class="grow-to-row"
-            [config]="{
-              mode: config.mode,
-              object: config.object,
-              field: 'defense_bypassed',
-              label: 'defenses bypassed',
-              editType: 'any',
-            }"></app-list-property>
-        </div>
-        <!-- SUPPORTS REMOTE -->
-        <div
-          *ngIf="
-            technique.supportsRemoteSupport || previous?.supportsRemoteSupport
-          "
-          class="row grow-to-row">
+        <div class="col">
           <app-boolean-property
             class="grow-to-row"
             [config]="{
               mode: config.mode,
               object: config.object,
-              field: 'supports_remote',
-              label: 'Supports Remote?',
+              field: 'is_subtechnique',
+              label: 'sub-technique?',
             }"></app-boolean-property>
         </div>
+        <div class="col">
+          <!-- VERSION NUMBER -->
+          <app-version-property
+            class="grow-to-row"
+            [config]="{
+              mode: config.mode,
+              object: config.object,
+            }"></app-version-property>
+        </div>
       </div>
-    </ng-container>
-  </div>
-  <div class="row">
-    <div class="col">
-      <!-- DETECTION -->
-      <app-descriptive-property
-        [config]="{
-          mode: config.mode,
-          object: config.object,
-          field: 'detection',
-          firstParagraphOnly: false,
-          referencesField: 'external_references',
-          label: 'Detection',
-        }"></app-descriptive-property>
+      <!-- PARENT SUBTECHNIQUE FIELDS -->
+      <div class="row" *ngIf="showParentField()">
+        <div class="col">
+          <app-list-property
+            class="grow-to-row"
+            [config]="{
+              mode: config.mode,
+              object: config.object,
+              field: 'parentTechnique',
+              label: 'parent technique',
+              editType: 'stixList',
+              required: true,
+            }"></app-list-property>
+        </div>
+      </div>
+
+      <!-- DOMAIN SPECIFIC FIELDS -->
+      <div class="row">
+        <div class="col">
+          <app-list-property
+            class="grow-to-row"
+            [config]="{
+              mode: config.mode,
+              object: config.object,
+              field: 'domains',
+              editType: 'select',
+            }"></app-list-property>
+        </div>
+        <ng-container
+          *ngIf="
+            technique.supportsDomainSpecificFields ||
+            previous?.supportsDomainSpecificFields
+          ">
+          <!-- Display only if domain specific fields exist or if in 'edit' mode -->
+          <div class="col arrow">
+            <mat-icon>arrow_forward</mat-icon>
+          </div>
+          <div class="col grid spacing-16">
+            <!-- DATA SOURCES (string array representation) -->
+            <div
+              *ngIf="
+                technique.supportsDataSources || previous?.supportsDataSources
+              "
+              class="row grow-to-row">
+              <app-list-property
+                class="grow-to-row"
+                [config]="{
+                  mode: config.mode,
+                  object: config.object,
+                  field: 'data_sources',
+                  label: 'ics data sources',
+                  editType: 'select',
+                }"></app-list-property>
+            </div>
+            <!-- SYSTEM REQUIREMENTS -->
+            <div
+              *ngIf="
+                technique.supportsSystemRequirements ||
+                previous?.supportsSystemRequirements
+              "
+              class="row grow-to-row">
+              <app-list-property
+                class="grow-to-row"
+                [config]="{
+                  mode: config.mode,
+                  object: config.object,
+                  field: 'system_requirements',
+                  label: 'system requirements',
+                  editType: 'any',
+                }"></app-list-property>
+            </div>
+            <!-- TACTIC TYPES -->
+            <div
+              *ngIf="
+                technique.supportsTacticTypes || previous?.supportsTacticTypes
+              "
+              class="row grow-to-row">
+              <app-list-property
+                class="grow-to-row"
+                [config]="{
+                  mode: config.mode,
+                  object: config.object,
+                  field: 'tactic_type',
+                  label: 'tactic type',
+                  editType: 'select',
+                }"></app-list-property>
+            </div>
+          </div>
+        </ng-container>
+      </div>
+      <div class="row">
+        <div class="col">
+          <!-- PLATFORMS -->
+          <app-list-property
+            class="grow-to-row"
+            [config]="{
+              mode: config.mode,
+              object: config.object,
+              field: 'platforms',
+              editType: 'select',
+            }"></app-list-property>
+        </div>
+        <div class="col">
+          <!-- CONTRIBUTORS -->
+          <app-list-property
+            class="grow-to-row"
+            [config]="{
+              mode: config.mode,
+              object: config.object,
+              field: 'contributors',
+              editType: 'any',
+            }"></app-list-property>
+        </div>
+      </div>
+      <div *ngIf="showCapecIdsField()" class="row">
+        <div class="col">
+          <app-list-property
+            class="grow-to-row"
+            [config]="{
+              mode: config.mode,
+              object: config.object,
+              field: 'capec_ids',
+              label: 'CAPEC IDs',
+              editType: 'any',
+            }"></app-list-property>
+        </div>
+      </div>
+      <div *ngIf="showMtcIdsField()" class="row">
+        <div class="col">
+          <app-list-property
+            class="grow-to-row"
+            [config]="{
+              mode: config.mode,
+              object: config.object,
+              field: 'mtc_ids',
+              label: 'MTC IDs',
+              editType: 'any',
+            }"></app-list-property>
+        </div>
+      </div>
+      <div class="row">
+        <div class="col">
+          <!-- DESCRIPTION -->
+          <app-descriptive-property
+            [config]="{
+              mode: config.mode,
+              object: config.object,
+              field: 'description',
+              firstParagraphOnly: false,
+              referencesField: 'external_references',
+              label: 'Description',
+            }"></app-descriptive-property>
+        </div>
+      </div>
+      <!-- TACTIC SPECIFIC FIELDS -->
+      <div class="row">
+        <div class="col">
+          <app-list-property
+            class="grow-to-row"
+            [config]="{
+              mode: config.mode,
+              object: config.object,
+              field: 'tactics',
+              editType: 'stixList',
+              disabled:
+                editing &&
+                (technique.domains.length === 0 || technique.is_subtechnique),
+            }"></app-list-property>
+        </div>
+        <ng-container
+          *ngIf="
+            technique.supportsTacticSpecificFields ||
+            previous?.supportsTacticSpecificFields
+          ">
+          <!-- Display only if tactic specific fields exist -->
+          <div class="col arrow">
+            <mat-icon>arrow_forward</mat-icon>
+          </div>
+          <div class="col grid spacing-16">
+            <!-- PERMISSIONS REQUIRED -->
+            <div
+              *ngIf="
+                technique.supportsPermissionsRequired ||
+                previous?.supportsPermissionsRequired
+              "
+              class="row grow-to-row">
+              <app-list-property
+                class="grow-to-row"
+                [config]="{
+                  mode: config.mode,
+                  object: config.object,
+                  field: 'permissions_required',
+                  label: 'permissions required',
+                  editType: 'select',
+                }"></app-list-property>
+            </div>
+            <!-- EFFECTIVE PERMISSIONS -->
+            <div
+              *ngIf="
+                technique.supportsEffectivePermissions ||
+                previous?.supportsEffectivePermissions
+              "
+              class="row grow-to-row">
+              <app-list-property
+                class="grow-to-row"
+                [config]="{
+                  mode: config.mode,
+                  object: config.object,
+                  field: 'effective_permissions',
+                  label: 'effective permissions',
+                  editType: 'select',
+                }"></app-list-property>
+            </div>
+            <!-- IMPACT TYPE -->
+            <div
+              *ngIf="
+                technique.supportsImpactType || previous?.supportsImpactType
+              "
+              class="row grow-to-row">
+              <app-list-property
+                class="grow-to-row"
+                [config]="{
+                  mode: config.mode,
+                  object: config.object,
+                  field: 'impact_type',
+                  label: 'impact type',
+                  editType: 'select',
+                }"></app-list-property>
+            </div>
+            <!-- DEFENSES BYPASSED -->
+            <div
+              *ngIf="
+                technique.supportsDefensesBypassed ||
+                previous?.supportsDefensesBypassed
+              "
+              class="row grow-to-row">
+              <app-list-property
+                class="grow-to-row"
+                [config]="{
+                  mode: config.mode,
+                  object: config.object,
+                  field: 'defense_bypassed',
+                  label: 'defenses bypassed',
+                  editType: 'any',
+                }"></app-list-property>
+            </div>
+            <!-- SUPPORTS REMOTE -->
+            <div
+              *ngIf="
+                technique.supportsRemoteSupport ||
+                previous?.supportsRemoteSupport
+              "
+              class="row grow-to-row">
+              <app-boolean-property
+                class="grow-to-row"
+                [config]="{
+                  mode: config.mode,
+                  object: config.object,
+                  field: 'supports_remote',
+                  label: 'Supports Remote?',
+                }"></app-boolean-property>
+            </div>
+          </div>
+        </ng-container>
+      </div>
+      <div
+        *ngIf="
+          technique.external_references.list().length > 0 ||
+          previous?.external_references.list().length > 0
+        ">
+        <div class="row">
+          <div class="col">
+            <h2 class="section-header">References</h2>
+          </div>
+        </div>
+        <div class="row">
+          <div class="col">
+            <app-external-references-property
+              [config]="{
+                mode: config.mode,
+                object: config.object,
+                referencesField: 'external_references',
+              }"></app-external-references-property>
+          </div>
+        </div>
+      </div>
     </div>
-  </div>
-  <!-- RELATIONSHIPS - NOTE: these are only shown in 'view' mode -->
-  <div
-    *ngIf="
-      (config.showRelationships ||
-        !config.hasOwnProperty('showRelationships')) &&
-      !editing
-    ">
-    <!-- SUBTECHNIQUES -->
+  </ng-template>
+
+  <ng-template #subtechTpl>
     <div *ngIf="!technique.is_subtechnique; else othersubs">
       <div class="row">
         <div class="col">
@@ -351,8 +374,10 @@
             [config]="{
               type: 'relationship',
               targetRef: technique.stixID,
+              relationshipCreatedBefore: config.relationshipCreatedBefore,
+              relationshipAddedAfter: config.relationshipAddedAfter,
               relationshipType: 'subtechnique-of',
-              allowEdits: true,
+              allowEdits: canEdit,
               clickBehavior: 'none',
             }"></app-stix-list>
         </div>
@@ -373,16 +398,20 @@
               [config]="{
                 type: 'relationship',
                 targetRef: technique.parentTechnique.stixID,
+                relationshipCreatedBefore: config.relationshipCreatedBefore,
+                relationshipAddedAfter: config.relationshipAddedAfter,
                 relationshipType: 'subtechnique-of',
                 clickBehavior: 'none',
-                allowEdits: true,
+                allowEdits: canEdit,
                 excludeSourceRefs: [technique.stixID],
               }"></app-stix-list>
           </div>
         </div>
       </ng-container>
     </ng-template>
-    <!-- campaigns -->
+  </ng-template>
+
+  <ng-template #campaignsTpl>
     <div class="row">
       <div class="col">
         <h2 class="section-header">Campaigns</h2>
@@ -407,14 +436,18 @@
           [config]="{
             type: 'relationship',
             targetRef: technique.stixID,
+            relationshipCreatedBefore: config.relationshipCreatedBefore,
+            relationshipAddedAfter: config.relationshipAddedAfter,
             sourceType: 'campaign',
             relationshipType: 'uses',
             clickBehavior: 'dialog',
-            allowEdits: true,
+            allowEdits: canEdit,
           }"></app-stix-list>
       </div>
     </div>
-    <!-- MITIGATIONS -->
+  </ng-template>
+
+  <ng-template #mitigationsTpl>
     <div class="row">
       <div class="col">
         <h2 class="section-header">Mitigations</h2>
@@ -438,13 +471,17 @@
           [config]="{
             type: 'relationship',
             targetRef: technique.stixID,
+            relationshipCreatedBefore: config.relationshipCreatedBefore,
+            relationshipAddedAfter: config.relationshipAddedAfter,
             relationshipType: 'mitigates',
             clickBehavior: 'dialog',
-            allowEdits: true,
+            allowEdits: canEdit,
           }"></app-stix-list>
       </div>
     </div>
-    <!-- procedure examples -->
+  </ng-template>
+
+  <ng-template #proceduresTpl>
     <div class="row">
       <div class="col">
         <h2 class="section-header">Procedure Examples</h2>
@@ -468,13 +505,17 @@
           [config]="{
             type: 'relationship',
             targetRef: technique.stixID,
+            relationshipCreatedBefore: config.relationshipCreatedBefore,
+            relationshipAddedAfter: config.relationshipAddedAfter,
             relationshipType: 'uses',
             clickBehavior: 'dialog',
-            allowEdits: true,
+            allowEdits: canEdit,
           }"></app-stix-list>
       </div>
     </div>
-    <!-- data sources (deprecated source/component object representation) -->
+  </ng-template>
+
+  <ng-template #dataSourcesTpl>
     <div [ngStyle]="{ display: showDataSources ? 'inherit' : 'none' }">
       <div class="row">
         <div class="col">
@@ -494,15 +535,19 @@
             [config]="{
               type: 'relationship',
               targetRef: technique.stixID,
+              relationshipCreatedBefore: config.relationshipCreatedBefore,
+              relationshipAddedAfter: config.relationshipAddedAfter,
               relationshipType: 'detects',
               sourceType: 'data-component',
               clickBehavior: 'dialog',
-              allowEdits: true,
+              allowEdits: canEdit,
             }"></app-stix-list>
         </div>
       </div>
     </div>
-    <!-- detection strategies -->
+  </ng-template>
+
+  <ng-template #detectsTpl>
     <div class="row">
       <div class="col">
         <h2 class="section-header">Detection Strategies</h2>
@@ -527,14 +572,18 @@
           [config]="{
             type: 'relationship',
             targetRef: technique.stixID,
+            relationshipCreatedBefore: config.relationshipCreatedBefore,
+            relationshipAddedAfter: config.relationshipAddedAfter,
             relationshipType: 'detects',
             sourceType: 'detection-strategy',
             clickBehavior: 'dialog',
-            allowEdits: true,
+            allowEdits: canEdit,
           }"></app-stix-list>
       </div>
     </div>
-    <!-- assets -->
+  </ng-template>
+
+  <ng-template #assetsTpl>
     <div class="row">
       <div class="col">
         <h2 class="section-header">Assets</h2>
@@ -558,34 +607,14 @@
           [config]="{
             type: 'relationship',
             sourceRef: technique.stixID,
+            relationshipCreatedBefore: config.relationshipCreatedBefore,
+            relationshipAddedAfter: config.relationshipAddedAfter,
             targetType: 'asset',
             relationshipType: 'targets',
             clickBehavior: 'dialog',
-            allowEdits: true,
+            allowEdits: canEdit,
           }"></app-stix-list>
       </div>
     </div>
-  </div>
-  <!-- EXTERNAL REFERENCES -->
-  <div
-    *ngIf="
-      technique.external_references.list().length > 0 ||
-      previous?.external_references.list().length > 0
-    ">
-    <div class="row">
-      <div class="col">
-        <h2 class="section-header">References</h2>
-      </div>
-    </div>
-    <div class="row">
-      <div class="col">
-        <app-external-references-property
-          [config]="{
-            mode: config.mode,
-            object: config.object,
-            referencesField: 'external_references',
-          }"></app-external-references-property>
-      </div>
-    </div>
-  </div>
+  </ng-template>
 </div>

@@ -8,6 +8,7 @@ import { EditorService } from 'src/app/services/editor/editor.service';
 import { AddDialogComponent } from '../add-dialog/add-dialog.component';
 import { ConfirmationDialogComponent } from '../confirmation-dialog/confirmation-dialog.component';
 import { forkJoin } from 'rxjs';
+import { WorkflowStatusMap } from 'src/app/utils/types';
 
 @Component({
   selector: 'app-object-status',
@@ -18,6 +19,7 @@ import { forkJoin } from 'rxjs';
 export class ObjectStatusComponent implements OnInit {
   public loaded = false;
   public select: SelectionModel<string>;
+  public workflows = Object.entries(WorkflowStatusMap);
   public objects: StixObject[];
   public object: StixObject;
   public relationships = [];

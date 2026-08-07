@@ -1,0 +1,41 @@
+<mat-tab-group dynamicHeight mat-stretch-tabs class="stix-page-tabs">
+  <mat-tab>
+    <ng-template mat-tab-label>
+      <span class="nav-tab-label">DETAILS</span>
+    </ng-template>
+    <ng-template matTabContent>
+      <div class="details-tpl-wrapper">
+        <ng-container *ngTemplateOutlet="detailsTemplate"></ng-container>
+      </div>
+    </ng-template>
+  </mat-tab>
+
+  <ng-container *ngFor="let tab of customTabs">
+    <mat-tab>
+      <ng-template mat-tab-label>
+        <span class="nav-tab-label">{{ tab.label | uppercase }}</span>
+      </ng-template>
+      <ng-template matTabContent>
+        <ng-container *ngTemplateOutlet="tab.template"></ng-container>
+      </ng-template>
+    </mat-tab>
+  </ng-container>
+
+  <mat-tab *ngIf="showMembership">
+    <ng-template mat-tab-label>
+      <span class="nav-tab-label">MEMBERSHIP</span>
+    </ng-template>
+    <ng-template matTabContent>
+      <app-membership-section [config]="config"></app-membership-section>
+    </ng-template>
+  </mat-tab>
+
+  <mat-tab *ngIf="showHistory">
+    <ng-template mat-tab-label>
+      <span class="nav-tab-label">HISTORY</span>
+    </ng-template>
+    <ng-template matTabContent>
+      <app-history-timeline></app-history-timeline>
+    </ng-template>
+  </mat-tab>
+</mat-tab-group>

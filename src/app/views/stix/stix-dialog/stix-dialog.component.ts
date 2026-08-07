@@ -17,11 +17,8 @@ import { ConfirmationDialogComponent } from 'src/app/components/confirmation-dia
 import { DeleteDialogComponent } from 'src/app/components/delete-dialog/delete-dialog.component';
 import { AuthenticationService } from 'src/app/services/connectors/authentication/authentication.service';
 import { RestApiConnectorService } from 'src/app/services/connectors/rest-api/rest-api-connector.service';
+import { ReleaseTracksConnectorService } from 'src/app/services/connectors/rest-api/release-tracks.service';
 import { EditorService } from 'src/app/services/editor/editor.service';
-import {
-  SidebarService,
-  tabOption,
-} from 'src/app/services/sidebar/sidebar.service';
 import { StixViewConfig } from '../stix-view-page';
 import { StixTypeToClass } from 'src/app/utils/class-mappings';
 
@@ -36,8 +33,8 @@ export class StixDialogComponent implements OnInit {
   constructor(
     public dialogRef: MatDialogRef<StixDialogComponent>,
     @Inject(MAT_DIALOG_DATA) public _config: StixViewConfig,
-    public sidebarService: SidebarService,
     public restApiService: RestApiConnectorService,
+    private releaseTracksService: ReleaseTracksConnectorService,
     public editorService: EditorService,
     private authenticationService: AuthenticationService,
     private dialog: MatDialog
@@ -76,7 +73,12 @@ export class StixDialogComponent implements OnInit {
       sourceType: this._config.sourceType ? this._config.sourceType : null,
       targetType: this._config.targetType ? this._config.targetType : null,
       showRelationships: this.showRelationships,
-      editable: this._config.editable && this.authenticationService.canEdit(),
+      relationshipCreatedBefore: this._config.relationshipCreatedBefore,
+      relationshipAddedAfter: this._config.relationshipAddedAfter,
+      editable:
+        this._config.mode !== 'diff' &&
+        this._config.editable &&
+        this.authenticationService.canEdit(),
       is_new: this._config.is_new ? true : false,
       sidebarControl:
         this._config.sidebarControl == 'disable' ? 'disable' : 'events',
@@ -144,12 +146,18 @@ export class StixDialogComponent implements OnInit {
     const object = Array.isArray(this.config.object)
       ? this.config.object[0]
       : this.config.object;
-    const subscription = object.save(this.restApiService).subscribe({
+    const save: Observable<void> =
+      object instanceof Relationship
+        ? object
+            .save(this.restApiService, this.releaseTracksService)
+            .pipe(map(() => undefined))
+        : object.save(this.restApiService).pipe(map(() => undefined));
+    const subscription = save.subscribe({
       next: result => {
         this.editorService.onEditingStopped.emit();
         this._config.is_new = false;
-        if (object.attackType == 'relationship')
-          this.updateRelationshipObjects(object as Relationship); // update source/target object versions
+        if (object instanceof Relationship)
+          this.updateRelationshipObjects(object); // update source/target object versions
         if (this.prevObject) this.revertToPreviousObject();
         else if (object.attackType == 'data-component') {
           // view data component on save
@@ -215,6 +223,9 @@ export class StixDialogComponent implements OnInit {
       maxWidth: '35em',
       disableClose: true,
       autoFocus: false, // disables auto focus on the dialog form field
+      data: {
+        stixId: object.stixID,
+      },
     });
     const subscription = prompt.afterClosed().subscribe({
       next: confirm => {
@@ -369,17 +380,8 @@ export class StixDialogComponent implements OnInit {
   }
 
   public sidebarOpened = false;
-  public currentTab: tabOption = 'history';
   public toggleSidebar() {
     this.sidebarOpened = !this.sidebarOpened;
-  }
-  public openHistory() {
-    this.sidebarOpened = true;
-    this.currentTab = 'history';
-  }
-  public openNotes() {
-    this.sidebarOpened = true;
-    this.currentTab = 'notes';
   }
   public get stixType(): string {
     return Array.isArray(this.config.object)

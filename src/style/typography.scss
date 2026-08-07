@@ -2,6 +2,10 @@
 @use 'colors';
 @use 'fonts';
 
+$mono-font:
+  Roboto Mono,
+  monospace;
+
 .superheading {
   //super big display text
   font-size: 60px;
@@ -78,6 +82,9 @@
   .dark & {
     color: rgba(255, 255, 255, 0.6);
   }
+}
+.description-text {
+  @extend .placeholder-text;
 }
 .mdc-label {
   line-height: 24px;

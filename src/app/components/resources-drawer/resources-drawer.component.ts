@@ -19,11 +19,12 @@ export class ResourcesDrawerComponent {
   @Output() onClose = new EventEmitter();
   @Input() useService = true; //if true, control of this drawer is performed through the sidebar service. Otherwise, events and internal state are used.
   @Input() showCloseButton = true;
-  @Input() currentTabOverride = 'history';
+  @Input() currentTabOverride = 'references';
 
   public get tabs() {
     return this.sidebarService.tabs;
   }
+
   public get currentTab(): string {
     if (this.useService) return this.sidebarService.currentTab;
     else return this.currentTabOverride;

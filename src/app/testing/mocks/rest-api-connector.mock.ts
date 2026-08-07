@@ -60,3 +60,7 @@ export function createMockRestApiConnector(config?: any): any {
 
   return { ...defaults, ...config };
 }
+
+export function createMockReleaseTrackApiConnector(config?: any): any {
+  return { ...config };
+}

@@ -3,7 +3,7 @@ import { RestApiConnectorService } from 'src/app/services/connectors/rest-api/re
 import { logger } from '../../utils/logger';
 import { ValidationData } from '../serializable';
 import { StixObject } from './stix-object';
-import { WorkflowState } from 'src/app/utils/types';
+import { WorkflowStatusType } from 'src/app/utils/types';
 
 export class Campaign extends StixObject {
   public name = '';
@@ -13,6 +13,7 @@ export class Campaign extends StixObject {
   public last_seen_citation = '';
   public aliases: string[] = [];
   public contributors: string[] = [];
+  public domains: string[] = [];
 
   public readonly supportsAttackID = true;
   protected get attackIDValidator() {
@@ -47,6 +48,7 @@ export class Campaign extends StixObject {
     rep.stix.x_mitre_last_seen_citation = this.last_seen_citation.trim();
     rep.stix.aliases = this.aliases.map(x => x.trim());
     rep.stix.x_mitre_contributors = this.contributors.map(x => x.trim());
+    rep.stix.x_mitre_domains = this.domains;
 
     // Strip properties that are empty strs + lists
     rep.stix = this.filterObject(rep.stix);
@@ -151,6 +153,12 @@ export class Campaign extends StixObject {
             ')'
           );
       } else this.contributors = [];
+
+      if ('x_mitre_domains' in sdo) {
+        if (this.isStringArray(sdo.x_mitre_domains))
+          this.domains = sdo.x_mitre_domains;
+        else logger.error('TypeError: domains field is not a string array.');
+      } else this.domains = [];
     }
   }
 
@@ -161,7 +169,7 @@ export class Campaign extends StixObject {
    */
   public validate(
     restAPIService: RestApiConnectorService,
-    tempWorkflowState?: WorkflowState
+    tempWorkflowState?: WorkflowStatusType
   ): Observable<ValidationData> {
     return this.base_validate(restAPIService, tempWorkflowState);
   }

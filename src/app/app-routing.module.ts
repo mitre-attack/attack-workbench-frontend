@@ -7,15 +7,18 @@ import { DataQualityComponent } from './views/dashboard-page/data-quality/data-q
 import { OrgSettingsPageComponent } from './views/dashboard-page/org-settings-page/org-settings-page.component';
 import { UserAccountsPageComponent } from './views/dashboard-page/user-accounts-page/user-accounts-page.component';
 import { DefaultMarkingDefinitionsComponent } from './views/dashboard-page/default-marking-definitions/default-marking-definitions.component';
+import { ValidationBypassesComponent } from './views/dashboard-page/validation-bypasses/validation-bypasses.component';
 import { ProfilePageComponent } from './views/profile-page/profile-page.component';
 import { AuthorizationGuard } from './services/helpers/authorization.guard';
 import { Role } from './classes/authn/role';
 import { TeamsListPageComponent } from './views/dashboard-page/teams/teams-list-page/teams-list-page.component';
 import { TeamsViewPageComponent } from './views/dashboard-page/teams/teams-view-page/teams-view-page.component';
+import { ReleaseManagementComponent } from './views/dashboard-page/release-management/release-management.component';
+import { ReleaseTrackPageComponent } from './views/dashboard-page/release-management/release-track-page/release-track-page.component';
 
 const editRoles = [Role.EDITOR, Role.TEAM_LEAD, Role.ADMIN];
 
-const routes: Routes = [
+export const routes: Routes = [
   {
     path: '',
     data: {
@@ -48,11 +51,43 @@ const routes: Routes = [
         children: [
           {
             path: '',
+            pathMatch: 'full',
+            redirectTo: 'overview',
+          },
+          {
+            path: 'overview',
             data: {
-              breadcrumb: 'dashboard',
-              title: 'Dashboard',
+              breadcrumb: 'overview',
+              title: 'Knowledge Base Overview',
             },
             component: DashboardPageComponent,
+          },
+          {
+            path: 'release-management',
+            data: {
+              breadcrumb: 'release management',
+              title: 'Release Management',
+              roles: [Role.ADMIN, Role.TEAM_LEAD],
+            },
+            children: [
+              {
+                path: '',
+                data: {
+                  breadcrumb: 'release management',
+                  title: 'Release Management',
+                },
+                component: ReleaseManagementComponent,
+              },
+              {
+                path: ':id',
+                data: {
+                  breadcrumb: 'view release track',
+                  editable: false,
+                  title: 'Release Track',
+                },
+                component: ReleaseTrackPageComponent,
+              },
+            ],
           },
           {
             path: 'teams',
@@ -117,6 +152,15 @@ const routes: Routes = [
             },
             component: DefaultMarkingDefinitionsComponent,
           },
+          {
+            path: 'validation-bypasses',
+            data: {
+              breadcrumb: 'validation bypasses',
+              title: 'ADM Validation Bypasses',
+              roles: [Role.ADMIN],
+            },
+            component: ValidationBypassesComponent,
+          },
         ],
       },
       {
@@ -128,12 +172,8 @@ const routes: Routes = [
         children: [
           {
             path: '',
-            data: {
-              breadcrumb: 'documentation',
-              markdown: '/assets/docs/README.md',
-              title: 'Documentation',
-            },
-            component: HelpPageComponent,
+            pathMatch: 'full',
+            redirectTo: 'usage',
           },
           {
             path: 'usage',

@@ -8,8 +8,14 @@ import {
   createMockAuthenticationService,
   createMockUserAccount,
 } from 'src/app/testing/mocks/authentication-service.mock';
+import { RestApiConnectorService } from 'src/app/services/connectors/rest-api/rest-api-connector.service';
+import {
+  createAsyncObservable,
+  createMockRestApiConnector,
+} from 'src/app/testing/mocks/rest-api-connector.mock';
 
 import { ProfilePageComponent } from './profile-page.component';
+import { UserAvatarComponent } from '../../components/user-avatar/user-avatar.component';
 
 describe('ProfilePageComponent', () => {
   let component: ProfilePageComponent;
@@ -24,9 +30,13 @@ describe('ProfilePageComponent', () => {
       }),
       canEdit: () => false,
     });
+    const mockRestApiConnector = createMockRestApiConnector({
+      getTeamsByUserId: () => createAsyncObservable([]),
+    });
 
     await TestBed.configureTestingModule({
       declarations: [ProfilePageComponent],
+      imports: [UserAvatarComponent],
       schemas: [NO_ERRORS_SCHEMA],
       providers: [
         provideHttpClient(),
@@ -40,6 +50,10 @@ describe('ProfilePageComponent', () => {
         {
           provide: AuthenticationService,
           useValue: mockAuthService,
+        },
+        {
+          provide: RestApiConnectorService,
+          useValue: mockRestApiConnector,
         },
       ],
     }).compileComponents();

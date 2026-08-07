@@ -24,21 +24,17 @@
     <h1 class="tab-title">
       {{ currentTab }}
     </h1>
-    <app-history-timeline
-      *ngIf="
-        currentTab === 'history' && sidebarService.tabEnabled('history')
-      "></app-history-timeline>
     <app-reference-sidebar
       *ngIf="
         currentTab === 'references' && sidebarService.tabEnabled('references')
       "></app-reference-sidebar>
-    <app-notes-editor
-      *ngIf="
-        currentTab === 'notes' && sidebarService.tabEnabled('notes')
-      "></app-notes-editor>
     <app-search
       *ngIf="
         currentTab === 'search' && sidebarService.tabEnabled('search')
       "></app-search>
+    <app-notes-editor
+      *ngIf="
+        currentTab === 'notes' && sidebarService.tabEnabled('notes')
+      "></app-notes-editor>
   </div>
 </div>
