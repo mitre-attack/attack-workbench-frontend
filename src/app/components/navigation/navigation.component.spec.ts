@@ -1,3 +1,4 @@
+import { Component } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { RouterModule } from '@angular/router';
 import { MatDividerModule } from '@angular/material/divider';
@@ -12,6 +13,13 @@ import { createMockAuthenticationService } from 'src/app/testing/mocks/authentic
 import { RestApiConnectorService } from 'src/app/services/connectors/rest-api/rest-api-connector.service';
 import { createMockRestApiConnector } from 'src/app/testing/mocks/rest-api-connector.mock';
 import { UserAccountEventsService } from 'src/app/services/user-account-events/user-account-events.service';
+
+@Component({
+  selector: 'app-footer',
+  template: '',
+  standalone: false,
+})
+class FooterStubComponent {}
 
 describe('NavigationComponent', () => {
   let component: NavigationComponent;
@@ -31,7 +39,7 @@ describe('NavigationComponent', () => {
     });
 
     await TestBed.configureTestingModule({
-      declarations: [NavigationComponent],
+      declarations: [NavigationComponent, FooterStubComponent],
       imports: [MatDividerModule, MatIconModule, RouterModule.forRoot([])],
       providers: [
         {

@@ -78,6 +78,23 @@ ng serve
 
 Open your browser and navigate to `http://localhost:4200`
 
+### Build information
+
+`ng serve` uses `src/assets/build-info.json`, which contains development
+fallbacks. The repository's `npm run build` and `npm run build-prod` commands
+generate `dist/app/browser/assets/build-info.json` after Angular finishes.
+Provide release metadata through the same variables used by the Docker build:
+
+```bash
+APP_VERSION=4.20.0-beta.23 \
+GIT_COMMIT=c2c017c146fae040caba559333b35536bfbd1189 \
+BUILD_DATE=2026-08-05T15:13:49.915Z \
+npm run build-prod
+```
+
+If variables are omitted, the generated asset uses the package version and
+reports its commit and build date as `unknown`.
+
 
 ## Note: Recommended setup using Visual Studio Code Workspaces
 

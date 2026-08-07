@@ -2,6 +2,14 @@
 
 The ATT&CK Workbench is a tool intended to allow the ATT&CK community to *explore*, *create*, *annotate* and *share* extensions of ATT&CK. 
 
+## Build Information
+
+The bottom of the primary navigation shows the release versions of the
+Workbench frontend and the connected REST API. Hover over either version to
+see the source commit and build date. If the REST API cannot be reached, its
+version is shown as `unknown` without preventing the rest of the application
+from loading.
+
 ## Exploring ATT&CK
 
 When first instantiated, the ATT&CK Workbench will not include any data. You can use the application to build a custom dataset, or import data from a data provider such as MITRE using the collections browser.
