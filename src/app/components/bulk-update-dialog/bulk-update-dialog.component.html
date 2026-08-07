@@ -1,0 +1,76 @@
+<div class="add-dialog">
+  <h1 *ngIf="config.title" mat-dialog-title>{{ config.title }}</h1>
+  <mat-dialog-content>
+    <div *ngIf="hasSelectableContent; else nothing">
+      <app-stix-list
+        *ngIf="config.type !== 'user'"
+        [config]="
+          config.stixListConfig || {
+            select: config.selectionType
+              ? config.selectionType
+              : config.select
+                ? 'many'
+                : 'disabled',
+            selectionModel: config.select,
+            type: config.type,
+            clickBehavior: 'expand',
+            stixObjects: config.selectableObjects
+              ? config.selectableObjects
+              : undefined,
+            showFilters: false,
+          }
+        "></app-stix-list>
+    </div>
+    <ng-template #nothing>
+      <h3>No available objects.</h3>
+    </ng-template>
+  </mat-dialog-content>
+  <mat-dialog-actions align="center">
+    <ng-container *ngIf="hasSelectableContent; else closeDialog">
+      <button
+        *ngIf="config.selectAll"
+        mat-raised-button
+        class="extended-button left-button"
+        color="primary"
+        (click)="selectAll()">
+        <span class="text-label">{{ 'Select All' }}</span>
+      </button>
+      <button
+        *ngIf="config.canPromote"
+        mat-raised-button
+        class="extended-button left-button"
+        color="primary"
+        (click)="dialogRef.close(true)">
+        <span class="text-label"> Promote Selection </span>
+      </button>
+      <button
+        *ngIf="config.canDemote"
+        mat-raised-button
+        class="extended-button left-button"
+        color="primary"
+        (click)="dialogRef.close(true)">
+        <span class="text-label"> Demote Selection </span>
+      </button>
+      <button
+        *ngIf="config.clearSelection"
+        mat-raised-button
+        class="extended-button"
+        color="primary"
+        (click)="clearSelections()">
+        <span class="text-label">Clear</span>
+      </button>
+      <button
+        mat-raised-button
+        class="extended-button right-button"
+        color="primary"
+        (click)="dialogRef.close()">
+        <span class="text-label">Cancel</span>
+      </button>
+    </ng-container>
+    <ng-template #closeDialog>
+      <button class="extended-button" mat-raised-button mat-dialog-close>
+        close
+      </button>
+    </ng-template>
+  </mat-dialog-actions>
+</div>
