@@ -1,3 +1,20 @@
+FROM node:22-alpine AS dev
+
+WORKDIR /workspace
+
+COPY package*.json ./
+RUN npm ci
+
+COPY . .
+RUN mkdir -p /workspace-seed && cp -R src /workspace-seed/src
+
+# Polling makes file watching reliable with Docker bind mounts.
+ENV CHOKIDAR_USEPOLLING=true
+
+EXPOSE 80 4200
+
+CMD ["sh", "-c", "if [ ! -f src/main.ts ]; then cp -R /workspace-seed/src/. src/; fi; exec npm start -- --host 0.0.0.0 --port 80 --poll 1000"]
+
 FROM --platform=${BUILDPLATFORM} node:22-alpine AS build
 
 WORKDIR /workspace
