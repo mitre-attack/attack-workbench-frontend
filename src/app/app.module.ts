@@ -151,6 +151,7 @@ import { IconViewComponent } from './components/icon-view/icon-view.component';
 import { ObjectStatusComponent } from './components/object-status/object-status.component';
 import { RecentActivityComponent } from './components/recent-activity/recent-activity.component';
 import { NotesEditorComponent } from './components/stix/stix-page-tabs/notes-editor/notes-editor.component';
+import { ReleaseReviewDialogComponent } from './components/release-review-dialog/release-review-dialog.component';
 import { IdentityPropertyComponent } from './components/stix/identity-property/identity-property.component';
 
 import { CitationEditComponent } from './components/stix/citation-property/citation-edit/citation-edit.component';
@@ -350,6 +351,7 @@ export function initConfig(appConfigService: AppConfigService) {
     OrderedListViewComponent,
     OrderedListEditComponent,
     NotesEditorComponent,
+    ReleaseReviewDialogComponent,
     ObjectStatusComponent,
     RecentActivityComponent,
     IdentityPropertyComponent,

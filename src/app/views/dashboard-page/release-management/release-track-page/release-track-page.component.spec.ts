@@ -21,6 +21,7 @@ import { DeleteDialogComponent } from 'src/app/components/delete-dialog/delete-d
 import { ReleasePreviewDialogComponent } from 'src/app/components/release-preview-dialog/release-preview-dialog.component';
 import { ConfirmationDialogComponent } from 'src/app/components/confirmation-dialog/confirmation-dialog.component';
 import { SnapshotDescriptionDialogComponent } from 'src/app/components/snapshot-description-dialog/snapshot-description-dialog.component';
+import { ReleaseReviewDialogComponent } from 'src/app/components/release-review-dialog/release-review-dialog.component';
 import { AuthenticationService } from 'src/app/services/connectors/authentication/authentication.service';
 import { FormsModule, ReactiveFormsModule } from '@angular/forms';
 import {
@@ -84,6 +85,7 @@ describe('ReleaseTrackPageComponent', () => {
     };
     mockRestApiConnector = {
       getAllObjects: vi.fn(() => of(createPaginatedResponse([]))),
+      postNote: vi.fn(() => of({})),
       triggerBrowserDownload: vi.fn(),
     };
     const mockBreadcrumbService = {
@@ -94,6 +96,7 @@ describe('ReleaseTrackPageComponent', () => {
     };
     mockAuthenticationService = {
       canEdit: vi.fn(() => true),
+      isAuthorized: vi.fn(() => true),
     };
 
     await TestBed.configureTestingModule({
@@ -2278,7 +2281,7 @@ describe('ReleaseTrackPageComponent', () => {
     expect(component.canManuallyPromote(lanes[0])).toBe(true);
     expect(component.canManuallyDemote(lanes[1])).toBe(true);
     expect(component.canReviewAndApprove(lanes[0].items[0], lanes[0])).toBe(
-      false
+      true
     );
   });
 
@@ -2318,13 +2321,38 @@ describe('ReleaseTrackPageComponent', () => {
     const refreshSpy = vi
       .spyOn(component, 'getReleaseTrack')
       .mockImplementation(() => undefined);
-    mockReleaseTrackApiConnector.reviewCandidates.mockReturnValue(of({}));
-    component.id = 'release-track--123';
-
-    component.onReviewAndApprove({
+    const candidate = {
       object_ref: 'attack-pattern--123',
       object_modified: new Date('2024-04-20T00:00:00.000Z'),
+      object_status: 'awaiting-review',
+    } as any;
+    vi.spyOn(component as any, 'resolveReviewDiffObjects').mockReturnValue(
+      of({ current: { type: 'attack-pattern' }, prior: null })
+    );
+    mockReleaseTrackApiConnector.reviewCandidates.mockReturnValue(of({}));
+    mockDialog.open.mockReturnValue({
+      afterClosed: () =>
+        of({
+          approved: [candidate],
+          updateRequests: [],
+        }),
     });
+    component.id = 'release-track--123';
+
+    component.onReviewAndApprove(candidate);
+
+    expect(mockDialog.open).toHaveBeenCalledWith(
+      ReleaseReviewDialogComponent,
+      expect.objectContaining({
+        data: {
+          items: [
+            expect.objectContaining({
+              item: candidate,
+            }),
+          ],
+        },
+      })
+    );
 
     expect(mockReleaseTrackApiConnector.reviewCandidates).toHaveBeenCalledWith(
       'release-track--123',
@@ -2340,5 +2368,50 @@ describe('ReleaseTrackPageComponent', () => {
       }
     );
     expect(refreshSpy).toHaveBeenCalled();
+  });
+
+  it('should attach a note when updates are requested', () => {
+    const refreshSpy = vi
+      .spyOn(component, 'getReleaseTrack')
+      .mockImplementation(() => undefined);
+    const candidate = {
+      object_ref: 'attack-pattern--123',
+      object_status: 'awaiting-review',
+      name: 'Example technique',
+    } as any;
+    vi.spyOn(component as any, 'resolveReviewDiffObjects').mockReturnValue(
+      of({ current: { type: 'attack-pattern' }, prior: null })
+    );
+    mockDialog.open.mockReturnValue({
+      afterClosed: () =>
+        of({
+          approved: [],
+          updateRequests: [{ item: candidate, note: 'Clarify the procedure.' }],
+        }),
+    });
+    component.id = 'release-track--123';
+
+    component.onReviewAndApprove(candidate);
+
+    expect(mockRestApiConnector.postNote).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: 'Updates requested: Example technique',
+        content: 'Clarify the procedure.',
+        object_refs: ['attack-pattern--123'],
+      })
+    );
+    expect(refreshSpy).toHaveBeenCalled();
+  });
+
+  it('should restrict review actions to team leads and admins', () => {
+    mockAuthenticationService.isAuthorized.mockReturnValue(false);
+    const lane = {
+      type: 'candidate',
+      statusFallback: 'awaiting-review',
+      items: [{ object_ref: 'attack-pattern--123' }],
+    } as any;
+
+    expect(component.canReviewAndApprove(lane.items[0], lane)).toBe(false);
+    expect(component.canReviewLane(lane)).toBe(false);
   });
 });
