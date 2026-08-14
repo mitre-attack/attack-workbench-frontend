@@ -2414,4 +2414,223 @@ describe('ReleaseTrackPageComponent', () => {
     expect(component.canReviewAndApprove(lane.items[0], lane)).toBe(false);
     expect(component.canReviewLane(lane)).toBe(false);
   });
+
+  it('should step through all awaiting-review candidates in bulk review', () => {
+    const candidates = [
+      {
+        object_ref: 'attack-pattern--one',
+        object_status: 'awaiting-review',
+      },
+      {
+        object_ref: 'attack-pattern--wip',
+        object_status: 'work-in-progress',
+      },
+      {
+        object_ref: 'attack-pattern--two',
+        object_status: 'awaiting-review',
+      },
+    ] as any[];
+    vi.spyOn(component as any, 'resolveReviewDiffObjects').mockReturnValue(
+      of({ current: { type: 'attack-pattern' }, prior: null })
+    );
+    mockDialog.open.mockReturnValue({ afterClosed: () => of(undefined) });
+
+    component.onReviewAll(candidates);
+
+    expect(mockDialog.open).toHaveBeenCalledWith(
+      ReleaseReviewDialogComponent,
+      expect.objectContaining({
+        data: {
+          items: [
+            expect.objectContaining({ item: candidates[0] }),
+            expect.objectContaining({ item: candidates[2] }),
+          ],
+        },
+      })
+    );
+  });
+
+  it('should not open review without permission or awaiting-review objects', () => {
+    component.onReviewAll([
+      {
+        object_ref: 'attack-pattern--wip',
+        object_status: 'work-in-progress',
+      },
+    ] as any);
+    expect(mockDialog.open).not.toHaveBeenCalled();
+
+    mockAuthenticationService.isAuthorized.mockReturnValue(false);
+    component.onReviewAll([
+      {
+        object_ref: 'attack-pattern--review',
+        object_status: 'awaiting-review',
+      },
+    ] as any);
+    expect(mockDialog.open).not.toHaveBeenCalled();
+  });
+
+  it('should report when review objects cannot be loaded', () => {
+    vi.spyOn(component as any, 'resolveReviewDiffObjects').mockReturnValue(
+      of({ current: null, prior: null })
+    );
+
+    component.onReviewAll([
+      {
+        object_ref: 'attack-pattern--missing',
+        object_status: 'awaiting-review',
+      },
+    ] as any);
+
+    expect(mockSnackbar.open).toHaveBeenCalledWith(
+      'Unable to load the objects awaiting review.',
+      undefined,
+      { duration: 4000, panelClass: 'error' }
+    );
+    expect(mockDialog.open).not.toHaveBeenCalled();
+  });
+
+  it('should omit review objects that fail to resolve', () => {
+    const candidates = [
+      {
+        object_ref: 'attack-pattern--loaded',
+        object_status: 'awaiting-review',
+      },
+      {
+        object_ref: 'attack-pattern--missing',
+        object_status: 'awaiting-review',
+      },
+    ] as any[];
+    vi.spyOn(component as any, 'resolveReviewDiffObjects').mockImplementation(
+      (item: any) =>
+        of({
+          current:
+            item.object_ref === 'attack-pattern--loaded'
+              ? { type: 'attack-pattern' }
+              : null,
+          prior: null,
+        })
+    );
+    mockDialog.open.mockReturnValue({ afterClosed: () => of(undefined) });
+
+    component.onReviewAll(candidates);
+
+    expect(mockSnackbar.open).toHaveBeenCalledWith(
+      'Some objects could not be loaded and were omitted from review.',
+      undefined,
+      { duration: 4000 }
+    );
+    expect(mockDialog.open).toHaveBeenCalledWith(
+      ReleaseReviewDialogComponent,
+      expect.objectContaining({
+        data: { items: [expect.objectContaining({ item: candidates[0] })] },
+      })
+    );
+  });
+
+  it('should report an error while loading review objects', () => {
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    vi.spyOn(component as any, 'resolveReviewDiffObjects').mockReturnValue(
+      throwError(() => new Error('load failed'))
+    );
+
+    component.onReviewAll([
+      {
+        object_ref: 'attack-pattern--error',
+        object_status: 'awaiting-review',
+      },
+    ] as any);
+
+    expect(mockSnackbar.open).toHaveBeenCalledWith(
+      'Unable to load the objects awaiting review.',
+      undefined,
+      { duration: 4000, panelClass: 'error' }
+    );
+    expect(consoleSpy).toHaveBeenCalled();
+  });
+
+  it('should resolve review diffs against the released member', () => {
+    const candidate = {
+      object_ref: 'attack-pattern--123',
+      object_modified: '2026-01-02T00:00:00.000Z',
+    } as any;
+    component.releaseTrack = {
+      members: [
+        {
+          object_ref: 'attack-pattern--123',
+          object_modified: '2026-01-01T00:00:00.000Z',
+        },
+      ],
+    } as any;
+    const fetchSpy = vi
+      .spyOn(component as any, 'fetchObjectVersion')
+      .mockImplementation((_id: string, modified: string) =>
+        of({ modified } as any)
+      );
+    let result: any;
+
+    (component as any)
+      .resolveReviewDiffObjects(candidate)
+      .subscribe((value: any) => (result = value));
+
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
+    expect(result.current.modified).toBe('2026-01-02T00:00:00.000Z');
+    expect(result.prior.modified).toBe('2026-01-01T00:00:00.000Z');
+  });
+
+  it('should resolve a new review object without a member baseline', () => {
+    const candidate = {
+      object_ref: 'attack-pattern--new',
+      object_modified: '2026-01-02T00:00:00.000Z',
+    } as any;
+    component.releaseTrack = { members: [] } as any;
+    vi.spyOn(component as any, 'fetchObjectVersion').mockReturnValue(
+      of({ type: 'attack-pattern' } as any)
+    );
+    let result: any;
+
+    (component as any)
+      .resolveReviewDiffObjects(candidate)
+      .subscribe((value: any) => (result = value));
+
+    expect(result.current).toEqual({ type: 'attack-pattern' });
+    expect(result.prior).toBeNull();
+  });
+
+  it('should refresh and notify when saving review actions fails', () => {
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const refreshSpy = vi
+      .spyOn(component, 'getReleaseTrack')
+      .mockImplementation(() => undefined);
+    mockReleaseTrackApiConnector.reviewCandidates.mockReturnValue(
+      throwError(() => new Error('save failed'))
+    );
+    component.id = 'release-track--123';
+
+    (component as any).applyReviewResult({
+      approved: [{ object_ref: 'attack-pattern--123' }],
+      updateRequests: [],
+    });
+
+    expect(mockSnackbar.open).toHaveBeenCalledWith(
+      'Unable to save all review updates.',
+      undefined,
+      { duration: 5000, panelClass: 'error' }
+    );
+    expect(refreshSpy).toHaveBeenCalled();
+    expect(consoleSpy).toHaveBeenCalled();
+  });
+
+  it('should ignore empty or cancelled review results', () => {
+    (component as any).applyReviewResult(undefined);
+    component.id = 'release-track--123';
+    (component as any).applyReviewResult({
+      approved: [],
+      updateRequests: [],
+    });
+
+    expect(
+      mockReleaseTrackApiConnector.reviewCandidates
+    ).not.toHaveBeenCalled();
+    expect(mockRestApiConnector.postNote).not.toHaveBeenCalled();
+  });
 });

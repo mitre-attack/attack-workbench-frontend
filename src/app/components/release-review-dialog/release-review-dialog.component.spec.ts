@@ -55,4 +55,45 @@ describe('ReleaseReviewDialogComponent', () => {
       ],
     });
   });
+
+  it('exposes the active object metadata and diff config', () => {
+    const { component } = createComponent();
+
+    expect(component.objectName).toBe('Technique 0');
+    expect(component.progressLabel).toBe('1 of 2');
+    expect(component.config).toEqual({
+      mode: 'diff',
+      object: [component.reviewItem.current, component.reviewItem.prior],
+      editable: false,
+      sidebarControl: 'disable',
+      showRelationships: false,
+    });
+
+    delete (component.reviewItem.item as any).name;
+    (component.reviewItem.item as any).attack_id = 'T0001';
+    expect(component.objectName).toBe('T0001');
+
+    delete (component.reviewItem.item as any).attack_id;
+    expect(component.objectName).toBe('Object');
+  });
+
+  it('closes without a result when no actions have been completed', () => {
+    const { component, dialogRef } = createComponent();
+
+    component.cancel();
+
+    expect(dialogRef.close).toHaveBeenCalledWith(undefined);
+  });
+
+  it('preserves completed actions when closing before the final item', () => {
+    const { component, dialogRef } = createComponent();
+
+    component.approve();
+    component.cancel();
+
+    expect(dialogRef.close).toHaveBeenLastCalledWith({
+      approved: [expect.objectContaining({ object_ref: 'attack-pattern--0' })],
+      updateRequests: [],
+    });
+  });
 });
