@@ -98,7 +98,7 @@ $workflow-reviewed-color: colors.color(success);
       background: rgba(colors.color(warn), 0.08);
     }
 
-    &:hover {
+    &:hover:not(:disabled) {
       .dark & {
         border-color: rgba(colors.color(warn), 0.62);
         background: rgba(colors.color(warn), 0.16);
@@ -107,6 +107,21 @@ $workflow-reviewed-color: colors.color(success);
       .light & {
         border-color: rgba(colors.color(warn), 0.56);
         background: rgba(colors.color(warn), 0.13);
+      }
+    }
+
+    &:disabled {
+      cursor: not-allowed;
+      @include colors.theme-text-deemphasis;
+
+      .dark & {
+        border-color: rgba(colors.on-color(dark), 0.24);
+        background: rgba(colors.on-color(dark), 0.035);
+      }
+
+      .light & {
+        border-color: rgba(colors.on-color(light), 0.24);
+        background: rgba(colors.on-color(light), 0.035);
       }
     }
   }
