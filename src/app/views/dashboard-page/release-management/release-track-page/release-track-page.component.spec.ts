@@ -1403,7 +1403,9 @@ describe('ReleaseTrackPageComponent', () => {
     ).not.toHaveBeenCalled();
   });
 
-  it('should open the all objects table to add candidates', () => {
+  it('should exclude current candidates from the all objects table', () => {
+    const candidateId = 'attack-pattern--candidate';
+    const stagedId = 'attack-pattern--staged';
     mockDialog.open.mockImplementation((_component: any, config: any) => {
       config.data.select.select('attack-pattern--1234');
       return {
@@ -1412,7 +1414,11 @@ describe('ReleaseTrackPageComponent', () => {
     });
     mockReleaseTrackApiConnector.addCandidates.mockReturnValue(of({}));
     component.id = 'release-track--123';
-    component.releaseTrack = { id: 'release-track--123' } as any;
+    component.releaseTrack = {
+      id: 'release-track--123',
+      candidates: [{ object_ref: candidateId }],
+      staged: [{ object_ref: stagedId }],
+    } as any;
 
     component.onAddCandidate();
 
@@ -1425,6 +1431,7 @@ describe('ReleaseTrackPageComponent', () => {
           stixListConfig: expect.objectContaining({
             showUserSearch: true,
             excludeAttackTypes: ['relationship', 'note', 'collection'],
+            excludeIDs: [candidateId],
             select: 'many',
           }),
         }),
