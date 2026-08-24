@@ -2450,6 +2450,65 @@ describe('ReleaseTrackPageComponent', () => {
     );
   });
 
+  it('should confirm before approving all awaiting-review candidates', () => {
+    const refreshSpy = vi
+      .spyOn(component, 'getReleaseTrack')
+      .mockImplementation(() => undefined);
+    const candidates = [
+      {
+        object_ref: 'attack-pattern--one',
+        object_status: 'awaiting-review',
+      },
+      {
+        object_ref: 'attack-pattern--wip',
+        object_status: 'work-in-progress',
+      },
+      {
+        object_ref: 'attack-pattern--two',
+        object_status: 'awaiting-review',
+      },
+    ] as any[];
+    component.id = 'release-track--123';
+    mockDialog.open.mockReturnValue({ afterClosed: () => of(true) });
+    mockReleaseTrackApiConnector.reviewCandidates.mockReturnValue(of({}));
+
+    component.onApproveAll(candidates);
+
+    expect(mockDialog.open).toHaveBeenCalledWith(
+      ConfirmationDialogComponent,
+      expect.objectContaining({
+        data: expect.objectContaining({
+          title: 'Approve all awaiting-review objects?',
+          yes_label: 'Approve all (2)',
+        }),
+      })
+    );
+    expect(mockReleaseTrackApiConnector.reviewCandidates).toHaveBeenCalledWith(
+      'release-track--123',
+      {
+        from: 'awaiting-review',
+        to: 'reviewed',
+        object_refs: ['attack-pattern--one', 'attack-pattern--two'],
+      }
+    );
+    expect(refreshSpy).toHaveBeenCalled();
+  });
+
+  it('should not bulk approve when confirmation is cancelled', () => {
+    mockDialog.open.mockReturnValue({ afterClosed: () => of(false) });
+
+    component.onApproveAll([
+      {
+        object_ref: 'attack-pattern--review',
+        object_status: 'awaiting-review',
+      },
+    ] as any);
+
+    expect(
+      mockReleaseTrackApiConnector.reviewCandidates
+    ).not.toHaveBeenCalled();
+  });
+
   it('should not open review without permission or awaiting-review objects', () => {
     component.onReviewAll([
       {
@@ -2461,6 +2520,14 @@ describe('ReleaseTrackPageComponent', () => {
 
     mockAuthenticationService.isAuthorized.mockReturnValue(false);
     component.onReviewAll([
+      {
+        object_ref: 'attack-pattern--review',
+        object_status: 'awaiting-review',
+      },
+    ] as any);
+    expect(mockDialog.open).not.toHaveBeenCalled();
+
+    component.onApproveAll([
       {
         object_ref: 'attack-pattern--review',
         object_status: 'awaiting-review',
@@ -2528,7 +2595,9 @@ describe('ReleaseTrackPageComponent', () => {
   });
 
   it('should report an error while loading review objects', () => {
-    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const consoleSpy = vi
+      .spyOn(console, 'error')
+      .mockImplementation(() => undefined);
     vi.spyOn(component as any, 'resolveReviewDiffObjects').mockReturnValue(
       throwError(() => new Error('load failed'))
     );
@@ -2597,7 +2666,9 @@ describe('ReleaseTrackPageComponent', () => {
   });
 
   it('should refresh and notify when saving review actions fails', () => {
-    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const consoleSpy = vi
+      .spyOn(console, 'error')
+      .mockImplementation(() => undefined);
     const refreshSpy = vi
       .spyOn(component, 'getReleaseTrack')
       .mockImplementation(() => undefined);

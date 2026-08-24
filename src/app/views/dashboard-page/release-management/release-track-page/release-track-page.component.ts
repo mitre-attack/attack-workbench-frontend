@@ -998,6 +998,38 @@ export class ReleaseTrackPageComponent implements OnInit {
     this.openReviewDialog(items);
   }
 
+  public onApproveAll(items: ReleaseTrackObjectItem[]): void {
+    const awaitingReview = items.filter(
+      item => this.getObjectStatus(item) === WorkflowStatus.AwaitingReview
+    );
+    if (!this.canReviewReleaseTrack || !awaitingReview.length) return;
+
+    this.dialog
+      .open(ConfirmationDialogComponent, {
+        width: '32em',
+        autoFocus: false,
+        data: {
+          title: 'Approve all awaiting-review objects?',
+          message:
+            'This will approve every awaiting-review object without stepping through its changes. Bulk approval is dangerous and cannot be undone from this review screen.',
+          no_label: 'Cancel',
+          yes_label: `Approve all (${awaitingReview.length})`,
+          confirm_color: 'warn',
+          confirm_appearance: 'raised',
+          layout: 'simple',
+        },
+      })
+      .afterClosed()
+      .pipe(take(1))
+      .subscribe(confirmed => {
+        if (!confirmed) return;
+        this.applyReviewResult({
+          approved: awaitingReview,
+          updateRequests: [],
+        });
+      });
+  }
+
   public get canReviewReleaseTrack(): boolean {
     return this.authenticationService.isAuthorized([
       Role.ADMIN,
@@ -2311,19 +2343,7 @@ export class ReleaseTrackPageComponent implements OnInit {
     current: StixObject | null;
     prior: StixObject | null;
   }> {
-    const memberEntry = this.findMemberEntry(item.object_ref);
-    return forkJoin({
-      current: this.fetchObjectVersion(
-        item.object_ref,
-        this.getDiffObjectModified(item)
-      ),
-      prior: memberEntry
-        ? this.fetchObjectVersion(
-            memberEntry.object_ref,
-            this.getDiffObjectModified(memberEntry)
-          )
-        : of(null),
-    });
+    return this.resolveDiffObjects(item, this.findMemberEntry(item.object_ref));
   }
 
   private openResolvedReviewDialog(items: ReleaseReviewItem[]): void {
@@ -2448,18 +2468,7 @@ export class ReleaseTrackPageComponent implements OnInit {
       : this.findMemberEntry(item.object_ref);
     const baselineEntry = stagedEntry ?? memberEntry;
 
-    return forkJoin({
-      current: this.fetchObjectVersion(
-        item.object_ref,
-        this.getDiffObjectModified(item)
-      ),
-      prior: baselineEntry
-        ? this.fetchObjectVersion(
-            baselineEntry.object_ref,
-            this.getDiffObjectModified(baselineEntry)
-          )
-        : of(null),
-    }).pipe(
+    return this.resolveDiffObjects(item, baselineEntry).pipe(
       map(({ current, prior }) => ({
         current,
         prior,
@@ -2475,24 +2484,34 @@ export class ReleaseTrackPageComponent implements OnInit {
   }> {
     const memberEntry = this.findMemberEntry(item.object_ref);
 
-    return forkJoin({
-      current: this.fetchObjectVersion(
-        item.object_ref,
-        this.getDiffObjectModified(item)
-      ),
-      prior: memberEntry
-        ? this.fetchObjectVersion(
-            memberEntry.object_ref,
-            this.getDiffObjectModified(memberEntry)
-          )
-        : of(null),
-    }).pipe(
+    return this.resolveDiffObjects(item, memberEntry).pipe(
       map(({ current, prior }) => ({
         current,
         prior,
         expectedBaseline: !!memberEntry,
       }))
     );
+  }
+
+  private resolveDiffObjects(
+    item: ReleaseTrackObjectItem,
+    baselineEntry: ReleaseTrackObjectItem | null
+  ): Observable<{
+    current: StixObject | null;
+    prior: StixObject | null;
+  }> {
+    return forkJoin({
+      current: this.fetchObjectVersion(
+        item.object_ref,
+        this.getDiffObjectModified(item)
+      ),
+      prior: baselineEntry
+        ? this.fetchObjectVersion(
+            baselineEntry.object_ref,
+            this.getDiffObjectModified(baselineEntry)
+          )
+        : of(null),
+    });
   }
 
   private fetchObjectVersion(
