@@ -1,0 +1,131 @@
+@use '../../../../../style/globals';
+@use '../../../../../style/colors.scss';
+
+.dictionary-edit {
+  @extend .labelled-box;
+
+  .mat-divider {
+    margin: 16px 8px;
+  }
+
+  .mat-mdc-form-field-subscript-wrapper {
+    display: none; // remove bottom padding used for hint
+  }
+  .mat-mdc-form-field-infix {
+    padding-bottom: 8px !important;
+    padding-top: 8px !important;
+    min-height: unset !important;
+  }
+  .mat-mdc-text-field-wrapper {
+    height: unset !important;
+    padding: 0 6px !important;
+  }
+
+  table.property-table {
+    width: 100%;
+    table-layout: fixed;
+  }
+  td.mat-mdc-cell,
+  td.mat-cell,
+  .cell {
+    position: relative;
+    overflow: visible;
+  }
+  .cell {
+    cursor: text;
+    padding: 6px;
+    &:hover {
+      .light & {
+        background: colors.color-alternate(light);
+      }
+      .dark & {
+        background: colors.color-alternate(dark);
+      }
+    }
+  }
+  th.mat-column-actions,
+  td.mat-column-actions {
+    width: 44px;
+    min-width: 44px;
+    max-width: 44px;
+    text-align: center;
+    padding-left: 0;
+    padding-right: 0;
+  }
+  .action-cell {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+  }
+  th.mat-column-name,
+  td.mat-column-name {
+    width: 30%;
+    max-width: 30%;
+  }
+  th.mat-mdc-header-cell,
+  td.mat-mdc-cell {
+    white-space: normal;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+    // vertical-align: top;
+    vertical-align: middle;
+  }
+  .table-value {
+    white-space: normal;
+    overflow-wrap: anywhere;
+
+    flex: 1;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    word-break: break-word;
+    // min-height: 28px;
+  }
+  .cell-inner {
+    position: relative;
+    min-height: 40px; // give single-line edits room for the input field
+    display: flex;
+    align-items: center;
+  }
+  .table-value.hidden {
+    visibility: hidden;
+  }
+  .editor {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    // align-items: flex-start;
+    align-items: center;
+    z-index: 2;
+  }
+  .editor-field {
+    width: 100%;
+    height: 100%;
+  }
+  .editor-field .mat-mdc-text-field-wrapper {
+    padding: 0 6px !important;
+    height: 100% !important;
+    display: flex;
+    align-items: center;
+  }
+  .editor-field .mat-mdc-form-field-infix {
+    padding-top: 0 !important;
+    padding-bottom: 0 !important;
+    min-height: unset !important;
+
+    display: flex;
+    align-items: center;
+  }
+  .editor-field input.mat-mdc-input-element {
+    height: 100%;
+    line-height: normal;
+  }
+  .editor-field .mat-mdc-form-field-subscript-wrapper {
+    display: none;
+  }
+  .content {
+    overflow-x: auto;
+    display: block !important;
+  }
+}

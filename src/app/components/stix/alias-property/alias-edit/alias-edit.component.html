@@ -2,7 +2,7 @@
   <div class="content">
     <mat-chip-listbox>
       <mat-chip
-        *ngFor="let value of config.object[config.field].slice(1)"
+        *ngFor="let value of visibleAliases"
         [removable]="true"
         (removed)="removeAlias(value)"
         (click)="editAlias(value)">

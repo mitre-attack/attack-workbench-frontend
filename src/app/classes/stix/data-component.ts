@@ -4,6 +4,7 @@ import { ValidationData } from '../serializable';
 import { StixObject } from './stix-object';
 import { logger } from '../../utils/logger';
 import { DataSource } from './data-source';
+import { WorkflowStatusType } from 'src/app/utils/types';
 
 export class DataComponent extends StixObject {
   public name = '';
@@ -48,6 +49,9 @@ export class DataComponent extends StixObject {
     if (this.logSources.length) {
       rep.stix.x_mitre_log_sources = this.logSources;
     }
+
+    // Strip properties that are empty strs + lists
+    rep.stix = this.filterObject(rep.stix);
 
     return rep;
   }
@@ -128,28 +132,10 @@ export class DataComponent extends StixObject {
    * @returns {Observable<ValidationData>} the validation warnings and errors once validation is complete.
    */
   public validate(
-    restAPIService: RestApiConnectorService
+    restAPIService: RestApiConnectorService,
+    tempWorkflowState?: WorkflowStatusType
   ): Observable<ValidationData> {
-    return this.base_validate(restAPIService).pipe(
-      map(result => {
-        if (!this.logSources.length) return result;
-
-        // validate log sources array
-        const seen = new Set<string>();
-        for (const { name, channel } of this.logSources) {
-          const key = `${name}::${channel}`;
-          if (seen.has(key)) {
-            result.errors.push({
-              field: 'permutations',
-              result: 'error',
-              message: `Duplicate log source found: name="${name}", channel="${channel}"`,
-            });
-          }
-          seen.add(key);
-        }
-        return result;
-      })
-    );
+    return this.base_validate(restAPIService, tempWorkflowState);
   }
 
   /**
@@ -204,6 +190,24 @@ export class DataComponent extends StixObject {
       },
     });
     return putObservable;
+  }
+
+  /**
+   * Revoke the STIX object in the database.
+   * @param restAPIService [RestApiConnectorService] the service to perform the revoke through
+   * @param revokingObject the revoking object payload
+   * @returns {Observable} of the revoke
+   */
+  public revoke(
+    restAPIService: RestApiConnectorService,
+    revokingObject: { revoking: { stixId: string; modified: string } },
+    preserveRelationships = false
+  ): Observable<object> {
+    return restAPIService.revokeDataComponent(
+      this.stixID,
+      revokingObject,
+      preserveRelationships
+    );
   }
 }
 

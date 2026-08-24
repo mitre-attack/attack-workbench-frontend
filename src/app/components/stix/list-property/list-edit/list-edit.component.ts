@@ -63,7 +63,7 @@ export class ListEditComponent implements OnInit, AfterContentChecked {
     permissions_required: 'x_mitre_permissions_required',
     collection_layers: 'x_mitre_collection_layers',
     data_sources: 'x_mitre_data_sources',
-    sectors: 'x_mitre_sectors',
+    sectors: 'sectors',
   };
   public domains = ['enterprise-attack', 'mobile-attack', 'ics-attack'];
 
@@ -299,7 +299,7 @@ export class ListEditComponent implements OnInit, AfterContentChecked {
     // filter values
     const values = new Set<string>();
     const property = this.allAllowedValues.properties.find(p => {
-      return p.propertyName == this.fieldToStix[this.config.field];
+      return p.propertyName == this.allowedValuesPropertyName();
     });
     if (!property) {
       // property not found
@@ -335,6 +335,14 @@ export class ListEditComponent implements OnInit, AfterContentChecked {
       this.selectControl.enable(); // re-enable field
     }
     return values;
+  }
+
+  private allowedValuesPropertyName(): string {
+    const object = this.config.object as StixObject;
+    if (object.attackType === 'asset' && this.config.field === 'sectors') {
+      return 'x_mitre_sectors';
+    }
+    return this.fieldToStix[this.config.field];
   }
 
   /** Add value to object property list */

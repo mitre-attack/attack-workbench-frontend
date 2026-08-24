@@ -1,9 +1,9 @@
-import { RelatedRef, StixObject } from './stix-object';
+import { EmbeddedRelationship, StixObject } from './stix-object';
 import { logger } from '../../utils/logger';
-import { catchError, forkJoin, map, Observable, of, switchMap } from 'rxjs';
+import { Observable, of, switchMap } from 'rxjs';
 import { RestApiConnectorService } from 'src/app/services/connectors/rest-api/rest-api-connector.service';
 import { ValidationData } from '../serializable';
-import { StixType } from 'src/app/utils/types';
+import { WorkflowStatusType } from 'src/app/utils/types';
 
 export class Analytic extends StixObject {
   public name = '';
@@ -13,7 +13,7 @@ export class Analytic extends StixObject {
   public mutableElements: MutableElement[] = [];
 
   // NOTE: the following fields will only be populated when this object is fetched with the `includeRefs=true` param
-  public relatedDetections: RelatedRef[] = [];
+  public relatedDetections: EmbeddedRelationship[] = [];
 
   public readonly supportsAttackID = true;
   protected get attackIDValidator() {
@@ -72,6 +72,10 @@ export class Analytic extends StixObject {
       );
     if (this.mutableElements?.length)
       rep.stix.x_mitre_mutable_elements = this.mutableElements;
+
+    // Strip properties that are empty strs + lists
+    rep.stix = this.filterObject(rep.stix);
+
     return rep;
   }
 
@@ -136,22 +140,23 @@ export class Analytic extends StixObject {
       } else this.mutableElements = [];
     }
 
-    this.deserializeRelatedRefs(raw);
+    this.deserializeEmbeddedRelationships(raw);
   }
 
-  public deserializeRelatedRefs(raw: any): void {
-    if ('related_to' in raw) {
-      const relatedTo = raw.related_to as any[];
-      const relatedRefs: RelatedRef[] = relatedTo.map(ref => ({
-        stixId: ref.id,
+  public deserializeEmbeddedRelationships(raw: any): void {
+    if (raw.workspace?.embedded_relationships) {
+      const relatedTo = raw.workspace.embedded_relationships as any[];
+      const relatedRefs: EmbeddedRelationship[] = relatedTo.map(ref => ({
+        stixId: ref.stix_id,
         name: ref.name,
         attackId: ref.attack_id,
-        type: ref.type as StixType,
       }));
 
-      this.relatedDetections = relatedRefs.filter(
-        ref => ref.type === 'x-mitre-detection-strategy'
-      );
+      function isDetectionStrategy(o: EmbeddedRelationship) {
+        return o.stixId.includes('x-mitre-detection-strategy');
+      }
+
+      this.relatedDetections = relatedRefs.filter(isDetectionStrategy);
     }
   }
 
@@ -173,9 +178,10 @@ export class Analytic extends StixObject {
    * @returns {Observable<ValidationData>} the validation warnings and errors once validation is complete.
    */
   public validate(
-    restAPIService: RestApiConnectorService
+    restAPIService: RestApiConnectorService,
+    tempWorkflowState?: WorkflowStatusType
   ): Observable<ValidationData> {
-    return this.base_validate(restAPIService).pipe(
+    return this.base_validate(restAPIService, tempWorkflowState).pipe(
       switchMap(result => {
         // validate unique mutable fields
         if (this.mutableElements.length) {
@@ -192,35 +198,6 @@ export class Analytic extends StixObject {
             seen.add(normalizedField);
           }
         }
-
-        // validate unique log source references
-        if (this.logSourceReferences.length) {
-          return forkJoin(
-            this.logSourceReferences.map(ref =>
-              restAPIService.getDataComponent(ref.dataComponentRef).pipe(
-                catchError(() => of(null)) // fallback if API fails
-              )
-            )
-          ).pipe(
-            map(dataComponents => {
-              const seen = new Set<string>();
-              this.logSourceReferences.forEach((lsr, idx) => {
-                const key = `${lsr.dataComponentRef}::${lsr.name}::${lsr.channel}`;
-                if (seen.has(key)) {
-                  const dataComponent = dataComponents[idx];
-                  result.errors.push({
-                    field: 'logSourceReferences',
-                    result: 'error',
-                    message: `Duplicate log source reference found: ${dataComponent?.[0].attackID || 'unknown'}`,
-                  });
-                }
-                seen.add(key);
-              });
-              return result;
-            })
-          );
-        }
-
         return of(result);
       })
     );

@@ -17,7 +17,9 @@ export abstract class StixViewPage {
     return this.config.mode == 'edit';
   }
   public get canEdit(): boolean {
-    return this.authenticationService.canEdit();
+    return (
+      this.config.editable !== false && this.authenticationService.canEdit()
+    );
   }
   public get configCurrentObject(): StixObject {
     return Array.isArray(this.config.object)
@@ -26,16 +28,6 @@ export abstract class StixViewPage {
   }
   public get configPreviousObject(): StixObject | null {
     return this.config.mode == 'diff' ? this.config.object[1] || null : null;
-  }
-
-  //outputs to use if config.sidebarControl == "events"
-  @Output() public onOpenHistory = new EventEmitter();
-  public openHistory(): void {
-    this.onOpenHistory.emit();
-  }
-  @Output() public onOpenNotes = new EventEmitter();
-  public openNotes(): void {
-    this.onOpenNotes.emit();
   }
 }
 
@@ -54,6 +46,10 @@ export interface StixViewConfig {
   targetType?: string; // the relationship target type (only relevant when creating a new relationship)
   /* if true or omitted, show relationships with the object on the page. If false, omit the relationships */
   showRelationships?: boolean;
+  /** Hide relationships created after this timestamp. */
+  relationshipCreatedBefore?: Date | string;
+  /** Mark relationships created after this timestamp as new. */
+  relationshipAddedAfter?: Date | string;
   /* is the current page editable?
    * if true or omitted, include edit elements on the page such as buttons to add a relationship
    * if false, hide such elements

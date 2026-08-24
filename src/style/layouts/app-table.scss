@@ -2,10 +2,8 @@
 @use '../typography';
 
 @use '@angular/material' as mat;
-// @import "../globals";
 
 .app-table {
-  // border-collapse: collapse;
   border-spacing: 0px;
 
   .light & {
@@ -32,5 +30,29 @@
   th,
   td {
     padding: 12px 12px;
+  }
+}
+
+.property-table {
+  width: 100%;
+  padding: 8px;
+  .light & {
+    background-color: colors.color(light);
+  }
+  .dark & {
+    background-color: colors.color(dark);
+  }
+  tr.mat-mdc-header-row {
+    height: 25px;
+  }
+  .mat-mdc-cell,
+  .mat-mdc-header-cell {
+    padding: 0 10px;
+    .light & {
+      border-color: colors.border-color(light);
+    }
+    .dark & {
+      border-color: colors.border-color(dark);
+    }
   }
 }

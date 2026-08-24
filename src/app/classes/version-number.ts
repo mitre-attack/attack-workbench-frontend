@@ -1,4 +1,4 @@
-import { ValidatorFn, AbstractControl } from '@angular/forms';
+import { AbstractControl, ValidatorFn } from '@angular/forms';
 import { logger } from '../utils/logger';
 
 export class VersionNumber {
@@ -114,14 +114,6 @@ export class VersionNumber {
       if (timesIncremented > 1) return true;
     }
     return timesIncremented > 1;
-  }
-
-  /**
-   * Is this version number formatted correctly?
-   * @returns {boolean} true if valid
-   */
-  public valid(): boolean {
-    return /^(\d+\.)*\d+$/.test(this.toString());
   }
 }
 

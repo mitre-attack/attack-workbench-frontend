@@ -3,6 +3,7 @@ import { RestApiConnectorService } from 'src/app/services/connectors/rest-api/re
 import { ValidationData } from '../serializable';
 import { StixObject } from './stix-object';
 import { logger } from '../../utils/logger';
+import { WorkflowStatusType } from 'src/app/utils/types';
 
 export class Note extends StixObject {
   public title = '';
@@ -86,9 +87,10 @@ export class Note extends StixObject {
    * @returns {Observable<ValidationData>} the validation warnings and errors once validation is complete.
    */
   public validate(
-    restAPIService: RestApiConnectorService
+    restAPIService: RestApiConnectorService,
+    tempWorkflowState?: WorkflowStatusType
   ): Observable<ValidationData> {
-    return this.base_validate(restAPIService);
+    return this.base_validate(restAPIService, tempWorkflowState);
   }
 
   /**

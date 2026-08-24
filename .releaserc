@@ -11,10 +11,6 @@
     {
       "name": "alpha",
       "prerelease": true
-    },
-    {
-      "name": "adm",
-      "prerelease": true
     }
   ],
   "plugins": [

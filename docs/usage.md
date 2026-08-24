@@ -2,6 +2,14 @@
 
 The ATT&CK Workbench is a tool intended to allow the ATT&CK community to *explore*, *create*, *annotate* and *share* extensions of ATT&CK. 
 
+## Build Information
+
+The bottom of the primary navigation shows the release versions of the
+Workbench frontend and the connected REST API. Hover over either version to
+see the source commit and build date. If the REST API cannot be reached, its
+version is shown as `unknown` without preventing the rest of the application
+from loading.
+
 ## Exploring ATT&CK
 
 When first instantiated, the ATT&CK Workbench will not include any data. You can use the application to build a custom dataset, or import data from a data provider such as MITRE using the collections browser.
@@ -17,6 +25,14 @@ Data providers may opt to describe their published collections through a _collec
 Objects may exist in multiple collections simultaneously, and objects can exist within the editor outside of the context of a collection. Collections exist at the _version_ level of an object: a specific version of the object is tagged with the collection instead of the object as a whole. If a user imports a collection, and then edits an object from that collection (thereby creating a new version of the object), the new version will not exist within that collection.
 
 You can read more about the technical specifications for a collection, such as the STIX representation of a collection object, in our [collections](/docs/collections.md) document. MITRE's ATT&CK collections and collection index can be found on our [attack-stix-data GitHub repository](https://github.com/mitre-attack/attack-stix-data).
+
+#### Releasing a Release-Track Snapshot
+
+The release preview offers minor and major relative tags as well as an exact `MAJOR.MINOR` version. Relative tags are calculated from the tagged snapshot immediately before the selected draft. When releasing an older draft, the exact version must also remain below the next tagged snapshot; the dialog shows these exclusive bounds. Optional release notes are stored on that snapshot and become the `x-mitre-collection` description in exported STIX bundles.
+
+The release-track page can export the latest snapshot or a selected historical snapshot as a STIX 2.0 bundle, a STIX 2.1 bundle, or Workbench JSON. Historical snapshot exports can also copy a concise summary. Tagged snapshots with a bundle cache use that pinned member graph for deterministic member-only exports in either STIX version.
+
+Each cached snapshot card displays server-generated SHA-256 hashes for the exact UTF-8 JSON files produced by its STIX 2.0 and STIX 2.1 bundle downloads. The adjacent copy buttons copy a hash for external file-integrity verification. Snapshot notes are locked while the bundle is cached; delete the cache, edit the notes, and cache the bundle again to generate matching hashes.
 
 #### Adding a Collection Index
 
@@ -226,6 +242,8 @@ When creating and/or editing an object, you can add multiple statements and sele
 
 Any object in the knowledge base, except for marking definitions, can be edited, even those imported from collections. Clicking the "edit" button in the toolbar, or the "edit" link in an object list, will bring you to the edit interface for the object. While editing an object, relationships cannot be viewed or created since they are saved independently of the objects they connect.
 
+Domain-bearing ATT&CK objects expose a Domain field that reads and writes the STIX `x_mitre_domains` list. This includes techniques, campaigns, mitigations, groups, software, analytics, assets, data components, data sources, detection strategies, matrices, and tactics. When an existing object is revised, its domains are retained unless the editor explicitly changes them.
+
 #### Editing Matrices
 
 Matrices share the typical fields on objects, including a description supporting markdown, LinkByIds, and citations. Unlike other object types, their IDs serve as identifier for their domain:
@@ -425,6 +443,7 @@ The source and target objects can be changed after the relationship has been cre
 
 Relationships also have a description to provide additional context or to hold citations of relevant reporting. Like all descriptions, those on relationships support citations, LinkByIds, and markdown formatting. Relationships between sub-techniques and techniques however are purely structural and do not support descriptions.
 
+Saving a relationship creates a new relationship revision and returns its connected source and target objects to the *work in progress* workflow state through new SDO revisions. Previously published or snapshot-pinned SDO revisions remain unchanged.
 
 ### Revoking and Deprecating Objects
 

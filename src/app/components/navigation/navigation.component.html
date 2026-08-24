@@ -1,0 +1,185 @@
+<nav class="app-navigation" aria-label="Primary navigation">
+  <div class="app-title">
+    <a routerLink="">ATT&CK Workbench</a>
+  </div>
+  <a
+    class="nav-area"
+    [routerLink]="isLoggedIn ? '/objects' : null"
+    [class.active]="isObjectLibraryActive"
+    [class.disabled]="!isLoggedIn"
+    [attr.aria-disabled]="!isLoggedIn"
+    [attr.tabindex]="isLoggedIn ? 0 : -1"
+    (click)="expandNavigationArea('objectLibrary')">
+    <mat-icon>dataset</mat-icon>
+    <span>Object Library</span>
+  </a>
+
+  <div
+    class="nav-area-children"
+    *ngIf="isNavigationAreaExpanded('objectLibrary')">
+    <a
+      class="nav-link"
+      [routerLink]="isLoggedIn ? '/objects' : null"
+      routerLinkActive="active"
+      [class.disabled]="!isLoggedIn"
+      [attr.aria-disabled]="!isLoggedIn"
+      [attr.tabindex]="isLoggedIn ? 0 : -1"
+      [routerLinkActiveOptions]="{ exact: true }">
+      All Objects
+    </a>
+
+    <section class="nav-section" *ngFor="let section of sections">
+      <button
+        class="nav-section-label"
+        type="button"
+        (click)="toggleSection(section.label)"
+        [attr.aria-controls]="sectionId(section.label)"
+        [attr.aria-expanded]="isSectionOpen(section.label)">
+        <span>{{ section.label }}</span>
+        <mat-icon>{{
+          isSectionOpen(section.label) ? 'expand_more' : 'chevron_right'
+        }}</mat-icon>
+      </button>
+
+      <div
+        class="nav-section-items"
+        *ngIf="isSectionOpen(section.label)"
+        [id]="sectionId(section.label)">
+        <a
+          class="nav-link"
+          *ngFor="let item of section.items"
+          [routerLink]="isLoggedIn ? item.path : null"
+          routerLinkActive="active"
+          [class.deprecated]="item.deprecated"
+          [class.disabled]="!isLoggedIn"
+          [attr.aria-disabled]="!isLoggedIn"
+          [attr.tabindex]="isLoggedIn ? 0 : -1">
+          <span>{{ item.label }}</span>
+          <mat-icon *ngIf="item.deprecated">warning</mat-icon>
+        </a>
+      </div>
+    </section>
+  </div>
+
+  <a
+    class="nav-area"
+    [routerLink]="isLoggedIn ? '/reference-manager' : null"
+    routerLinkActive="active"
+    [class.disabled]="!isLoggedIn"
+    [attr.aria-disabled]="!isLoggedIn"
+    [attr.tabindex]="isLoggedIn ? 0 : -1"
+    (click)="collapseNavigationGroups()">
+    <mat-icon>manage_search</mat-icon>
+    <span>Reference Manager</span>
+  </a>
+
+  <a
+    class="nav-area"
+    [routerLink]="isLoggedIn ? '/contributors' : null"
+    routerLinkActive="active"
+    [class.disabled]="!isLoggedIn"
+    [attr.aria-disabled]="!isLoggedIn"
+    [attr.tabindex]="isLoggedIn ? 0 : -1"
+    (click)="collapseNavigationGroups()">
+    <mat-icon>groups</mat-icon>
+    <span>Contributors</span>
+  </a>
+
+  <a
+    class="nav-area"
+    *ngIf="canAccessDashboard"
+    [routerLink]="isLoggedIn ? '/dashboard' : null"
+    [class.active]="isDashboardActive"
+    [class.disabled]="!isLoggedIn"
+    [attr.aria-disabled]="!isLoggedIn"
+    [attr.tabindex]="isLoggedIn ? 0 : -1"
+    (click)="expandNavigationArea('dashboard')">
+    <mat-icon>dashboard</mat-icon>
+    <span>Dashboard</span>
+    <span
+      *ngIf="hasPendingUserAccounts"
+      class="nav-attention-dot"
+      [attr.aria-label]="pendingUserAccountsMessage"
+      [attr.title]="pendingUserAccountsMessage"></span>
+  </a>
+
+  <div
+    class="nav-area-children"
+    *ngIf="canAccessDashboard && isNavigationAreaExpanded('dashboard')">
+    <a
+      class="nav-link"
+      *ngFor="let item of dashboardItems"
+      [routerLink]="isLoggedIn ? item.path : null"
+      routerLinkActive="active"
+      [routerLinkActiveOptions]="{ exact: item.exact }"
+      [class.disabled]="!isLoggedIn"
+      [attr.aria-disabled]="!isLoggedIn"
+      [attr.tabindex]="isLoggedIn ? 0 : -1">
+      <span>{{ item.label }}</span>
+    </a>
+
+    <section
+      class="nav-section"
+      *ngIf="canAccessAdminDashboard && dashboardAdminItems.length">
+      <button
+        class="nav-section-label"
+        type="button"
+        (click)="toggleSection('Admin')"
+        [attr.aria-controls]="sectionId('Admin')"
+        [attr.aria-expanded]="isSectionOpen('Admin')">
+        <span>Admin</span>
+        <mat-icon>{{
+          isSectionOpen('Admin') ? 'expand_more' : 'chevron_right'
+        }}</mat-icon>
+      </button>
+
+      <div
+        class="nav-section-items"
+        *ngIf="isSectionOpen('Admin')"
+        [id]="sectionId('Admin')">
+        <a
+          class="nav-link"
+          *ngFor="let item of dashboardAdminItems"
+          [routerLink]="isLoggedIn ? item.path : null"
+          routerLinkActive="active"
+          [routerLinkActiveOptions]="{ exact: item.exact }"
+          [class.disabled]="!isLoggedIn"
+          [attr.aria-disabled]="!isLoggedIn"
+          [attr.tabindex]="isLoggedIn ? 0 : -1">
+          <span>{{ item.label }}</span>
+          <span
+            *ngIf="isUserAccountsNavigationItem(item) && hasPendingUserAccounts"
+            class="nav-attention-count"
+            [attr.aria-label]="pendingUserAccountsMessage"
+            [attr.title]="pendingUserAccountsMessage">
+            {{ pendingUserAccountsDisplay }}
+          </span>
+        </a>
+      </div>
+    </section>
+  </div>
+
+  <a
+    class="nav-area"
+    routerLink="/docs/usage"
+    [class.active]="isDocumentationActive"
+    (click)="expandNavigationArea('documentation')">
+    <mat-icon>menu_book</mat-icon>
+    <span>Documentation</span>
+  </a>
+
+  <div
+    class="nav-area-children"
+    *ngIf="isNavigationAreaExpanded('documentation')">
+    <a
+      class="nav-link"
+      *ngFor="let item of documentationItems"
+      [routerLink]="item.path"
+      routerLinkActive="active"
+      [routerLinkActiveOptions]="{ exact: item.exact }">
+      <span>{{ item.label }}</span>
+    </a>
+  </div>
+
+  <app-footer></app-footer>
+</nav>

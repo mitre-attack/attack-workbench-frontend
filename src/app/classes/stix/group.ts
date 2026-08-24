@@ -3,11 +3,13 @@ import { RestApiConnectorService } from 'src/app/services/connectors/rest-api/re
 import { Observable } from 'rxjs';
 import { ValidationData } from '../serializable';
 import { logger } from '../../utils/logger';
+import { WorkflowStatusType } from 'src/app/utils/types';
 
 export class Group extends StixObject {
   public name = '';
-  public aliases: string[] = ['placeholder']; // initialize field with placeholder in first index for group name
+  public aliases: string[] = [];
   public contributors: string[] = [];
+  public domains: string[] = [];
 
   public readonly supportsAttackID = true;
   protected get attackIDValidator() {
@@ -37,6 +39,10 @@ export class Group extends StixObject {
     rep.stix.name = this.name.trim();
     rep.stix.aliases = this.aliases.map(x => x.trim());
     rep.stix.x_mitre_contributors = this.contributors.map(x => x.trim());
+    rep.stix.x_mitre_domains = this.domains;
+
+    // Strip properties that are empty strs + lists
+    rep.stix = this.filterObject(rep.stix);
 
     return rep;
   }
@@ -86,6 +92,12 @@ export class Group extends StixObject {
             ')'
           );
       } else this.contributors = [];
+
+      if ('x_mitre_domains' in sdo) {
+        if (this.isStringArray(sdo.x_mitre_domains))
+          this.domains = sdo.x_mitre_domains;
+        else logger.error('TypeError: domains field is not a string array.');
+      } else this.domains = [];
     }
   }
 
@@ -95,9 +107,10 @@ export class Group extends StixObject {
    * @returns {Observable<ValidationData>} the validation warnings and errors once validation is complete.
    */
   public validate(
-    restAPIService: RestApiConnectorService
+    restAPIService: RestApiConnectorService,
+    tempWorkflowState?: WorkflowStatusType
   ): Observable<ValidationData> {
-    return this.base_validate(restAPIService);
+    return this.base_validate(restAPIService, tempWorkflowState);
   }
 
   /**
@@ -106,8 +119,6 @@ export class Group extends StixObject {
    * @returns {Observable} of the post
    */
   public save(restAPIService: RestApiConnectorService): Observable<Group> {
-    // update first index of aliases field to group name
-    this.aliases[0] = this.name;
     const postObservable = restAPIService.postGroup(this);
     const subscription = postObservable.subscribe({
       next: result => {
@@ -150,5 +161,23 @@ export class Group extends StixObject {
       },
     });
     return putObservable;
+  }
+
+  /**
+   * Revoke the STIX object in the database.
+   * @param restAPIService [RestApiConnectorService] the service to perform the revoke through
+   * @param revokingObject the revoking object payload
+   * @returns {Observable} of the revoke
+   */
+  public revoke(
+    restAPIService: RestApiConnectorService,
+    revokingObject: { revoking: { stixId: string; modified: string } },
+    preserveRelationships = false
+  ): Observable<object> {
+    return restAPIService.revokeGroup(
+      this.stixID,
+      revokingObject,
+      preserveRelationships
+    );
   }
 }

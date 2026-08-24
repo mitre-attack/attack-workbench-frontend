@@ -1,4 +1,7 @@
+import { NO_ERRORS_SCHEMA } from '@angular/core';
 import { ComponentFixture, TestBed, waitForAsync } from '@angular/core/testing';
+import { provideHttpClient } from '@angular/common/http';
+import { provideRouter } from '@angular/router';
 
 import { LandingPageComponent } from './landing-page.component';
 
@@ -9,6 +12,8 @@ describe('LandingPageComponent', () => {
   beforeEach(waitForAsync(() => {
     TestBed.configureTestingModule({
       declarations: [LandingPageComponent],
+      providers: [provideHttpClient(), provideRouter([])],
+      schemas: [NO_ERRORS_SCHEMA],
     }).compileComponents();
   }));
 

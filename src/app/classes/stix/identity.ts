@@ -1,13 +1,15 @@
-import { Observable, of } from 'rxjs';
+import { Observable } from 'rxjs';
 import { RestApiConnectorService } from 'src/app/services/connectors/rest-api/rest-api-connector.service';
+import { logger } from '../../utils/logger';
 import { ValidationData } from '../serializable';
 import { StixObject } from './stix-object';
-import { logger } from '../../utils/logger';
+import { WorkflowStatusType } from 'src/app/utils/types';
 
 export class Identity extends StixObject {
   public name: string; // identity name
   public identity_class: string; // type of entity this identity describes
-  public roles?: string[]; // list of roles this identity performs
+  public roles: string[] = []; // list of roles this identity performs
+  public sectors: string[] = []; // list of sectors this identity belongs to
   public contact?: string; // contact information for this identity
 
   public readonly supportsAttackID = false; // Identity does not support ATT&CK IDs
@@ -15,11 +17,15 @@ export class Identity extends StixObject {
     return null;
   } // identities do not have an ATT&CK ID
 
+  // override StixObject excludedFields
+  protected excludedFields = ['x_mitre_version'];
+
   constructor(sdo?: any) {
     super(sdo, 'identity');
     if (sdo) {
       this.deserialize(sdo);
     }
+    this.workflow = undefined;
   }
 
   /**
@@ -33,7 +39,11 @@ export class Identity extends StixObject {
     rep.stix.name = this.name;
     rep.stix.identity_class = this.identity_class;
     if (this.roles) rep.stix.roles = this.roles;
+    if (this.sectors?.length) rep.stix.sectors = this.sectors;
     if (this.contact) rep.stix.contact_information = this.contact;
+
+    // Strip properties that are empty strs + lists
+    rep.stix = this.filterObject(rep.stix);
 
     return rep;
   }
@@ -75,6 +85,15 @@ export class Identity extends StixObject {
       if ('roles' in sdo) {
         if (this.isStringArray(sdo.roles)) this.roles = sdo.roles;
         else logger.error('TypeError: roles field is not a string array.');
+      } else {
+        this.roles = [];
+      }
+
+      if ('sectors' in sdo) {
+        if (this.isStringArray(sdo.sectors)) this.sectors = sdo.sectors;
+        else logger.error('TypeError: sectors field is not a string array.');
+      } else {
+        this.sectors = [];
       }
 
       if ('contact_information' in sdo) {
@@ -98,8 +117,10 @@ export class Identity extends StixObject {
    * @returns {Observable<ValidationData>} the validation warnings and errors once validation is complete.
    */
   public validate(
-    restAPIService: RestApiConnectorService
+    restAPIService: RestApiConnectorService,
+    _tempWorkflowState?: WorkflowStatusType
   ): Observable<ValidationData> {
+    void _tempWorkflowState;
     return this.base_validate(restAPIService);
   }
 
@@ -122,9 +143,14 @@ export class Identity extends StixObject {
     return postObservable;
   }
 
-  public delete(_restAPIService: RestApiConnectorService): Observable<object> {
-    // deletion is not supported on Identity objects
-    return of({});
+  public delete(restAPIService: RestApiConnectorService): Observable<object> {
+    const deleteObservable = restAPIService.deleteIdentity(this.stixID);
+    const subscription = deleteObservable.subscribe({
+      complete: () => {
+        subscription.unsubscribe();
+      },
+    });
+    return deleteObservable;
   }
 
   /**

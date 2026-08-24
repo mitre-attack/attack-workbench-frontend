@@ -1,4 +1,4 @@
-<div class="group-view view-page grid spacing-16">
+<div class="group-view view-page">
   <div class="row">
     <div class="col">
       <app-name-property
@@ -6,79 +6,121 @@
           mode: config.mode,
           object: config.object,
         }"></app-name-property>
-      <app-subheading
-        [config]="config"
-        (onOpenHistory)="openHistory()"
-        (onOpenNotes)="openNotes()"></app-subheading>
+      <app-subheading [config]="config"></app-subheading>
     </div>
   </div>
-  <div class="row">
-    <div class="col">
-      <!-- ATT&CK ID -->
-      <app-attackid-property
-        class="grow-to-row"
-        [config]="{
-          mode: config.mode,
-          object: config.object,
-        }"></app-attackid-property>
+
+  <app-stix-page-tabs
+    [config]="config"
+    [detailsTemplate]="detailsTpl"
+    [customTabs]="[
+      { label: 'Techniques', template: techniqueTpl },
+      { label: 'Campaigns', template: campaignTpl },
+      { label: 'Software', template: softwareTpl },
+    ]">
+  </app-stix-page-tabs>
+
+  <ng-template #detailsTpl>
+    <div class="grid spacing-16">
+      <div class="row">
+        <div class="col">
+          <!-- ATT&CK ID -->
+          <app-attackid-property
+            class="grow-to-row"
+            [config]="{
+              mode: config.mode,
+              object: config.object,
+            }"></app-attackid-property>
+        </div>
+        <div class="col">
+          <!-- VERSION NUMBER -->
+          <app-version-property
+            class="grow-to-row"
+            [config]="{
+              mode: config.mode,
+              object: config.object,
+            }"></app-version-property>
+        </div>
+      </div>
+      <div class="row">
+        <div class="col">
+          <!-- DOMAINS -->
+          <app-list-property
+            class="grow-to-row"
+            [config]="{
+              mode: config.mode,
+              object: config.object,
+              field: 'domains',
+              editType: 'select',
+            }"></app-list-property>
+        </div>
+      </div>
+      <div class="row">
+        <div class="col">
+          <!-- CONTRIBUTORS -->
+          <app-list-property
+            class="grow-to-row"
+            [config]="{
+              mode: config.mode,
+              object: config.object,
+              field: 'contributors',
+              editType: 'any',
+            }"></app-list-property>
+        </div>
+        <div class="col">
+          <!-- GROUP ALIASES -->
+          <app-alias-property
+            class="grow-to-row"
+            [config]="{
+              mode: config.mode,
+              object: config.object,
+              field: 'aliases',
+              referencesField: 'external_references',
+              label: 'Associated Groups',
+            }"></app-alias-property>
+        </div>
+      </div>
+      <div class="row">
+        <div class="col">
+          <!-- DESCRIPTION -->
+          <app-descriptive-property
+            [config]="{
+              mode: config.mode,
+              object: config.object,
+              field: 'description',
+              firstParagraphOnly: false,
+              referencesField: 'external_references',
+              label: 'Description',
+            }"></app-descriptive-property>
+        </div>
+      </div>
+
+      <!-- EXTERNAL REFERENCES -->
+      <div
+        *ngIf="
+          group.external_references.list().length > 0 ||
+          previous?.external_references.list().length > 0
+        ">
+        <div class="row">
+          <div class="col">
+            <h2 class="section-header">References</h2>
+          </div>
+        </div>
+        <div class="row">
+          <div class="col">
+            <app-external-references-property
+              [config]="{
+                mode: config.mode,
+                object: config.object,
+                referencesField: 'external_references',
+              }"></app-external-references-property>
+          </div>
+        </div>
+      </div>
     </div>
-    <div class="col">
-      <!-- VERSION NUMBER -->
-      <app-version-property
-        class="grow-to-row"
-        [config]="{
-          mode: config.mode,
-          object: config.object,
-        }"></app-version-property>
-    </div>
-  </div>
-  <div class="row">
-    <div class="col">
-      <!-- CONTRIBUTORS -->
-      <app-list-property
-        class="grow-to-row"
-        [config]="{
-          mode: config.mode,
-          object: config.object,
-          field: 'contributors',
-          editType: 'any',
-        }"></app-list-property>
-    </div>
-    <div class="col">
-      <!-- GROUP ALIASES -->
-      <app-alias-property
-        class="grow-to-row"
-        [config]="{
-          mode: config.mode,
-          object: config.object,
-          field: 'aliases',
-          referencesField: 'external_references',
-          label: 'Associated Groups',
-        }"></app-alias-property>
-    </div>
-  </div>
-  <div class="row">
-    <div class="col">
-      <!-- DESCRIPTION -->
-      <app-descriptive-property
-        [config]="{
-          mode: config.mode,
-          object: config.object,
-          field: 'description',
-          firstParagraphOnly: false,
-          referencesField: 'external_references',
-          label: 'Description',
-        }"></app-descriptive-property>
-    </div>
-  </div>
-  <!-- RELATIONSHIPS - NOTE: these are only shown in 'view' mode -->
-  <div
-    *ngIf="
-      (config.showRelationships ||
-        !config.hasOwnProperty('showRelationships')) &&
-      !editing
-    ">
-    <!-- campaign relationships -->
+  </ng-template>
+
+  <ng-template #campaignTpl>
     <div class="row">
       <div class="col">
         <h2 class="section-header">Campaigns</h2>
@@ -101,15 +143,19 @@
           #campaignList
           [config]="{
             type: 'relationship',
+            relationshipCreatedBefore: config.relationshipCreatedBefore,
+            relationshipAddedAfter: config.relationshipAddedAfter,
             targetRef: group.stixID,
             sourceType: 'campaign',
             relationshipType: 'attributed-to',
             clickBehavior: 'dialog',
-            allowEdits: true,
+            allowEdits: canEdit,
           }"></app-stix-list>
       </div>
     </div>
-    <!-- technique relationships -->
+  </ng-template>
+
+  <ng-template #techniqueTpl>
     <div class="row">
       <div class="col">
         <h2 class="section-header">Techniques Used</h2>
@@ -133,16 +179,19 @@
           #techniqueList
           [config]="{
             type: 'relationship',
+            relationshipCreatedBefore: config.relationshipCreatedBefore,
+            relationshipAddedAfter: config.relationshipAddedAfter,
             sourceRef: group.stixID,
             targetType: 'technique',
             relationshipType: 'uses',
             clickBehavior: 'dialog',
-            allowEdits: true,
+            allowEdits: canEdit,
           }"></app-stix-list>
       </div>
     </div>
+  </ng-template>
 
-    <!-- software relationships -->
+  <ng-template #softwareTpl>
     <div class="row">
       <div class="col">
         <h2 class="section-header">Software Used</h2>
@@ -166,35 +215,15 @@
           #softwareList
           [config]="{
             type: 'relationship',
+            relationshipCreatedBefore: config.relationshipCreatedBefore,
+            relationshipAddedAfter: config.relationshipAddedAfter,
             sourceRef: group.stixID,
             targetType: 'software',
             relationshipType: 'uses',
             clickBehavior: 'dialog',
-            allowEdits: true,
+            allowEdits: canEdit,
           }"></app-stix-list>
       </div>
     </div>
-  </div>
-  <!-- EXTERNAL REFERENCES -->
-  <div
-    *ngIf="
-      group.external_references.list().length > 0 ||
-      previous?.external_references.list().length > 0
-    ">
-    <div class="row">
-      <div class="col">
-        <h2 class="section-header">References</h2>
-      </div>
-    </div>
-    <div class="row">
-      <div class="col">
-        <app-external-references-property
-          [config]="{
-            mode: config.mode,
-            object: config.object,
-            referencesField: 'external_references',
-          }"></app-external-references-property>
-      </div>
-    </div>
-  </div>
+  </ng-template>
 </div>

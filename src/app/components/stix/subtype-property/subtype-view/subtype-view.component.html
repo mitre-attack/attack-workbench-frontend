@@ -5,7 +5,7 @@
       *ngIf="detailTable.length"
       mat-table
       [dataSource]="detailTable"
-      class="subtype-table">
+      class="property-table">
       <ng-container
         [matColumnDef]="column.label ? column.label : column.name"
         *ngFor="let column of subtypeFields">

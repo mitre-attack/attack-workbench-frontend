@@ -1,0 +1,52 @@
+@use '../../../../style/globals';
+
+.data-quality-subheader {
+  @extend .text-label;
+  @extend .text-deemphasis;
+  text-align: center;
+  text-transform: uppercase;
+  margin-bottom: 20px;
+}
+
+.dq-accordion {
+  .mat-expansion-panel-header-title {
+    font-family: Roboto, Arial, sans-serif;
+    font-weight: 500;
+    font-size: 1.2rem; /* larger header text */
+    line-height: 1.3;
+  }
+  .dq-rel-table {
+    width: 100%;
+  }
+  .dq-actions {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin: 8px 0 16px;
+  }
+  .dq-note {
+    font-size: 0.9rem;
+    opacity: 0.8;
+  }
+}
+
+.missing-list {
+  .missing-id {
+    font-family: Roboto, Arial, sans-serif;
+    font-size: 1rem;
+    word-break: break-all;
+  }
+  .missing-item {
+    padding: 8px 0;
+    border-bottom: 1px solid #eee;
+  }
+  .missing-rel-header {
+    font-weight: 600;
+    font-size: 1.05rem;
+  }
+  .missing-rel-description,
+  .missing-description {
+    margin-top: 4px;
+    font-size: 0.95rem;
+  }
+}

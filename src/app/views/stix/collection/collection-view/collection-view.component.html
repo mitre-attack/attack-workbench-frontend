@@ -11,11 +11,7 @@
               object: config.object,
             }"></app-name-property>
           <!-- SUBHEADING -->
-          <app-subheading
-            *ngIf="!editing"
-            [config]="config"
-            (onOpenHistory)="openHistory()"
-            (onOpenNotes)="openNotes()"></app-subheading>
+          <app-subheading *ngIf="!editing" [config]="config"></app-subheading>
         </div>
       </div>
       <div class="row width-limited">

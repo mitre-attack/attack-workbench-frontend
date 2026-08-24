@@ -54,7 +54,7 @@ $dark-theme: mat.m2-define-dark-theme(
   (
     color: (
       primary: mat.m2-define-palette(
-          colors.to-material-map(primary),
+          colors.to-material-map(primary-dark),
           50,
           100,
           200
@@ -185,24 +185,62 @@ $tooltip-color: colors.color-alternate(dark, 4);
     // tooltip styling
     background: $tooltip-color;
   }
+  .mat-mdc-menu-panel.account-menu {
+    min-width: 180px;
+
+    .mat-mdc-menu-item {
+      padding: 0 18px;
+
+      .mat-icon {
+        color: currentColor;
+      }
+    }
+
+    .mat-mdc-menu-item.logout-menu-item {
+      color: colors.color(error);
+
+      .mat-icon {
+        color: colors.color(error);
+      }
+    }
+  }
   &.dark .mat-mdc-menu-panel {
     background: colors.color(dark);
     color: colors.on-color(dark);
+
     .mat-mdc-menu-item:hover {
       background: colors.color-alternate(dark);
     }
+
     .mat-mdc-menu-item:disabled {
       color: colors.on-color-deemphasis(dark);
+    }
+  }
+  &.dark .mat-mdc-menu-panel.account-menu {
+    border: 1px solid rgba(colors.on-color(dark), 0.14);
+    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.45);
+
+    .mat-mdc-menu-item.logout-menu-item:hover {
+      background: rgba(colors.color(error), 0.14);
     }
   }
   &.light .mat-mdc-menu-panel {
     background: colors.color(light);
     color: colors.on-color(light);
+
     .mat-mdc-menu-item:hover {
       background: colors.color-alternate(light);
     }
+
     .mat-mdc-menu-item:disabled {
       color: colors.on-color-deemphasis(light);
+    }
+  }
+  &.light .mat-mdc-menu-panel.account-menu {
+    border: 1px solid rgba(colors.on-color(light), 0.1);
+
+    .mat-mdc-menu-item.logout-menu-item:hover {
+      background: rgba(colors.color(error), 0.08);
     }
   }
   &.dark .mat-mdc-dialog-surface {
@@ -430,12 +468,12 @@ button.mat-mdc-outlined-button:disabled {
   }
 }
 
-.mat-mdc-card .mat-mdc-card-header {
+.mat-mdc-card .mat-mdc-card-actions {
   .light & {
-    background: colors.color-alternate(light);
+    border-top: 1px solid colors.color-alternate(light);
   }
   .dark & {
-    background: colors.color-alternate(dark);
+    border-top: 1px solid colors.color-alternate(dark);
   }
 }
 

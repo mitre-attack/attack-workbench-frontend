@@ -26,6 +26,10 @@ $colors: (
     color: $mitre-navy,
     on-color: $mitre-silver,
   ),
+  primary-dark: (
+    color: $mitre-blue,
+    on-color: $mitre-silver,
+  ),
   secondary: (
     color: $mitre-blue,
     on-color: $mitre-black,
@@ -64,6 +68,10 @@ $colors: (
   ),
   mitre-dark-gray: (
     color: $mitre-dark-gray,
+    on-color: $mitre-black,
+  ),
+  mitre-light-blue: (
+    color: $mitre-light-blue,
     on-color: $mitre-black,
   ),
   // snackbar colors
@@ -136,6 +144,40 @@ $colors: (
 @function border-color($name) {
   @return color.mix(color($name), on-color($name), 80%);
   // @return rgba(invert(color($name)), 0.125);
+}
+
+@mixin theme-property($property, $dark-value, $light-value) {
+  .dark & {
+    #{$property}: $dark-value;
+  }
+
+  .light & {
+    #{$property}: $light-value;
+  }
+}
+
+@mixin theme-border-color {
+  @include theme-property(
+    border-color,
+    border-color(dark),
+    border-color(light)
+  );
+}
+
+@mixin theme-text-emphasis {
+  @include theme-property(
+    color,
+    on-color-emphasis(dark),
+    on-color-emphasis(light)
+  );
+}
+
+@mixin theme-text-deemphasis {
+  @include theme-property(
+    color,
+    on-color-deemphasis(dark),
+    on-color-deemphasis(light)
+  );
 }
 
 // escape the color. Note param is a color and not a color name: this is not an accessor to the color map above.

@@ -1,10 +1,11 @@
 import { forkJoin, Observable, of } from 'rxjs';
 import { concatMap, map, shareReplay, switchMap } from 'rxjs/operators';
 import { RestApiConnectorService } from 'src/app/services/connectors/rest-api/rest-api-connector.service';
-import { ValidationData } from '../serializable';
-import { StixObject } from './stix-object';
 import { logger } from '../../utils/logger';
+import { ValidationData } from '../serializable';
 import { Relationship } from './relationship';
+import { StixObject } from './stix-object';
+import { WorkflowStatusType } from 'src/app/utils/types';
 
 export class Technique extends StixObject {
   public name = '';
@@ -243,6 +244,10 @@ export class Technique extends StixObject {
         }
       }
     }
+
+    // Strip properties that are empty strs + lists
+    rep.stix = this.filterObject(rep.stix);
+
     return rep;
   }
 
@@ -447,9 +452,10 @@ export class Technique extends StixObject {
    * @returns {Observable<ValidationData>} the validation warnings and errors once validation is complete.
    */
   public validate(
-    restAPIService: RestApiConnectorService
+    restAPIService: RestApiConnectorService,
+    tempWorkflowState?: WorkflowStatusType
   ): Observable<ValidationData> {
-    return this.base_validate(restAPIService).pipe(
+    return this.base_validate(restAPIService, tempWorkflowState).pipe(
       map(result => {
         // validate technique has at least one tactic
         if (this.attackID && this.tactics.length == 0) {
@@ -773,5 +779,23 @@ export class Technique extends StixObject {
       },
     });
     return putObservable;
+  }
+
+  /**
+   * Revoke the STIX object in the database.
+   * @param restAPIService [RestApiConnectorService] the service to perform the revoke through
+   * @param revokingObject the revoking object payload
+   * @returns {Observable} of the revoke
+   */
+  public revoke(
+    restAPIService: RestApiConnectorService,
+    revokingObject: { revoking: { stixId: string; modified: string } },
+    preserveRelationships = false
+  ): Observable<object> {
+    return restAPIService.revokeTechnique(
+      this.stixID,
+      revokingObject,
+      preserveRelationships
+    );
   }
 }

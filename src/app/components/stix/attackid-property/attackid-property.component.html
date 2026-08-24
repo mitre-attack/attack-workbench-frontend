@@ -1,32 +1,37 @@
 <div class="attackid-property grow-to-row">
-  <div
-    *ngIf="!config.mode || config.mode === 'view'"
-    class="labelled-box grow-to-row">
-    <div
-      class="content"
-      [ngClass]="{ 'icon-button': config.object['attackID'] }">
-      <app-attackid-view [config]="config"></app-attackid-view>
-      <button
-        mat-icon-button
-        *ngIf="config.object['attackID']"
-        [cdkCopyToClipboard]="linkById"
-        (click)="
-          snackbar.open('LinkById copied to clipboard', null, {
-            duration: 1000,
-          })
-        "
-        matTooltip="copy LinkById"
-        aria-label="copy linkById">
-        <mat-icon>content_copy</mat-icon>
-      </button>
+  @if (config.mode === 'diff') {
+    <div class="labelled-box grow-to-row">
+      <div class="content">
+        <app-property-diff
+          [before]="previousId"
+          [after]="currentId"></app-property-diff>
+      </div>
+      <span class="labelled-box-label">ATT&CK ID</span>
     </div>
-    <span class="labelled-box-label">ATT&CK ID</span>
-  </div>
-  <app-attackid-edit
-    *ngIf="config.mode === 'edit'"
-    [config]="config"
-    (attackIdGenerated)="onAttackIdGenerated()"></app-attackid-edit>
-  <app-attackid-diff
-    *ngIf="config.mode === 'diff'"
-    [config]="config"></app-attackid-diff>
+  } @else {
+    <div class="labelled-box grow-to-row">
+      <div
+        class="content"
+        [ngClass]="{ 'icon-button': config.object['attackID'] }">
+        {{ config.object['attackID'] }}
+        @if (config.object['attackID']) {
+          <button
+            mat-icon-button
+            [cdkCopyToClipboard]="linkById"
+            (click)="
+              snackbar.open('LinkById copied to clipboard', null, {
+                duration: 1000,
+              })
+            "
+            matTooltip="copy LinkById"
+            aria-label="copy linkById">
+            <mat-icon>content_copy</mat-icon>
+          </button>
+        } @else {
+          <span class="text-deemphasis"> Auto-generated on save. </span>
+        }
+      </div>
+      <span class="labelled-box-label">ATT&CK ID</span>
+    </div>
+  }
 </div>

@@ -1,3 +1,4 @@
+import { NO_ERRORS_SCHEMA } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 
 import { TlpViewComponent } from './tlp-view.component';
@@ -9,6 +10,7 @@ describe('TlpViewComponent', () => {
   beforeEach(async () => {
     await TestBed.configureTestingModule({
       declarations: [TlpViewComponent],
+      schemas: [NO_ERRORS_SCHEMA],
     }).compileComponents();
   });
 

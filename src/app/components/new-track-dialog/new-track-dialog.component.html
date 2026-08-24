@@ -1,0 +1,283 @@
+<div class="new-track-dialog">
+  <h2>
+    {{
+      isVirtual
+        ? 'Create New Virtual Release Track'
+        : 'Create New Release Track'
+    }}
+  </h2>
+
+  <form [formGroup]="form" (ngSubmit)="handleCreate()">
+    <mat-form-field appearance="outline" class="no-hint">
+      <mat-label>Track Name</mat-label>
+      <input
+        matInput
+        id="track-name"
+        formControlName="name"
+        placeholder="e.g., Enterprise CTI" />
+    </mat-form-field>
+
+    <mat-form-field appearance="outline" class="no-hint">
+      <mat-label>Description</mat-label>
+      <textarea
+        matInput
+        id="track-description"
+        formControlName="description"
+        placeholder="A brief description of the track's purpose..."></textarea>
+    </mat-form-field>
+
+    <mat-form-field appearance="outline">
+      <mat-label>Initial snapshot notes</mat-label>
+      <textarea
+        matInput
+        id="snapshot-description"
+        formControlName="snapshotDescription"
+        maxlength="4000"
+        rows="3"
+        placeholder="What should analysts know about this initial snapshot?"></textarea>
+      <mat-hint align="start">
+        Shown only on the initial snapshot in release history
+      </mat-hint>
+      <mat-hint align="end">
+        {{ form.get('snapshotDescription')?.value?.length || 0 }}/4000
+      </mat-hint>
+    </mat-form-field>
+
+    <mat-divider></mat-divider>
+
+    <!-- Standard track -->
+    <div *ngIf="!isVirtual">
+      <div class="section-block">
+        <div>
+          <div class="section-title">Auto-promote Candidates</div>
+          <div class="section-sub">
+            Automatically promote Candidates to "Staged" when they meet the
+            threshold.
+          </div>
+        </div>
+        <mat-slide-toggle formControlName="autoPromote">
+          <span style="margin-left: 8px"> Auto-promote </span>
+        </mat-slide-toggle>
+      </div>
+
+      <div class="section-block">
+        <mat-form-field appearance="outline" class="no-hint">
+          <mat-label>Candidacy Threshold</mat-label>
+          <mat-select formControlName="candidacyThreshold">
+            <mat-option *ngFor="let opt of candidacyOptions" [value]="opt">{{
+              formatOption(opt)
+            }}</mat-option>
+          </mat-select>
+        </mat-form-field>
+      </div>
+
+      <mat-divider style="margin: 24px 0"></mat-divider>
+
+      <mat-form-field class="section-block" appearance="outline">
+        <mat-label>Member Sync Strategy</mat-label>
+        <mat-select formControlName="memberSync">
+          <mat-option *ngFor="let opt of memberSyncOptions" [value]="opt">{{
+            formatOption(opt)
+          }}</mat-option>
+        </mat-select>
+        <mat-hint>
+          Determines if new revisions to existing member objects are
+          automatically added as candidates
+        </mat-hint>
+      </mat-form-field>
+
+      <mat-form-field class="section-block" appearance="outline">
+        <mat-label>Supplant Behavior</mat-label>
+        <mat-select formControlName="supplantBehavior">
+          <mat-option *ngFor="let opt of supplantOptions" [value]="opt">{{
+            formatOption(opt)
+          }}</mat-option>
+        </mat-select>
+        <mat-hint>
+          How to handle a new version of an object that is already staged
+        </mat-hint>
+      </mat-form-field>
+    </div>
+
+    <!-- Virtual track -->
+    <div *ngIf="isVirtual">
+      <div class="section-block stack">
+        <div class="section-title">Component Tracks</div>
+        <div class="section-sub">
+          Standard tracks to include in this virtual release track.
+        </div>
+      </div>
+
+      <div formGroupName="composition" class="composition-structured">
+        <div *ngIf="isLoadingComponentTracks" class="loading-row">
+          <mat-spinner diameter="24"></mat-spinner>
+          <span>Loading component tracks</span>
+        </div>
+
+        <div
+          *ngIf="!isLoadingComponentTracks && !componentTrackOptions.length"
+          class="empty-state">
+          No standard release tracks found.
+        </div>
+
+        <div
+          *ngIf="componentTrackOptions.length"
+          class="component-track-picker">
+          <mat-form-field appearance="outline">
+            <mat-label>Add component track</mat-label>
+            <input
+              matInput
+              type="text"
+              formControlName="componentTrackSearch"
+              [matAutocomplete]="componentTrackAutocomplete"
+              placeholder="Search standard tracks" />
+            <mat-icon matSuffix>arrow_drop_down</mat-icon>
+            <mat-autocomplete
+              #componentTrackAutocomplete="matAutocomplete"
+              [displayWith]="displayComponentTrack"
+              (optionSelected)="selectComponentTrack($event)">
+              <mat-option
+                *ngFor="let track of filteredComponentTrackOptions"
+                [value]="track">
+                <span class="component-track-option-label">
+                  <span class="component-track-option-name">
+                    {{ track.name }}
+                  </span>
+                  <span class="component-track-option-meta">
+                    ({{ getComponentTrackSnapshotLabel(track) }})
+                  </span>
+                </span>
+              </mat-option>
+              <mat-option
+                *ngIf="!filteredComponentTrackOptions.length"
+                disabled>
+                No matching standard tracks
+              </mat-option>
+            </mat-autocomplete>
+            <mat-hint>
+              Select one or more standard tracks to include in this virtual
+              track.
+            </mat-hint>
+          </mat-form-field>
+        </div>
+
+        <div
+          *ngIf="selectedComponentTracks.length"
+          class="selected-component-track-list">
+          <div
+            *ngFor="let track of selectedComponentTracks"
+            class="component-track-option selected">
+            <div class="component-track-selected-header">
+              <div>
+                <div class="component-track-name">{{ track.name }}</div>
+                <div class="component-track-meta">
+                  {{ getComponentTrackSnapshotLabel(track) }}
+                </div>
+              </div>
+              <button
+                mat-icon-button
+                type="button"
+                aria-label="Remove component track"
+                (click)="removeComponentTrack(track)">
+                <mat-icon>close</mat-icon>
+              </button>
+            </div>
+
+            <p *ngIf="track.description" class="component-track-description">
+              {{ track.description }}
+            </p>
+
+            <mat-form-field
+              *ngIf="track.selected"
+              appearance="outline"
+              class="object-type-filter">
+              <mat-label>Object type filter</mat-label>
+              <mat-select multiple [(value)]="track.objectTypes">
+                <mat-option
+                  *ngFor="let opt of objectTypeOptions"
+                  [value]="opt.value">
+                  {{ opt.label }}
+                </mat-option>
+              </mat-select>
+              <mat-hint>Leave empty to include all object types</mat-hint>
+            </mat-form-field>
+
+            <mat-form-field
+              *ngIf="track.selected"
+              appearance="outline"
+              class="object-type-filter">
+              <mat-label>Domain filter</mat-label>
+              <mat-select multiple [(value)]="track.domains">
+                <mat-option
+                  *ngFor="let domain of domainOptions"
+                  [value]="domain">
+                  {{ domain }}
+                </mat-option>
+              </mat-select>
+              <mat-hint>Leave empty to include all domains</mat-hint>
+            </mat-form-field>
+          </div>
+        </div>
+
+        <mat-divider style="margin: 24px 0 16px"></mat-divider>
+
+        <div class="section-block stack">
+          <div class="section-title">Object Deduplication</div>
+          <mat-form-field appearance="outline">
+            <mat-label>Strategy</mat-label>
+            <mat-select formControlName="deduplicationStrategy">
+              <mat-option
+                *ngFor="let opt of deduplicationOptions"
+                [value]="opt"
+                >{{ formatOption(opt) }}</mat-option
+              >
+            </mat-select>
+          </mat-form-field>
+        </div>
+      </div>
+
+      <mat-divider style="margin: 12px 0"></mat-divider>
+
+      <div class="section-block stack">
+        <div class="section-title">Snapshot Schedule</div>
+        <div class="section-sub">
+          Configure automatic snapshot scheduling for this virtual track
+        </div>
+      </div>
+
+      <div formGroupName="snapshotSchedule" class="snapshot-schedule">
+        <mat-form-field appearance="outline">
+          <mat-label>Mode</mat-label>
+          <mat-select formControlName="mode">
+            <mat-option *ngFor="let opt of snapshotModeOptions" [value]="opt">{{
+              formatOption(opt)
+            }}</mat-option>
+          </mat-select>
+          <mat-hint>Select mode for snapshot scheduling</mat-hint>
+        </mat-form-field>
+
+        <mat-form-field
+          appearance="outline"
+          *ngIf="form.get('snapshotSchedule.mode')?.value === 'cron'">
+          <mat-label>Cron Expression</mat-label>
+          <input
+            matInput
+            formControlName="cron"
+            placeholder="e.g., 0 0 1 1,7 *" />
+          <mat-hint>Cron expression (UTC) used when mode is 'cron'</mat-hint>
+        </mat-form-field>
+      </div>
+    </div>
+  </form>
+
+  <mat-dialog-actions align="end">
+    <button mat-button (click)="closeDialog()">cancel</button>
+    <button
+      mat-stroked-button
+      class="success"
+      [disabled]="!isFormValid()"
+      (click)="handleCreate()">
+      create
+    </button>
+  </mat-dialog-actions>
+</div>

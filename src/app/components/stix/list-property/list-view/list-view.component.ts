@@ -1,7 +1,7 @@
 import { Component, Input, ViewEncapsulation } from '@angular/core';
 import { ListPropertyConfig } from '../list-property.component';
 import { StixTypeToAttackType } from 'src/app/utils/type-mappings';
-import { RelatedRef } from 'src/app/classes/stix/stix-object';
+import { EmbeddedRelationship } from 'src/app/classes/stix/stix-object';
 
 @Component({
   selector: 'app-list-view',
@@ -32,9 +32,10 @@ export class ListViewComponent {
   }
 
   public get values() {
-    if (this.config.field == 'aliases')
-      return this.config.object[this.config.field].slice(1); // filter out the first alias
-    const arr = this.config.object[this.config.field];
+    const value = this.config.object[this.config.field];
+    if (!Array.isArray(value)) return [];
+    if (this.config.field == 'aliases') return value.slice(1); // filter out the first alias
+    const arr = [...value];
     arr.sort((a, b) => {
       const aVal =
         this.config.objectProperty && typeof a === 'object'
@@ -49,7 +50,7 @@ export class ListViewComponent {
     return arr;
   }
 
-  public getHTML(val: string | RelatedRef) {
+  public getHTML(val: string | EmbeddedRelationship) {
     if (this.config.objectProperty && typeof val === 'object') {
       if (this.showLink) {
         return `<a class="external-link" href="${this.internalLink(val)}" rel="nofollow noopener">${val[this.config.objectProperty]}</a>`;
@@ -59,8 +60,9 @@ export class ListViewComponent {
     return val;
   }
 
-  public internalLink(item: RelatedRef): string {
-    const attackType = StixTypeToAttackType[item.type];
+  public internalLink(item: EmbeddedRelationship): string {
+    const stixType = item.stixId.split('--')?.[0];
+    const attackType = StixTypeToAttackType[stixType];
     return `/${attackType}/${item.stixId}`;
   }
 }

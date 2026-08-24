@@ -185,14 +185,14 @@
               *ngIf="config.select && config.select === 'many'"
               color="primary"
               (click)="onSelect.emit(element); $event.stopPropagation()"
-              (change)="$event ? selection.toggle(element.stixID) : null"
+              (change)="$event ? toggleSelection(element) : null"
               [checked]="selection.isSelected(element.stixID)">
             </mat-checkbox>
             <mat-radio-button
               *ngIf="config.select && config.select === 'one'"
               color="primary"
               (click)="onSelect.emit(element); $event.stopPropagation()"
-              (change)="$event ? selection.toggle(element.stixID) : null"
+              (change)="$event ? toggleSelection(element) : null"
               [checked]="selection.isSelected(element.stixID)">
             </mat-radio-button>
           </td>
@@ -266,119 +266,84 @@
             <div
               class="element-detail"
               @detailExpand
-              *ngIf="expandedElement === element">
+              *ngIf="isCollectionType() && expandedElement === element">
               <div class="element-description columns">
                 <div
-                  class="column controls"
-                  [ngClass]="
-                    !config.type.includes('collection-')
-                      ? 'is-narrow'
-                      : 'collection-table'
-                  "
+                  class="column controls collection-table"
                   *ngIf="config.showLinks">
-                  <span *ngIf="!config.type.includes('collection-')">
-                    <div
-                      *ngFor="
-                        let route of getAccessibleRoutes(
-                          element.attackType,
-                          element.routes
-                        )
-                      ">
-                      <button
-                        class="detail-button"
-                        mat-button
-                        (click)="
-                          routeTo(
-                            '/' +
-                              [
-                                element.attackType,
-                                element.stixID,
-                                route.route,
-                              ].join('/'),
-                            route.query
-                          )
-                        ">
-                        {{ route.label }}
-                      </button>
-                    </div>
-                  </span>
-                  <span *ngIf="config.type.includes('collection-')">
-                    <mat-table
-                      mat-table
-                      multiTemplateDataRows
-                      [dataSource]="config.collectionMap.get(element.stixID)">
-                      <ng-container matColumnDef="action">
-                        <mat-header-cell *matHeaderCellDef></mat-header-cell>
-                        <mat-cell *matCellDef="let collection">
-                          <div
-                            *ngFor="
-                              let route of getAccessibleRoutes(
-                                collection.attackType,
-                                collection.routes
+                  <mat-table
+                    mat-table
+                    multiTemplateDataRows
+                    [dataSource]="config.collectionMap.get(element.stixID)">
+                    <ng-container matColumnDef="action">
+                      <mat-header-cell *matHeaderCellDef></mat-header-cell>
+                      <mat-cell *matCellDef="let collection">
+                        <div
+                          *ngFor="
+                            let route of getAccessibleCollectionRoutes(
+                              collection
+                            )
+                          ">
+                          <button
+                            class="detail-button"
+                            mat-button
+                            (click)="
+                              routeTo(
+                                '/' +
+                                  [
+                                    collection.attackType,
+                                    collection.stixID,
+                                    route.route,
+                                  ].join('/'),
+                                route.query
                               )
                             ">
-                            <button
-                              class="detail-button"
-                              mat-button
-                              (click)="
-                                routeTo(
-                                  '/' +
-                                    [
-                                      collection.attackType,
-                                      collection.stixID,
-                                      route.route,
-                                    ].join('/'),
-                                  route.query
-                                )
-                              ">
-                              {{ route.label }}
-                            </button>
-                          </div>
-                        </mat-cell>
-                      </ng-container>
+                            {{ route.label }}
+                          </button>
+                        </div>
+                      </mat-cell>
+                    </ng-container>
 
-                      <ng-container matColumnDef="version">
-                        <mat-header-cell *matHeaderCellDef
-                          >Version</mat-header-cell
-                        >
-                        <mat-cell *matCellDef="let collection">{{
-                          collection.version
-                        }}</mat-cell>
-                      </ng-container>
+                    <ng-container matColumnDef="version">
+                      <mat-header-cell *matHeaderCellDef
+                        >Version</mat-header-cell
+                      >
+                      <mat-cell *matCellDef="let collection">{{
+                        collection.version
+                      }}</mat-cell>
+                    </ng-container>
 
-                      <ng-container matColumnDef="released">
-                        <mat-header-cell *matHeaderCellDef
-                          >Released</mat-header-cell
-                        >
-                        <mat-cell *matCellDef="let collection">{{
-                          collection.release
-                        }}</mat-cell>
-                      </ng-container>
+                    <ng-container matColumnDef="released">
+                      <mat-header-cell *matHeaderCellDef
+                        >Released</mat-header-cell
+                      >
+                      <mat-cell *matCellDef="let collection">{{
+                        collection.release
+                      }}</mat-cell>
+                    </ng-container>
 
-                      <ng-container matColumnDef="description">
-                        <mat-header-cell *matHeaderCellDef
-                          >Description</mat-header-cell
-                        >
-                        <mat-cell
-                          *matCellDef="let collection; let i = dataIndex">
-                          <span *ngIf="i == 0">{{
-                            collection.description
-                          }}</span>
-                        </mat-cell>
-                      </ng-container>
+                    <ng-container matColumnDef="description">
+                      <mat-header-cell *matHeaderCellDef
+                        >Description</mat-header-cell
+                      >
+                      <mat-cell *matCellDef="let collection; let i = dataIndex">
+                        <span *ngIf="i === 0">{{
+                          collection.description
+                        }}</span>
+                      </mat-cell>
+                    </ng-container>
 
-                      <mat-header-row
-                        *matHeaderRowDef="
-                          collectionColumnsToDisplay;
-                          sticky: true
-                        "></mat-header-row>
-                      <mat-row
-                        *matRowDef="
-                          let row;
-                          columns: collectionColumnsToDisplay
-                        "></mat-row>
-                    </mat-table>
-                  </span>
+                    <mat-header-row
+                      *matHeaderRowDef="
+                        collectionColumnsToDisplay;
+                        sticky: true
+                      "></mat-header-row>
+                    <mat-row
+                      *matRowDef="
+                        let row;
+                        columns: collectionColumnsToDisplay
+                      "></mat-row>
+                  </mat-table>
                 </div>
                 <div
                   class="column description"
@@ -404,7 +369,11 @@
           mat-row
           *matRowDef="let element; columns: tableColumns_controls"
           class="element-row"
-          [class.expanded]="expandedElement === element"></tr>
+          [class.relationship-added]="isNewRelationship(element)"
+          [class.relationship-changed]="isChangedRelationship(element)"
+          [class.expanded]="
+            isCollectionType() && expandedElement === element
+          "></tr>
         <tr
           mat-row
           *matRowDef="let row; columns: ['expandedDetail']"

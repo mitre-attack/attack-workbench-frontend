@@ -15,7 +15,6 @@ import { MatPaginator } from '@angular/material/paginator';
 import { SelectionModel } from '@angular/cdk/collections';
 import { MatDialog } from '@angular/material/dialog';
 import { Router } from '@angular/router';
-
 import { fromEvent, Observable, of, Subscription } from 'rxjs';
 import {
   debounceTime,
@@ -23,16 +22,16 @@ import {
   filter,
   tap,
 } from 'rxjs/operators';
-
-import { RelatedRef, StixObject } from 'src/app/classes/stix/stix-object';
+import {
+  EmbeddedRelationship,
+  StixObject,
+} from 'src/app/classes/stix/stix-object';
 import { StixDialogComponent } from 'src/app/views/stix/stix-dialog/stix-dialog.component';
 import {
   Paginated,
   RestApiConnectorService,
 } from 'src/app/services/connectors/rest-api/rest-api-connector.service';
 import { AuthenticationService } from 'src/app/services/connectors/authentication/authentication.service';
-import { SidebarService } from 'src/app/services/sidebar/sidebar.service';
-import { MatSelect } from '@angular/material/select';
 import { AddDialogComponent } from '../../add-dialog/add-dialog.component';
 import { Collection } from 'src/app/classes/stix/collection';
 import { logger } from 'src/app/utils/logger';
@@ -81,19 +80,14 @@ export class StixListComponent implements OnInit, AfterViewInit, OnDestroy {
 
   @ViewChild(MatPaginator) paginator: MatPaginator;
   @ViewChild('search') search: ElementRef;
-  @ViewChild(MatSelect) matSelect: MatSelect;
 
   // search query
   public searchQuery = '';
   private searchSubscription: Subscription;
 
   // objects to render
-  public objects$: Observable<StixObject[]>;
   public data$: Observable<Paginated<StixObject>>;
   public totalObjectCount = 0;
-
-  // view mode
-  public mode = 'cards';
 
   // options provided to the user for grouping and filtering
   public filterOptions: FilterGroup[] = [];
@@ -101,7 +95,6 @@ export class StixListComponent implements OnInit, AfterViewInit, OnDestroy {
 
   // current grouping and filtering selections
   public filter: string[] = [];
-  public groupBy: string[] = [];
   public userIdsUsedInSearch = [];
 
   // TABLE STUFF
@@ -116,7 +109,7 @@ export class StixListComponent implements OnInit, AfterViewInit, OnDestroy {
   // Selection stuff
   public selection: SelectionModel<string>;
 
-  // all possible each type of filter/groupBy
+  // all possible each type of filter
   private platformSubscription: Subscription;
   private platformMap = new Map<string, Map<string, string[]>>();
   private domains: FilterValue[] = [
@@ -167,8 +160,7 @@ export class StixListComponent implements OnInit, AfterViewInit, OnDestroy {
     public dialog: MatDialog,
     private restAPIConnectorService: RestApiConnectorService,
     private router: Router,
-    private authenticationService: AuthenticationService,
-    private sidebarService: SidebarService
+    private authenticationService: AuthenticationService
   ) {}
 
   ngOnInit(): void {
@@ -207,7 +199,7 @@ export class StixListComponent implements OnInit, AfterViewInit, OnDestroy {
 
   ngAfterViewInit() {
     // set up listener to search input
-    if (this.config.type && this.config.type != 'relationship') {
+    if (this.config.type != 'relationship') {
       this.searchSubscription = fromEvent(this.search.nativeElement, 'keyup')
         .pipe(
           filter(Boolean),
@@ -225,7 +217,7 @@ export class StixListComponent implements OnInit, AfterViewInit, OnDestroy {
   /**
    * Build the stix list table to display
    */
-  private buildTable(): void {
+  protected buildTable(): void {
     // filter options
     this.filterOptions = [];
     if (!('showFilters' in this.config)) this.config.showFilters = true;
@@ -234,14 +226,28 @@ export class StixListComponent implements OnInit, AfterViewInit, OnDestroy {
     const sticky_allowed = !(
       this.config.rowAction && this.config.rowAction.position == 'start'
     );
+    // Column presets take precedence
+    if (this.config.columnsPreset === 'id-name') {
+      this.addColumn('ID', 'attackID', 'plain', false);
+      this.addColumn('name', 'name', 'plain', sticky_allowed, ['name']);
+      this.tableDetail = [];
+      return;
+    }
+    if (this.config.columnsPreset === 'all-objects') {
+      this.addIdAndNameColumns(sticky_allowed);
+      this.addColumn('type', 'attackType', 'plain');
+      this.addDomainColumn();
+      this.addColumn('modified', 'modified', 'timestamp');
+      this.tableDetail = [];
+      return;
+    }
     if ('type' in this.config) {
       // set columns according to type
       switch (this.config.type.replace(/_/g, '-')) {
         case 'collection':
         case 'collection-created':
-          this.addColumn('name', 'name', 'plain', sticky_allowed, ['name']);
+          this.addNameColumn(sticky_allowed);
           this.addColumn('latest version', 'version', 'version');
-          this.addColumn('created', 'created', 'timestamp');
           this.addColumn('modified', 'modified', 'timestamp');
           this.tableDetail = [
             {
@@ -257,7 +263,7 @@ export class StixListComponent implements OnInit, AfterViewInit, OnDestroy {
           ];
           break;
         case 'collection-imported':
-          this.addColumn('name', 'name', 'plain', sticky_allowed, ['name']);
+          this.addNameColumn(sticky_allowed);
           this.addColumn('latest version', 'version', 'version');
           this.addColumn('imported', 'imported', 'timestamp');
           this.addColumn('modified', 'modified', 'timestamp');
@@ -276,48 +282,24 @@ export class StixListComponent implements OnInit, AfterViewInit, OnDestroy {
         case 'mitigation':
         case 'tactic':
         case 'data-component':
-          this.addColumn('', 'workflow', 'icon');
-          this.addColumn('', 'state', 'icon');
-          this.addColumn('ID', 'attackID', 'plain', false);
-          this.addColumn('name', 'name', 'plain', sticky_allowed, ['name']);
-          this.addColumn('domain', 'domains', 'list');
-          this.addVersionsAndDatesColumns();
-          this.tableDetail = [
-            {
-              field: 'description',
-              display: 'descriptive',
-            },
-          ];
+          this.addStateColumnOnly();
+          this.addIdAndNameColumns(sticky_allowed);
+          this.addDomainColumn();
+          this.addColumn('modified', 'modified', 'timestamp');
           break;
         case 'matrix':
-          this.addColumn('', 'workflow', 'icon');
-          this.addColumn('', 'state', 'icon');
-          this.addColumn('name', 'name', 'plain', sticky_allowed, ['name']);
-          this.addVersionsAndDatesColumns();
-          this.tableDetail = [
-            {
-              field: 'description',
-              display: 'descriptive',
-            },
-          ];
+          this.addStateColumnOnly();
+          this.addNameColumn(sticky_allowed);
+          this.addColumn('modified', 'modified', 'timestamp');
           break;
         case 'detection-strategy':
         case 'campaign':
-          this.addColumn('', 'workflow', 'icon');
-          this.addColumn('', 'state', 'icon');
-          this.addColumn('ID', 'attackID', 'plain', false);
-          this.addColumn('name', 'name', 'plain', sticky_allowed, ['name']);
-          this.addVersionsAndDatesColumns();
-          this.tableDetail = [
-            {
-              field: 'description',
-              display: 'descriptive',
-            },
-          ];
+          this.addStateColumnOnly();
+          this.addIdAndNameColumns(sticky_allowed);
+          this.addColumn('modified', 'modified', 'timestamp');
           break;
         case 'analytic':
-          this.addColumn('', 'workflow', 'icon');
-          this.addColumn('', 'state', 'icon');
+          this.addStateColumnOnly();
           this.addColumn('ID', 'attackID', 'plain', false);
           this.addColumn(
             'related detection strategy',
@@ -328,148 +310,144 @@ export class StixListComponent implements OnInit, AfterViewInit, OnDestroy {
             'name'
           );
           this.addColumn('platform', 'platform', 'plain');
-          this.addColumn('domain', 'domains', 'list');
-          this.addVersionsAndDatesColumns();
-          this.tableDetail = [
-            {
-              field: 'description',
-              display: 'descriptive',
-            },
-          ];
+          this.addDomainColumn();
+          this.addColumn('modified', 'modified', 'timestamp');
           break;
         case 'group':
-          this.addColumn('', 'workflow', 'icon');
-          this.addColumn('', 'state', 'icon');
-          this.addColumn('ID', 'attackID', 'plain', false);
-          this.addColumn('name', 'name', 'plain', sticky_allowed, ['name']);
+          this.addStateColumnOnly();
+          this.addIdAndNameColumns(sticky_allowed);
           this.addColumn('associated groups', 'aliases', 'list');
-          this.addVersionsAndDatesColumns();
-          this.tableDetail = [
-            {
-              field: 'description',
-              display: 'descriptive',
-            },
-          ];
+          this.addColumn('modified', 'modified', 'timestamp');
           break;
         case 'software':
-          this.addColumn('', 'workflow', 'icon');
-          this.addColumn('', 'state', 'icon');
-          this.addColumn('ID', 'attackID', 'plain', false);
-          this.addColumn('name', 'name', 'plain', sticky_allowed, ['name']);
+          this.addStateColumnOnly();
+          this.addIdAndNameColumns(sticky_allowed);
           this.addColumn('type', 'type', 'plain');
-          this.addColumn('domain', 'domains', 'list');
-          this.addVersionsAndDatesColumns();
-          this.tableDetail = [
-            {
-              field: 'description',
-              display: 'descriptive',
-            },
-          ];
+          this.addDomainColumn();
+          this.addColumn('modified', 'modified', 'timestamp');
+          break;
+        case 'identity':
+          this.addStateColumnOnly();
+          this.addNameColumn(sticky_allowed);
+          this.addColumn('identity class', 'identity_class', 'plain');
+          this.addColumn('modified', 'modified', 'timestamp');
           break;
         case 'data-source':
         case 'technique':
-          this.addColumn('', 'workflow', 'icon');
-          this.addColumn('', 'state', 'icon');
-          this.addColumn('ID', 'attackID', 'plain', false);
-          this.addColumn('name', 'name', 'plain', sticky_allowed, ['name']);
-          this.addColumn('platforms', 'platforms', 'list');
-          this.addColumn('domain', 'domains', 'list');
-          this.addVersionsAndDatesColumns();
-          this.tableDetail = [
-            {
-              field: 'description',
-              display: 'descriptive',
-            },
-          ];
+          this.addStateColumnOnly();
+          this.addIdAndNameColumns(sticky_allowed);
+          this.addDomainColumn();
+          this.addPlatformsColumn();
+          this.addColumn('modified', 'modified', 'timestamp');
           break;
         case 'asset':
-          this.addColumn('', 'workflow', 'icon');
-          this.addColumn('', 'state', 'icon');
-          this.addColumn('ID', 'attackID', 'plain', false);
-          this.addColumn('name', 'name', 'plain', sticky_allowed, ['name']);
-          this.addColumn('platforms', 'platforms', 'list');
+          this.addStateColumnOnly();
+          this.addIdAndNameColumns(sticky_allowed);
+          this.addPlatformsColumn();
           this.addColumn('sectors', 'sectors', 'list');
-          this.addVersionsAndDatesColumns();
-          this.tableDetail = [
-            {
-              field: 'description',
-              display: 'descriptive',
-            },
-          ];
+          this.addColumn('modified', 'modified', 'timestamp');
           break;
         case 'relationship':
-          this.addColumn('', 'state', 'icon');
-          if (
-            this.config.relationshipType &&
-            this.config.relationshipType !== 'detects'
-          ) {
+          if (this.config.compactRelationshipColumns) {
+            // Only show source ID, type, target ID, and description
             this.addColumn('source', 'source_ID', 'plain');
+            this.addColumn('type', 'relationship_type', 'plain', false, [
+              'text-deemphasis',
+              'relationship-joiner',
+            ]);
+            this.addColumn('target', 'target_ID', 'plain');
+            this.addColumn('description', 'description', 'descriptive', false);
+            this.addColumn('created', 'created', 'timestamp', false);
+            this.addColumn('modified', 'modified', 'timestamp', false);
+          } else {
+            this.addStateColumnOnly();
+            if (
+              this.config.relationshipType &&
+              this.config.relationshipType !== 'detects'
+            ) {
+              this.addColumn('source', 'source_ID', 'plain');
+              this.addColumn(
+                '',
+                'source_name',
+                'plain',
+                this.config.targetRef ? sticky_allowed : false,
+                ['relationship-name']
+              );
+            } else
+              this.addColumn(
+                'source',
+                'source_name',
+                'plain',
+                this.config.targetRef ? sticky_allowed : false,
+                ['relationship-name']
+              );
+            this.addColumn('type', 'relationship_type', 'plain', false, [
+              'text-deemphasis',
+              'relationship-joiner',
+            ]);
+            this.addColumn('target', 'target_ID', 'plain');
             this.addColumn(
               '',
-              'source_name',
+              'target_name',
               'plain',
-              this.config.targetRef ? sticky_allowed : false,
+              this.config.sourceRef ? sticky_allowed : false,
               ['relationship-name']
             );
-          } else
-            this.addColumn(
-              'source',
-              'source_name',
-              'plain',
-              this.config.targetRef ? sticky_allowed : false,
-              ['relationship-name']
-            );
-          this.addColumn('type', 'relationship_type', 'plain', false, [
-            'text-deemphasis',
-            'relationship-joiner',
-          ]);
-          this.addColumn('target', 'target_ID', 'plain');
-          this.addColumn(
-            '',
-            'target_name',
-            'plain',
-            this.config.sourceRef ? sticky_allowed : false,
-            ['relationship-name']
-          );
-          if (
-            !(
-              this.config.relationshipType &&
-              this.config.relationshipType == 'subtechnique-of'
+            if (
+              !(
+                this.config.relationshipType &&
+                this.config.relationshipType == 'subtechnique-of'
+              )
             )
-          )
-            this.addColumn('description', 'description', 'descriptive', false);
+              this.addColumn(
+                'description',
+                'description',
+                'descriptive',
+                false
+              );
+          }
           break;
         case 'marking-definition':
           this.addColumn('definition type', 'definition_type', 'plain');
           this.addColumn('created', 'created', 'timestamp');
           this.addColumn('definition', 'definition_string', 'descriptive');
-          this.tableDetail = [
-            {
-              field: 'definition_string',
-              display: 'descriptive',
-            },
-          ];
           break;
         case 'note':
           this.addColumn('title', 'title', 'plain');
           this.addColumn('content', 'content', 'plain');
           this.addColumn('modified', 'modified', 'timestamp');
-          this.addColumn('created', 'created', 'timestamp');
           break;
         default:
           this.addColumn('type', 'attackType', 'plain');
           this.addColumn('modified', 'modified', 'timestamp');
-          this.addColumn('created', 'created', 'timestamp');
       }
     } else {
-      this.groupBy = ['type'];
-      this.addColumn('', 'state', 'icon');
+      this.addStateColumnOnly();
       this.addColumn('type', 'attackType', 'plain');
-      this.addColumn('ID', 'attackID', 'plain', false);
-      this.addColumn('name', 'name', 'plain', true, ['name']);
+      this.addIdAndNameColumns(true);
       this.addColumn('modified', 'modified', 'timestamp');
-      this.addColumn('created', 'created', 'timestamp');
     }
+  }
+
+  private addStateColumnOnly(): void {
+    this.addColumn('', 'state', 'icon');
+  }
+
+  private addIdAndNameColumns(stickyAllowed: boolean): void {
+    this.addColumn('ID', 'attackID', 'plain', false);
+    this.addColumn('name', 'name', 'plain', stickyAllowed, ['name']);
+  }
+
+  private addNameColumn(stickyAllowed: boolean): void {
+    this.addColumn('name', 'name', 'plain', stickyAllowed, ['name']);
+  }
+
+  private addDomainColumn(): void {
+    this.addColumn('domain', 'domains', 'list');
+  }
+
+  private addPlatformsColumn(type: column_types = 'list'): void {
+    this.addColumn('platforms', 'platforms', type);
   }
 
   /**
@@ -524,7 +502,6 @@ export class StixListComponent implements OnInit, AfterViewInit, OnDestroy {
     if (filterList.includes('workflow_status')) {
       this.filterOptions.push({
         name: 'workflow status',
-        disabled: 'status' in this.config,
         values: this.statuses,
       });
     }
@@ -540,19 +517,18 @@ export class StixListComponent implements OnInit, AfterViewInit, OnDestroy {
     if (filterList.includes('state')) {
       this.filterOptions.push({
         name: 'state',
-        disabled: 'status' in this.config,
         values: this.states,
       });
     }
     if (filterList.includes('state_exclusive')) {
       this.filterOptions.push({
         name: 'state (exclusive)',
-        disabled: 'status' in this.config,
         values: this.statesExclusive,
       });
     }
     const filterByDomain: boolean = this.config.type
       ? [
+          'data-component',
           'data-source',
           'mitigation',
           'software',
@@ -567,7 +543,6 @@ export class StixListComponent implements OnInit, AfterViewInit, OnDestroy {
     if (filterByDomain) {
       this.filterOptions.push({
         name: 'domain',
-        disabled: 'status' in this.config,
         values: this.domains,
       });
     }
@@ -579,7 +554,6 @@ export class StixListComponent implements OnInit, AfterViewInit, OnDestroy {
       if (platforms.length) {
         this.filterOptions.push({
           name: 'platform',
-          disabled: 'status' in this.config,
           values: platforms,
         });
       }
@@ -604,21 +578,13 @@ export class StixListComponent implements OnInit, AfterViewInit, OnDestroy {
    * @param {boolean} [sticky] is the column sticky? If true, the column will be static in the X scrolling of the view
    * @param {string[]} [classes] list of css classes to apply to the cell
    */
-  private addColumn(
+  protected addColumn(
     label: string,
     field: string,
-    display:
-      | 'version'
-      | 'list'
-      | 'plain'
-      | 'timestamp'
-      | 'descriptive'
-      | 'relationship_name'
-      | 'icon'
-      | 'related_ref_list',
+    display: column_types,
     sticky?: boolean,
     classes?: string[],
-    relatedRefProperty?: keyof RelatedRef
+    relatedRefProperty?: keyof EmbeddedRelationship
   ) {
     this.tableColumns.push(field);
     this.tableColumns_settings.set(field, {
@@ -628,15 +594,6 @@ export class StixListComponent implements OnInit, AfterViewInit, OnDestroy {
       classes,
       relatedRefProperty,
     });
-  }
-
-  /**
-   * Add version, modified, and created columns to the table
-   */
-  private addVersionsAndDatesColumns() {
-    this.addColumn('version', 'version', 'version');
-    this.addColumn('modified', 'modified', 'timestamp');
-    this.addColumn('created', 'created', 'timestamp');
   }
 
   public openUserSelectModal(): void {
@@ -676,10 +633,9 @@ export class StixListComponent implements OnInit, AfterViewInit, OnDestroy {
    * @param {StixObject} object of the row that was clicked
    */
   public rowClick(element: StixObject) {
-    if (this.config.clickBehavior && this.config.clickBehavior == 'none')
-      return;
-    if (this.config.clickBehavior && this.config.clickBehavior == 'dialog') {
-      //open modal
+    if (this.config.clickBehavior == 'none') return;
+
+    if (this.config.clickBehavior == 'dialog') {
       const prompt = this.dialog.open(StixDialogComponent, {
         data: {
           object: element,
@@ -689,10 +645,11 @@ export class StixListComponent implements OnInit, AfterViewInit, OnDestroy {
         maxHeight: '75vh',
         autoFocus: false, // prevents auto focus on toolbar buttons
       });
+
       const subscription = prompt.afterClosed().subscribe({
-        next: result => {
+        next: () => {
           if (prompt.componentInstance.dirty) {
-            //re-fetch values since an edit occurred
+            // re-fetch values since an edit occurred
             this.applyControls();
             this.refresh.emit();
           }
@@ -701,41 +658,30 @@ export class StixListComponent implements OnInit, AfterViewInit, OnDestroy {
           subscription.unsubscribe();
         },
       });
-    } else if (
-      this.config.clickBehavior &&
-      this.config.clickBehavior == 'linkToObjectPage'
-    ) {
-      this.onRowAction.emit(); // close any open dialogs
-      this.router.navigateByUrl(
-        '/' + element.attackType + '/' + element.stixID
-      );
-    } else if (
-      this.config.clickBehavior &&
-      this.config.clickBehavior == 'linkToSourceRef'
-    ) {
+      return;
+    }
+
+    if (this.config.clickBehavior == 'linkToSourceRef') {
       const source_ref = element['source_ref'];
       // Get type to navigate from source_ref
       const type = StixTypeToAttackType[source_ref.split('--')[0]];
       this.router.navigateByUrl(`/${type}/${source_ref}`);
-    } else if (
-      this.config.clickBehavior &&
-      this.config.clickBehavior == 'linkToTargetRef'
-    ) {
+      return;
+    }
+
+    if (this.config.clickBehavior == 'linkToTargetRef') {
       const target_ref = element['target_ref'];
       // Get type to navigate from target_ref
       const type = StixTypeToAttackType[target_ref.split('--')[0]];
       this.router.navigateByUrl(`/${type}/${target_ref}`);
-    } else if (
-      this.config.clickBehavior &&
-      this.config.clickBehavior == 'linkToObjectRef'
-    ) {
+      return;
+    }
+
+    if (this.config.clickBehavior == 'linkToObjectRef') {
       // technically a note can be linked to many objects, we will select the first object
       const object_ref = element['object_refs'][0];
       // Get type to navigate from target_ref
       const type = StixTypeToAttackType[object_ref.split('--')[0]];
-
-      this.sidebarService.opened = true;
-      this.sidebarService.currentTab = 'notes';
 
       // collection objs have a different URL structure
       let url = `/${type}/${object_ref}`;
@@ -754,42 +700,68 @@ export class StixListComponent implements OnInit, AfterViewInit, OnDestroy {
       } else {
         this.router.navigateByUrl(url);
       }
-    } else {
-      //expand
-      this.expandedElement = this.expandedElement === element ? null : element;
+      return;
     }
+
+    if (this.isCollectionType()) {
+      this.expandedElement = this.expandedElement === element ? null : element;
+      return;
+    }
+
+    // by default, link to the object page
+    if (
+      this.config.clickBehavior == 'linkToObjectPage' ||
+      !this.config.clickBehavior
+    ) {
+      this.onRowAction.emit(); // close any open dialogs
+      this.router.navigateByUrl(
+        '/' + element.attackType + '/' + element.stixID
+      );
+      return;
+    }
+  }
+
+  public toggleSelection(element: StixObject): void {
+    this.selection.toggle(element.stixID);
+    const selectedObjectRefs = this.config.selectedObjectRefs;
+    if (!selectedObjectRefs) return;
+
+    if (this.selection.isSelected(element.stixID)) {
+      selectedObjectRefs.set(element.stixID, {
+        id: element.stixID,
+        modified: element.modified.toISOString(),
+      });
+    } else {
+      selectedObjectRefs.delete(element.stixID);
+    }
+  }
+
+  public isCollectionType(): boolean {
+    return ['collection', 'collection-created', 'collection-imported'].includes(
+      this.config.type
+    );
   }
 
   // AUTHENTICATION FUNCTIONS
 
-  public getAccessibleRoutes(attackType: string, routes: any[]) {
-    return routes.filter(
-      route => this.canAccess(attackType, route) && this.canEdit(route)
+  public getAccessibleCollectionRoutes(collection) {
+    return collection.routes.filter(route =>
+      this.canShowCollectionRoute(collection.attackType, route)
     );
+  }
+
+  private canShowCollectionRoute(attackType: string, route): boolean {
+    if (route.label == 'edit') {
+      return (
+        this.authenticationService.canEdit(attackType) &&
+        !this.config.uneditableObject
+      );
+    }
+    return true;
   }
 
   public routeTo(url, queryParams): void {
     this.router.navigate([url], { queryParams: queryParams });
-  }
-
-  private canAccess(attackType: string, route: any) {
-    if (
-      route.label &&
-      route.label == 'edit' &&
-      !this.authenticationService.canEdit(attackType)
-    ) {
-      // user not authorized
-      return false;
-    }
-    // user authorized
-    return true;
-  }
-
-  private canEdit(route: any) {
-    if (route.label && route.label == 'edit' && this.config.uneditableObject) {
-      return false;
-    }
-    return true;
   }
 
   /**
@@ -908,11 +880,233 @@ export class StixListComponent implements OnInit, AfterViewInit, OnDestroy {
     }
   }
 
+  private hasLocalStixObjects(): boolean {
+    return (
+      'stixObjects' in this.config && this.config.stixObjects !== undefined
+    );
+  }
+
   /**
    * Apply all controls and fetch objects from the back-end if configured
    */
-  public applyControls() {
-    const {
+  public applyControls(): void {
+    const filterStates = this.getFilterObjectStates();
+
+    if (this.hasLocalStixObjects()) {
+      this.applyControlsToLocalData(filterStates);
+    } else {
+      this.applyControlsToBackendData(filterStates);
+    }
+  }
+
+  private applyControlsToLocalData(filterStates): void {
+    if (this.config.stixObjects instanceof Observable) {
+      // pull objects out of observable
+      return;
+    }
+    // filter on STIX objects specified in the config
+    let filtered = this.filterExcludedAttackTypes(this.config.stixObjects);
+    filtered = this.filterLocalObjects(filtered, filterStates);
+    filtered = this.sortObjects(filtered);
+
+    if (this.paginator) this.totalObjectCount = filtered.length;
+
+    // filter to only ones within the correct index range
+    const { startIndex, endIndex } = this.getPaginationRange();
+    const paged = filtered.slice(startIndex, endIndex);
+
+    this.data$ = of({
+      data: paged,
+      pagination: {
+        total: this.config.stixObjects.length,
+        offset: startIndex,
+        limit: this.paginator ? this.paginator.pageSize : 0,
+      },
+    });
+
+    this.emitDetectsHasData(paged.length > 0);
+  }
+
+  private applyControlsToBackendData(filterStates): void {
+    // fetch objects from backend
+    const limit = this.paginator ? this.paginator.pageSize : 10;
+    const offset = this.paginator ? this.paginator.pageIndex * limit : 0;
+
+    const options = {
+      limit: limit,
+      offset: offset,
+      excludeIDs: this.config.excludeIDs,
+      search: this.searchQuery,
+      state: filterStates.state,
+      includeRevoked: filterStates.revoked,
+      includeDeprecated: filterStates.deprecated,
+      platforms: filterStates.platforms,
+      domains: filterStates.domains,
+      lastUpdatedBy: this.userIdsUsedInSearch,
+    };
+    if (this.config.type == 'software')
+      this.data$ = this.restAPIConnectorService.getAllSoftware(options);
+    else if (this.config.type == 'campaign')
+      this.data$ = this.restAPIConnectorService.getAllCampaigns(options);
+    else if (this.config.type == 'group')
+      this.data$ = this.restAPIConnectorService.getAllGroups(options);
+    else if (this.config.type == 'matrix')
+      this.data$ = this.restAPIConnectorService.getAllMatrices(options);
+    else if (this.config.type == 'mitigation')
+      this.data$ = this.restAPIConnectorService.getAllMitigations(options);
+    else if (this.config.type == 'tactic')
+      this.data$ = this.restAPIConnectorService.getAllTactics(options);
+    else if (this.config.type == 'technique')
+      this.data$ = this.restAPIConnectorService.getAllTechniques(options);
+    else if (this.config.type?.includes('collection'))
+      this.data$ = this.restAPIConnectorService.getAllCollections({
+        search: this.searchQuery,
+        versions: 'all',
+      });
+    else if (this.config.type == 'relationship')
+      this.data$ = this.restAPIConnectorService.getRelatedTo({
+        sourceRef: this.config.sourceRef,
+        targetRef: this.config.targetRef,
+        sourceType: this.config.sourceType,
+        targetType: this.config.targetType,
+        relationshipType: this.config.relationshipType,
+        excludeSourceRefs: this.config.excludeSourceRefs,
+        excludeTargetRefs: this.config.excludeTargetRefs,
+        limit: limit,
+        offset: offset,
+        includeDeprecated: filterStates.deprecated,
+      });
+    else if (this.config.type == 'detection-strategy')
+      this.data$ =
+        this.restAPIConnectorService.getAllDetectionStrategies(options);
+    else if (this.config.type == 'analytic')
+      this.data$ = this.restAPIConnectorService.getAllAnalytics({
+        ...options,
+        includeRefs: true,
+      });
+    else if (this.config.type == 'data-source')
+      this.data$ = this.restAPIConnectorService.getAllDataSources(options);
+    else if (this.config.type == 'data-component')
+      this.data$ = this.restAPIConnectorService.getAllDataComponents(options);
+    else if (this.config.type == 'asset')
+      this.data$ = this.restAPIConnectorService.getAllAssets(options);
+    else if (this.config.type == 'marking-definition')
+      this.data$ =
+        this.restAPIConnectorService.getAllMarkingDefinitions(options);
+    else if (this.config.type == 'identity')
+      this.data$ = this.restAPIConnectorService.getAllIdentities(options);
+    else if (this.config.type == 'note')
+      this.data$ = this.restAPIConnectorService.getAllNotes(options);
+    else
+      this.data$ = this.restAPIConnectorService.getAllObjects({
+        limit,
+        offset,
+        state: filterStates.state,
+        revoked: filterStates.revoked,
+        deprecated: filterStates.deprecated,
+        deserialize: true,
+        lastUpdatedBy: this.userIdsUsedInSearch,
+        search: this.searchQuery,
+      });
+    let subscription: Subscription | undefined;
+    subscription = this.data$.subscribe({
+      next: data => {
+        if (
+          this.config.type === 'relationship' &&
+          this.config.relationshipCreatedBefore
+        ) {
+          // For a staged diff, hide relationships created after that timestamp so they do not
+          // appear in the staged view. Keep the pagination count in sync with
+          // the rows hidden client-side.
+          const relationshipCount = data.data.length;
+          data.data = this.filterRelationshipsCreatedBefore(
+            data.data,
+            this.config.relationshipCreatedBefore
+          );
+          data.pagination.total -= relationshipCount - data.data.length;
+        }
+        data.data = this.filterExcludedAttackTypes(data.data);
+        this.totalObjectCount = data.pagination.total;
+        this.emitDetectsHasData(data.data.length > 0);
+      },
+      complete: () => {
+        if (subscription) subscription.unsubscribe();
+      },
+    });
+  }
+
+  /**
+   * Relationships created after `createdBefore` did not exist at
+   * the staged object's timestamp, so they are hidden. An invalid cutoff, or
+   * an unreadable relationship creation date, leaves that relationship visible
+   * to avoid treating missing date data as proof that it is new.
+   */
+  private filterRelationshipsCreatedBefore(
+    relationships: StixObject[],
+    createdBefore: Date | string
+  ): StixObject[] {
+    const cutoff = new Date(createdBefore).getTime();
+    if (!Number.isFinite(cutoff)) return relationships;
+
+    return relationships.filter(relationship => {
+      const created = new Date(relationship.created).getTime();
+      return !Number.isFinite(created) || created <= cutoff;
+    });
+  }
+
+  /**
+   * Determines whether a relationship should receive the candidate-diff
+   * styling. The candidate table remains the current relationship list;
+   * a row is new only when its creation time is later than the staged object's
+   * `relationshipAddedAfter` baseline. Non-relationship tables and invalid or
+   * missing timestamps are never marked as new.
+   */
+  public isNewRelationship(relationship: StixObject): boolean {
+    if (
+      this.config.type !== 'relationship' ||
+      !this.config.relationshipAddedAfter
+    ) {
+      return false;
+    }
+
+    const baseline = new Date(this.config.relationshipAddedAfter).getTime();
+    const created = new Date(relationship.created).getTime();
+    return (
+      Number.isFinite(baseline) &&
+      Number.isFinite(created) &&
+      created > baseline
+    );
+  }
+
+  /**
+   * Determines whether an existing relationship changed after the staged
+   * baseline. Candidate relationships are fetched at their current version,
+   * so this highlights changes that cannot be represented accurately in the
+   * staged table without relationship version history.
+   */
+  public isChangedRelationship(relationship: StixObject): boolean {
+    if (
+      this.config.type !== 'relationship' ||
+      !this.config.relationshipAddedAfter
+    ) {
+      return false;
+    }
+
+    const baseline = new Date(this.config.relationshipAddedAfter).getTime();
+    const created = new Date(relationship.created).getTime();
+    const modified = new Date(relationship.modified).getTime();
+    return (
+      Number.isFinite(baseline) &&
+      Number.isFinite(created) &&
+      Number.isFinite(modified) &&
+      created <= baseline &&
+      modified > baseline
+    );
+  }
+
+  private filterLocalObjects(
+    objects: StixObject[],
+    {
       deprecated,
       revoked,
       state,
@@ -920,187 +1114,113 @@ export class StixListComponent implements OnInit, AfterViewInit, OnDestroy {
       domains,
       exclusiveDeprecated,
       exclusiveRevoked,
-    } = this.getFilterObjectStates();
-    if ('stixObjects' in this.config && this.config.stixObjects !== undefined) {
-      if (this.config.stixObjects instanceof Observable) {
-        // pull objects out of observable
-      } else {
-        // filter on STIX objects specified in the config
-        let filtered = this.config.stixObjects;
-
-        //filter by domains
-        if (Array.isArray(domains) && domains.length > 0) {
-          filtered = filtered.filter((obj: any) =>
-            obj.domains.some((object_domain: any) =>
-              domains.includes(object_domain)
-            )
-          );
-        }
-
-        //filter by platforms
-        if (Array.isArray(platforms) && platforms.length > 0) {
-          filtered = filtered.filter((obj: any) =>
-            obj.platforms.some((object_platform: any) =>
-              platforms.includes(object_platform)
-            )
-          );
-        }
-
-        // filter by workflow status
-        if (state) {
-          filtered = filtered.filter(
-            (obj: any) => obj.workflow && obj.workflow.state == state
-          );
-        }
-
-        // filter by deprecation status
-        if (exclusiveDeprecated) {
-          filtered = filtered.filter((obj: any) => obj.deprecated);
-        } else if (deprecated || this.config.includeDeprecatedObjects) {
-          filtered = filtered.filter((obj: any) => obj || obj.deprecated);
-        } else {
-          filtered = filtered.filter((obj: any) => !obj.deprecated);
-        }
-
-        // filter by revocation status
-        if (exclusiveRevoked) {
-          filtered = filtered.filter((obj: any) => obj.revoked);
-        }
-
-        // filter by users
-        if (
-          Array.isArray(this.userIdsUsedInSearch) &&
-          this.userIdsUsedInSearch.length > 0
-        ) {
-          filtered = filtered.filter(
-            (obj: any) =>
-              obj.workflow &&
-              this.userIdsUsedInSearch.includes(
-                obj.workflow.created_by_user_account
-              )
-          );
-        }
-
-        // filter to objects matching searchString
-        filtered = this.filterObjects(this.searchQuery, filtered);
-        // sort
-        filtered = filtered.sort((a, b) => {
-          const x = a as any;
-          const y = b as any;
-          return x.hasOwnProperty('name') && y.hasOwnProperty('name')
-            ? x.name.localeCompare(y.name)
-            : x.stixID.localeCompare(y.stixID);
-        });
-        if (this.paginator) this.totalObjectCount = filtered.length;
-
-        // filter to only ones within the correct index range
-        const startIndex = this.paginator
-          ? this.paginator.pageIndex * this.paginator.pageSize
-          : 0;
-        const endIndex = this.paginator
-          ? startIndex + this.paginator.pageSize
-          : 10;
-        filtered = filtered.slice(startIndex, endIndex);
-        this.data$ = of({
-          data: filtered,
-          pagination: {
-            total: this.config.stixObjects.length,
-            offset: startIndex,
-            limit: this.paginator ? this.paginator.pageSize : 0,
-          },
-        });
-        // used to conditionally hide data component relationships with techniques
-        if (
-          this.config.type === 'relationship' &&
-          this.config.relationshipType === 'detects'
-        ) {
-          this.detectsHasData.emit(filtered.length > 0);
-        }
-      }
-    } else {
-      // fetch objects from backend
-      const limit = this.paginator ? this.paginator.pageSize : 10;
-      const offset = this.paginator ? this.paginator.pageIndex * limit : 0;
-
-      const options = {
-        limit: limit,
-        offset: offset,
-        excludeIDs: this.config.excludeIDs,
-        search: this.searchQuery,
-        state: state,
-        includeRevoked: revoked,
-        includeDeprecated: deprecated,
-        platforms: platforms,
-        domains: domains,
-        lastUpdatedBy: this.userIdsUsedInSearch,
-      };
-      if (this.config.type == 'software')
-        this.data$ = this.restAPIConnectorService.getAllSoftware(options);
-      else if (this.config.type == 'campaign')
-        this.data$ = this.restAPIConnectorService.getAllCampaigns(options);
-      else if (this.config.type == 'group')
-        this.data$ = this.restAPIConnectorService.getAllGroups(options);
-      else if (this.config.type == 'matrix')
-        this.data$ = this.restAPIConnectorService.getAllMatrices(options);
-      else if (this.config.type == 'mitigation')
-        this.data$ = this.restAPIConnectorService.getAllMitigations(options);
-      else if (this.config.type == 'tactic')
-        this.data$ = this.restAPIConnectorService.getAllTactics(options);
-      else if (this.config.type == 'technique')
-        this.data$ = this.restAPIConnectorService.getAllTechniques(options);
-      else if (this.config.type.includes('collection'))
-        this.data$ = this.restAPIConnectorService.getAllCollections({
-          search: this.searchQuery,
-          versions: 'all',
-        });
-      else if (this.config.type == 'relationship')
-        this.data$ = this.restAPIConnectorService.getRelatedTo({
-          sourceRef: this.config.sourceRef,
-          targetRef: this.config.targetRef,
-          sourceType: this.config.sourceType,
-          targetType: this.config.targetType,
-          relationshipType: this.config.relationshipType,
-          excludeSourceRefs: this.config.excludeSourceRefs,
-          excludeTargetRefs: this.config.excludeTargetRefs,
-          limit: limit,
-          offset: offset,
-          includeDeprecated: deprecated,
-        });
-      else if (this.config.type == 'detection-strategy')
-        this.data$ =
-          this.restAPIConnectorService.getAllDetectionStrategies(options);
-      else if (this.config.type == 'analytic')
-        this.data$ = this.restAPIConnectorService.getAllAnalytics({
-          ...options,
-          includeRefs: true,
-        });
-      else if (this.config.type == 'data-source')
-        this.data$ = this.restAPIConnectorService.getAllDataSources(options);
-      else if (this.config.type == 'data-component')
-        this.data$ = this.restAPIConnectorService.getAllDataComponents(options);
-      else if (this.config.type == 'asset')
-        this.data$ = this.restAPIConnectorService.getAllAssets(options);
-      else if (this.config.type == 'marking-definition')
-        this.data$ =
-          this.restAPIConnectorService.getAllMarkingDefinitions(options);
-      else if (this.config.type == 'note')
-        this.data$ = this.restAPIConnectorService.getAllNotes(options);
-      const subscription = this.data$.subscribe({
-        next: data => {
-          this.totalObjectCount = data.pagination.total;
-          // used to conditionally hide data component relationships with techniques
-          if (
-            this.config.type === 'relationship' &&
-            this.config.relationshipType === 'detects'
-          ) {
-            this.detectsHasData.emit(data.data.length > 0);
-          }
-        },
-        complete: () => {
-          if (subscription) subscription.unsubscribe();
-        },
-      });
+    }: ReturnType<typeof this.getFilterObjectStates>
+  ): StixObject[] {
+    let filtered = objects;
+    //filter by domains
+    if (Array.isArray(domains) && domains.length > 0) {
+      filtered = filtered.filter((obj: any) =>
+        this.getArrayField(obj, 'domains').some((object_domain: any) =>
+          domains.includes(object_domain)
+        )
+      );
     }
+
+    //filter by platforms
+    if (Array.isArray(platforms) && platforms.length > 0) {
+      filtered = filtered.filter((obj: any) =>
+        this.getArrayField(obj, 'platforms').some((object_platform: any) =>
+          platforms.includes(object_platform)
+        )
+      );
+    }
+
+    // filter by workflow status
+    if (state) {
+      filtered = filtered.filter(
+        (obj: any) => obj.workflow && obj.workflow.state == state
+      );
+    }
+
+    // filter by deprecation status
+    if (exclusiveDeprecated) {
+      filtered = filtered.filter((obj: any) => obj.deprecated);
+    } else if (deprecated || this.config.includeDeprecatedObjects) {
+      filtered = filtered.filter((obj: any) => obj || obj.deprecated);
+    } else {
+      filtered = filtered.filter((obj: any) => !obj.deprecated);
+    }
+
+    // filter by revocation status
+    if (exclusiveRevoked) {
+      filtered = filtered.filter((obj: any) => obj.revoked);
+    }
+
+    // filter by users
+    if (
+      Array.isArray(this.userIdsUsedInSearch) &&
+      this.userIdsUsedInSearch.length > 0
+    ) {
+      filtered = filtered.filter(
+        (obj: any) =>
+          obj.workflow &&
+          this.userIdsUsedInSearch.includes(
+            obj.workflow.created_by_user_account
+          )
+      );
+    }
+
+    // filter to objects matching searchString
+    filtered = this.filterObjects(this.searchQuery, filtered);
+    return filtered;
+  }
+
+  private getArrayField(object: any, field: string): any[] {
+    const value = object?.[field];
+    return Array.isArray(value) ? value : [];
+  }
+
+  private sortObjects(objects: StixObject[]): StixObject[] {
+    return [...objects].sort((a, b) => {
+      const x = a as any;
+      const y = b as any;
+      return x.hasOwnProperty('name') && y.hasOwnProperty('name')
+        ? x.name.localeCompare(y.name)
+        : x.stixID.localeCompare(y.stixID);
+    });
+  }
+
+  private getPaginationRange(): {
+    startIndex: number;
+    endIndex: number;
+  } {
+    const startIndex = this.paginator
+      ? this.paginator.pageIndex * this.paginator.pageSize
+      : 0;
+    const endIndex = this.paginator ? startIndex + this.paginator.pageSize : 10;
+
+    return { startIndex, endIndex };
+  }
+
+  private emitDetectsHasData(hasData: boolean) {
+    // used to conditionally hide data component relationships with techniques
+    if (
+      this.config.type === 'relationship' &&
+      this.config.relationshipType === 'detects'
+    ) {
+      this.detectsHasData.emit(hasData);
+    }
+  }
+
+  private filterExcludedAttackTypes(objects: StixObject[]): StixObject[] {
+    if (!this.config.excludeAttackTypes?.length) return objects;
+
+    return objects.filter(
+      object =>
+        !this.config.excludeAttackTypes.includes(
+          object.attackType as AttackType
+        )
+    );
   }
 
   public showDeprecated(event) {
@@ -1204,7 +1324,16 @@ export class StixListComponent implements OnInit, AfterViewInit, OnDestroy {
 }
 
 type selection_types = 'one' | 'many' | 'disabled';
-type filter_types = 'state' | 'workflow_status';
+type filter_types = 'state' | 'workflow_status' | 'state_exclusive';
+type column_types =
+  | 'version'
+  | 'list'
+  | 'plain'
+  | 'timestamp'
+  | 'descriptive'
+  | 'relationship_name'
+  | 'icon'
+  | 'related_ref_list';
 export interface StixListConfig {
   /* if specified, shows the given STIX objects in the table instead of loading from the back-end based on other configurations. */
   stixObjects?: Observable<StixObject[]> | StixObject[];
@@ -1217,11 +1346,15 @@ export interface StixListConfig {
   targetType?: AttackType;
   /** relationship type to get, use with type=='relationship' */
   relationshipType?: string;
+  /** Hide relationships created after this timestamp. */
+  relationshipCreatedBefore?: Date | string;
+  /** Mark relationships created after this timestamp as new. */
+  relationshipAddedAfter?: Date | string;
 
   /** force the list to show only this type */
   type?: AttackType | 'collection-created' | 'collection-imported';
-  /** force the list to show only objects matching this query */
-  query?: any;
+  /** exclude rows matching these ATT&CK object types */
+  excludeAttackTypes?: AttackType[];
 
   /** can the user select in this list? allowed options:
    *     "one": user can select a single element at a time
@@ -1234,12 +1367,15 @@ export interface StixListConfig {
    * Only relevant if 'select' is also enabled. Also, will cause problems if multiple constructor pram is set according to 'select'.
    */
   selectionModel?: SelectionModel<string>;
+  selectedObjectRefs?: Map<string, { id: string; modified: string }>;
   /** show links to view/edit pages for relevant objects? */
   showLinks?: boolean;
   /** default true, if false hides the filter dropdown menu */
   showFilters?: boolean;
   /** default true, if false hides all search/filter/control options */
   showControls?: boolean;
+  /** Optional preset to override default columns */
+  columnsPreset?: 'id-name' | 'all-objects';
   /** display the 'show deprecated' filter, default false
    *  this may be relevant when displaying a list of embedded relationships, where
    *  the list of STIX objects is provided in the 'stixObjects' configuration
@@ -1295,6 +1431,11 @@ export interface StixListConfig {
    * Map of collections by stixID
    */
   collectionMap?: Map<string, Collection[]>;
+
+  /**
+   * If true, collapse relationship columns to source, type, target, description only
+   */
+  compactRelationshipColumns?: boolean;
 }
 
 export interface FilterValue {

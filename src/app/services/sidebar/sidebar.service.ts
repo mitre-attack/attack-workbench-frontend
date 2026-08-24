@@ -32,13 +32,8 @@ export class SidebarService {
       enabled: true,
     },
     {
-      name: 'history',
-      icon: 'history',
-      enabled: false,
-    },
-    {
       name: 'notes',
-      icon: 'sticky_note_2_outlined',
+      icon: 'sticky_note_2',
       enabled: true,
     },
   ];
@@ -61,7 +56,7 @@ export class SidebarService {
     // intentionally left blank
   }
 }
-export type tabOption = 'search' | 'references' | 'history' | 'notes';
+export type tabOption = 'search' | 'references' | 'notes';
 
 interface TabDefinition {
   name: tabOption; // the tab name

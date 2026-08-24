@@ -1,8 +1,9 @@
-import { StixObject } from './stix-object';
-import { logger } from '../../utils/logger';
 import { Observable } from 'rxjs';
 import { RestApiConnectorService } from 'src/app/services/connectors/rest-api/rest-api-connector.service';
+import { logger } from '../../utils/logger';
 import { ValidationData } from '../serializable';
+import { StixObject } from './stix-object';
+import { WorkflowStatusType } from 'src/app/utils/types';
 
 export class Campaign extends StixObject {
   public name = '';
@@ -10,8 +11,9 @@ export class Campaign extends StixObject {
   public last_seen: Date;
   public first_seen_citation = '';
   public last_seen_citation = '';
-  public aliases: string[] = ['placeholder']; // initialize field with placeholder in first index for campaign name
+  public aliases: string[] = [];
   public contributors: string[] = [];
+  public domains: string[] = [];
 
   public readonly supportsAttackID = true;
   protected get attackIDValidator() {
@@ -40,12 +42,16 @@ export class Campaign extends StixObject {
     }
 
     rep.stix.name = this.name.trim();
-    rep.stix.first_seen = this.first_seen.toISOString();
-    rep.stix.last_seen = this.last_seen.toISOString();
+    rep.stix.first_seen = this.first_seen?.toISOString();
+    rep.stix.last_seen = this.last_seen?.toISOString();
     rep.stix.x_mitre_first_seen_citation = this.first_seen_citation.trim();
     rep.stix.x_mitre_last_seen_citation = this.last_seen_citation.trim();
     rep.stix.aliases = this.aliases.map(x => x.trim());
     rep.stix.x_mitre_contributors = this.contributors.map(x => x.trim());
+    rep.stix.x_mitre_domains = this.domains;
+
+    // Strip properties that are empty strs + lists
+    rep.stix = this.filterObject(rep.stix);
 
     return rep;
   }
@@ -147,6 +153,12 @@ export class Campaign extends StixObject {
             ')'
           );
       } else this.contributors = [];
+
+      if ('x_mitre_domains' in sdo) {
+        if (this.isStringArray(sdo.x_mitre_domains))
+          this.domains = sdo.x_mitre_domains;
+        else logger.error('TypeError: domains field is not a string array.');
+      } else this.domains = [];
     }
   }
 
@@ -156,9 +168,10 @@ export class Campaign extends StixObject {
    * @returns {Observable<ValidationData>} the validation warnings and errors once validation is complete.
    */
   public validate(
-    restAPIService: RestApiConnectorService
+    restAPIService: RestApiConnectorService,
+    tempWorkflowState?: WorkflowStatusType
   ): Observable<ValidationData> {
-    return this.base_validate(restAPIService);
+    return this.base_validate(restAPIService, tempWorkflowState);
   }
 
   /**
@@ -167,8 +180,6 @@ export class Campaign extends StixObject {
    * @returns {Observable} of the post
    */
   public save(restAPIService: RestApiConnectorService): Observable<Campaign> {
-    // update first index of aliases field to campaign name
-    this.aliases[0] = this.name;
     const postObservable = restAPIService.postCampaign(this);
     const subscription = postObservable.subscribe({
       next: result => {
@@ -211,5 +222,23 @@ export class Campaign extends StixObject {
       },
     });
     return putObservable;
+  }
+
+  /**
+   * Revoke the STIX object in the database.
+   * @param restAPIService [RestApiConnectorService] the service to perform the revoke through
+   * @param revokingObject the revoking object payload
+   * @returns {Observable} of the revoke
+   */
+  public revoke(
+    restAPIService: RestApiConnectorService,
+    revokingObject: { revoking: { stixId: string; modified: string } },
+    preserveRelationships = false
+  ): Observable<object> {
+    return restAPIService.revokeCampaign(
+      this.stixID,
+      revokingObject,
+      preserveRelationships
+    );
   }
 }

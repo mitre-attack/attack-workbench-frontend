@@ -3,11 +3,13 @@ import { logger } from '../../utils/logger';
 import { Observable } from 'rxjs';
 import { RestApiConnectorService } from 'src/app/services/connectors/rest-api/rest-api-connector.service';
 import { ValidationData } from '../serializable';
+import { WorkflowStatusType } from 'src/app/utils/types';
 
 export class DetectionStrategy extends StixObject {
   public name = '';
   public contributors: string[] = [];
   public analytics: string[] = []; // list of x-mitre-analytic uuids
+  public domains: string[] = [];
 
   public readonly supportsAttackID = true;
   protected get attackIDValidator() {
@@ -36,6 +38,10 @@ export class DetectionStrategy extends StixObject {
     rep.stix.name = this.name.trim();
     rep.stix.x_mitre_contributors = this.contributors.map(x => x.trim());
     if (this.analytics) rep.stix.x_mitre_analytic_refs = this.analytics;
+    rep.stix.x_mitre_domains = this.domains;
+
+    // Strip properties that are empty strs + lists
+    rep.stix = this.filterObject(rep.stix);
 
     return rep;
   }
@@ -74,6 +80,12 @@ export class DetectionStrategy extends StixObject {
             `TypeError: x_mitre_analytic_refs field is not a string array: ${sdo.x_mitre_analytic_refs} (${typeof sdo.x_mitre_analytic_refs})`
           );
       } else this.analytics = [];
+
+      if ('x_mitre_domains' in sdo) {
+        if (this.isStringArray(sdo.x_mitre_domains))
+          this.domains = sdo.x_mitre_domains;
+        else logger.error('TypeError: domains field is not a string array.');
+      } else this.domains = [];
     }
   }
 
@@ -83,9 +95,10 @@ export class DetectionStrategy extends StixObject {
    * @returns {Observable<ValidationData>} the validation warnings and errors once validation is complete.
    */
   public validate(
-    restAPIService: RestApiConnectorService
+    restAPIService: RestApiConnectorService,
+    tempWorkflowState?: WorkflowStatusType
   ): Observable<ValidationData> {
-    return this.base_validate(restAPIService);
+    return this.base_validate(restAPIService, tempWorkflowState);
   }
 
   /**

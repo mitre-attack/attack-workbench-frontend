@@ -99,109 +99,53 @@
               <app-relationship-view
                 [config]="config"
                 (onVersionChange)="versionChange($event)"
-                (onOpenHistory)="openHistory()"
-                (onOpenNotes)="openNotes()"
                 (changeDialogToObject)="changeDialogObject($event)"
                 (closeDialogEvent)="close()">
               </app-relationship-view>
             }
             @case ('intrusion-set') {
-              <app-group-view
-                [config]="config"
-                (onOpenHistory)="openHistory()"
-                (onOpenNotes)="openNotes()">
-              </app-group-view>
+              <app-group-view [config]="config"> </app-group-view>
             }
             @case ('campaign') {
-              <app-campaign-view
-                [config]="config"
-                (onOpenHistory)="openHistory()"
-                (onOpenNotes)="openNotes()">
-              </app-campaign-view>
+              <app-campaign-view [config]="config"> </app-campaign-view>
             }
             @case ('malware') {
-              <app-software-view
-                [config]="config"
-                (onOpenHistory)="openHistory()"
-                (onOpenNotes)="openNotes()">
-              </app-software-view>
+              <app-software-view [config]="config"> </app-software-view>
             }
             @case ('tool') {
-              <app-software-view
-                [config]="config"
-                (onOpenHistory)="openHistory()"
-                (onOpenNotes)="openNotes()">
-              </app-software-view>
+              <app-software-view [config]="config"> </app-software-view>
             }
             @case ('x-mitre-matrix') {
-              <app-matrix-view
-                [config]="config"
-                (onOpenHistory)="openHistory()"
-                (onOpenNotes)="openNotes()">
-              </app-matrix-view>
+              <app-matrix-view [config]="config"> </app-matrix-view>
             }
             @case ('course-of-action') {
-              <app-mitigation-view
-                [config]="config"
-                (onOpenHistory)="openHistory()"
-                (onOpenNotes)="openNotes()">
-              </app-mitigation-view>
+              <app-mitigation-view [config]="config"> </app-mitigation-view>
             }
             @case ('attack-pattern') {
-              <app-technique-view
-                [config]="config"
-                (onOpenHistory)="openHistory()"
-                (onOpenNotes)="openNotes()">
-              </app-technique-view>
+              <app-technique-view [config]="config"> </app-technique-view>
             }
             @case ('x-mitre-data-source') {
-              <app-data-source-view
-                [config]="config"
-                (onOpenHistory)="openHistory()"
-                (onOpenNotes)="openNotes()">
-              </app-data-source-view>
+              <app-data-source-view [config]="config"> </app-data-source-view>
             }
             @case ('x-mitre-data-component') {
-              <app-data-component-view
-                [config]="config"
-                (onOpenHistory)="openHistory()"
-                (onOpenNotes)="openNotes()">
+              <app-data-component-view [config]="config">
               </app-data-component-view>
             }
             @case ('x-mitre-asset') {
-              <app-asset-view
-                [config]="config"
-                (onOpenHistory)="openHistory()"
-                (onOpenNotes)="openNotes()">
-              </app-asset-view>
+              <app-asset-view [config]="config"> </app-asset-view>
             }
             @case ('x-mitre-tactic') {
-              <app-tactic-view
-                [config]="config"
-                (onOpenHistory)="openHistory()"
-                (onOpenNotes)="openNotes()">
-              </app-tactic-view>
+              <app-tactic-view [config]="config"> </app-tactic-view>
             }
             @case ('x-mitre-collection') {
-              <app-collection-view
-                [config]="config"
-                (onOpenHistory)="openHistory()"
-                (onOpenNotes)="openNotes()">
-              </app-collection-view>
+              <app-collection-view [config]="config"> </app-collection-view>
             }
             @case ('x-mitre-detection-strategy') {
-              <app-detection-strategy-view
-                [config]="config"
-                (onOpenHistory)="openHistory()"
-                (onOpenNotes)="openNotes()">
+              <app-detection-strategy-view [config]="config">
               </app-detection-strategy-view>
             }
             @case ('x-mitre-analytic') {
-              <app-analytic-view
-                [config]="config"
-                (onOpenHistory)="openHistory()"
-                (onOpenNotes)="openNotes()">
-              </app-analytic-view>
+              <app-analytic-view [config]="config"> </app-analytic-view>
             }
           }
         </div>

@@ -7,6 +7,14 @@ COPY . .
 
 ARG TARGETOS
 ARG TARGETARCH
+ARG VERSION=dev
+ARG BUILDTIME=unknown
+ARG REVISION=unknown
+
+# Make the OCI build metadata available while Angular's static assets are built.
+ENV APP_VERSION=${VERSION} \
+    GIT_COMMIT=${REVISION} \
+    BUILD_DATE=${BUILDTIME}
 
 # Install dependencies
 RUN npm install --cpu ${TARGETARCH} --os ${TARGETOS}
@@ -36,6 +44,9 @@ LABEL org.opencontainers.image.title="ATT&CK Workbench Frontend Service" \
     org.opencontainers.image.vendor="The MITRE Corporation" \
     org.opencontainers.image.licenses="Apache-2.0" \
     org.opencontainers.image.authors="MITRE ATT&CK<attack@mitre.org>" \
+    org.opencontainers.image.version="${VERSION}" \
+    org.opencontainers.image.created="${BUILDTIME}" \
+    org.opencontainers.image.revision="${REVISION}" \
     maintainer="MITRE ATT&CK<attack@mitre.org>"
 
 # Remove the default nginx website

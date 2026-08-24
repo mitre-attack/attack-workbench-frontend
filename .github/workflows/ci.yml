@@ -8,7 +8,6 @@ on:
       - next-major
       - beta
       - alpha
-      - adm
       - '*.x'     # Matches branches like '1.x', '2.x'
   pull_request: # Run on all PRs regardless of target branch
   workflow_dispatch:
@@ -36,9 +35,66 @@ jobs:
       - name: Validate all commits
         run: npx commitlint --from ${{ github.event.pull_request.base.sha || github.event.before }} --to ${{ github.event.pull_request.head.sha || github.sha }} --verbose
 
-  # Job 2: Semantic Release and Docker Build
-  release:
+  # Job 2a: Static Checks (Linting)
+  static-checks:
     needs: [commitlint]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.x'
+
+      - name: Install dependencies
+        run: npm ci
+
+      # since there are lots of lint errors, run lint with warnonly to not fail the build
+      - name: Run linting
+        run: npm run lint:warnonly
+
+  # Job 2b: Tests
+  run-tests:
+    runs-on: ubuntu-latest
+    needs: [commitlint]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.x'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run regression tests with code coverage
+        run: npm run test:coverage
+
+      - name: Upload coverage artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: workbench-frontend-coverage
+          path: coverage
+          retention-days: 7
+
+      - name: Upload coverage reports to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          slug: mitre-attack/attack-workbench-frontend
+          files: coverage/lcov.info
+          verbose: true
+
+      - name: Verify integrity of dependencies
+        run: npm audit signatures
+
+  # Job 3: Semantic Release and Docker Build
+  release:
+    needs: [static-checks, run-tests]
     # Only run on pushes (not PRs) - semantic-release will determine whether to release
     if: github.event_name == 'push'
     runs-on: ubuntu-latest

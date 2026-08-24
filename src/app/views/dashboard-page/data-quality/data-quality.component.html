@@ -1,0 +1,79 @@
+<div class="data-quality-container">
+  <h1>Duplicate Relationships</h1>
+  <app-loading-overlay *ngIf="loadingParallel"></app-loading-overlay>
+  <div *ngIf="parallelError" class="error">{{ parallelError }}</div>
+
+  <!-- Accordion view for parallel relationships -->
+  <mat-accordion
+    class="dq-accordion"
+    *ngIf="!loadingParallel && parallelRelationships?.length > 0">
+    <mat-expansion-panel *ngFor="let group of parallelRelationships">
+      <mat-expansion-panel-header>
+        <mat-panel-title>
+          <ng-container *ngIf="group.relationships[0] as first">
+            <a [routerLink]="objectLink(first.source_object)">
+              {{ first.source_object.stix.external_references[0].external_id }}
+            </a>
+            <mat-icon aria-hidden="false" aria-label="to"
+              >arrow_forward</mat-icon
+            >
+            {{ group.relationshipType }}
+            <mat-icon aria-hidden="false" aria-label="to"
+              >arrow_forward</mat-icon
+            >
+            <a [routerLink]="objectLink(first.target_object)">
+              {{ first.target_object.stix.external_references[0].external_id }}
+            </a>
+          </ng-container>
+        </mat-panel-title>
+      </mat-expansion-panel-header>
+      <!-- Table for parallel relationships with single-select radios -->
+      <app-stix-list
+        [config]="stixConfigForGroup(group)"
+        (onSelect)="onGroupSelect($event, group)"></app-stix-list>
+      <div class="dq-actions">
+        <button
+          mat-raised-button
+          color="primary"
+          (click)="deprecateOthers(group)"
+          [disabled]="!group.toDeprecate?.length">
+          Deprecate Others ({{ group.toDeprecate.length }})
+        </button>
+        <span class="dq-note" *ngIf="group.toDeprecate?.length">
+          Selecting one relationship will mark the remaining
+          {{ group.toDeprecate.length }} for deprecation
+        </span>
+      </div>
+    </mat-expansion-panel>
+  </mat-accordion>
+  <div
+    *ngIf="
+      !loadingParallel &&
+      (!parallelRelationships || parallelRelationships.length === 0)
+    ">
+    No parallel relationships found.
+  </div>
+
+  <!-- Missing Links Section -->
+  <h1>Missing LinkByIds Status</h1>
+  <app-loading-overlay *ngIf="loadingMissingLinks"></app-loading-overlay>
+  <div *ngIf="error" class="error">{{ error }}</div>
+  <mat-accordion
+    class="dq-accordion"
+    *ngIf="!loadingMissingLinks && missingLinks && missingLinks.length > 0">
+    <mat-expansion-panel>
+      <mat-expansion-panel-header>
+        <mat-panel-title>
+          Missing Links by ID ({{ missingLinks.length }})
+        </mat-panel-title>
+      </mat-expansion-panel-header>
+      <app-stix-list [config]="stixConfigForMissingLinks()"></app-stix-list>
+    </mat-expansion-panel>
+  </mat-accordion>
+  <div
+    *ngIf="
+      !loadingMissingLinks && (!missingLinks || missingLinks.length === 0)
+    ">
+    No missing link by ids found.
+  </div>
+</div>

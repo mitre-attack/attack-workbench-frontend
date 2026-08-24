@@ -1,0 +1,81 @@
+<div class="dictionary-edit grow-to-row">
+  <div class="content">
+    <div class="add-row-button">
+      <button mat-flat-button color="primary" (click)="addRow()">
+        Add {{ config.buttonLabel || 'Row' }}
+      </button>
+    </div>
+
+    @if (config.object[config.field].length > 0) {
+      <mat-divider></mat-divider>
+      <table
+        mat-table
+        [dataSource]="config.object[config.field]"
+        class="property-table">
+        <ng-container
+          *ngFor="let column of config.columns"
+          [matColumnDef]="column.name">
+          <th mat-header-cell *matHeaderCellDef>
+            {{ column.label || column.name }}
+          </th>
+          <td
+            mat-cell
+            *matCellDef="let row; let rowIndex = index"
+            class="cell"
+            tabindex="0"
+            (click)="editCell(rowIndex, column.name)"
+            (keydown.enter)="
+              isEditing(rowIndex, column.name) &&
+                editCell(rowIndex, column.name)
+            "
+            (keydown.escape)="cancelEditing()">
+            <div class="cell-inner">
+              <div
+                class="table-value"
+                [class.hidden]="isEditing(rowIndex, column.name)">
+                {{ row[column.name] }}
+              </div>
+              @if (isEditing(rowIndex, column.name)) {
+                <div class="editor">
+                  <mat-form-field class="editor-field" appearance="outline">
+                    <input
+                      #editInput
+                      matInput
+                      type="text"
+                      [(ngModel)]="row[column.name]"
+                      (keydown.enter)="stopEditing()"
+                      (keydown.escape)="cancelEditing()"
+                      (blur)="stopEditing()"
+                      [required]="column.required ?? false" />
+                  </mat-form-field>
+                </div>
+              }
+            </div>
+          </td>
+        </ng-container>
+
+        <ng-container matColumnDef="actions" stickyEnd>
+          <th mat-header-cell *matHeaderCellDef></th>
+          <td
+            mat-cell
+            *matCellDef="let row; let rowIndex = index"
+            class="action-td">
+            <div class="action-cell">
+              <button
+                mat-icon-button
+                matTooltip="remove row"
+                class="table-icon-button"
+                (click)="deleteRow(rowIndex)">
+                <mat-icon>remove</mat-icon>
+              </button>
+            </div>
+          </td>
+        </ng-container>
+
+        <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+        <tr mat-row *matRowDef="let row; columns: displayedColumns"></tr>
+      </table>
+    }
+  </div>
+  <span class="labelled-box-label">{{ config.label }}</span>
+</div>
