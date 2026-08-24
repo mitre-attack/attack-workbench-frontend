@@ -760,6 +760,12 @@ describe('ReleaseTrackPageComponent', () => {
     expect(component.getVirtualObjectSubtitle(component.members[0])).toBe(
       'NX0001'
     );
+    expect(
+      component.getVirtualSourceVersion({ source_snapshot_version: '1.2' })
+    ).toBe('v1.2');
+    expect(
+      component.getVirtualSourceVersion({ source_snapshot_version: 'v2.0' })
+    ).toBe('v2.0');
   });
 
   it('should load component track summaries alongside a virtual track', () => {

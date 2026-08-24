@@ -1279,14 +1279,13 @@ export class ReleaseTrackPageComponent implements OnInit {
   }
 
   public getVirtualObjectSubtitle(item: any): string {
-    return (
-      item?.attack_id ||
-      item?.attackId ||
-      item?.source_snapshot_version ||
-      item?.conflict_reason ||
-      item?.object_ref ||
-      ''
-    );
+    return item?.attack_id || item?.attackId || item?.object_ref || '';
+  }
+
+  public getVirtualSourceVersion(item: any): string {
+    const version = String(item?.source_snapshot_version || '');
+    if (!version) return '';
+    return version.startsWith('v') ? version : `v${version}`;
   }
 
   private getResolutionNumber(resolution: any, ...keys: string[]): number {

@@ -391,6 +391,94 @@
 
     <ng-template #virtualDetailsTpl>
       <div class="virtual-track-layout">
+        <div class="labelled-box summary-frame">
+          <div
+            class="summary-overview content no-label"
+            aria-label="Virtual release track summary">
+            <section class="summary-description">
+              <div class="summary-section-header">
+                <h2>Description</h2>
+                <button
+                  *ngIf="!isEditingDescription"
+                  class="description-edit-button"
+                  mat-icon-button
+                  type="button"
+                  aria-label="Edit release track description"
+                  (click)="onEditDescription()">
+                  <mat-icon>edit</mat-icon>
+                </button>
+              </div>
+
+              <p
+                *ngIf="!isEditingDescription"
+                class="summary-description-text"
+                [ngClass]="{ empty: !releaseTrackDescription }">
+                {{ releaseTrackDescription || 'No description provided.' }}
+              </p>
+
+              <div *ngIf="isEditingDescription" class="description-editor">
+                <mat-form-field appearance="outline">
+                  <textarea
+                    matInput
+                    rows="3"
+                    placeholder="Describe this release track..."
+                    [(ngModel)]="descriptionDraft"></textarea>
+                </mat-form-field>
+                <div class="small-buttons description-actions">
+                  <button
+                    mat-stroked-button
+                    type="button"
+                    (click)="onCancelDescriptionEdit()">
+                    Cancel
+                  </button>
+                  <button
+                    mat-raised-button
+                    color="primary"
+                    type="button"
+                    [disabled]="isSavingDescription"
+                    (click)="onSaveDescription()">
+                    Save
+                  </button>
+                </div>
+              </div>
+            </section>
+
+            <div
+              class="summary-stats"
+              aria-label="Virtual release track object counts">
+              <div class="summary-metric candidates-summary">
+                <strong class="summary-count view-color">
+                  {{ virtualComponentTracks.length }}
+                </strong>
+                <div class="summary-copy">
+                  <strong class="summary-heading">Components</strong>
+                  <span class="text-deemphasis">standard tracks</span>
+                </div>
+              </div>
+
+              <div class="summary-metric staged-summary">
+                <strong class="summary-count promote-color">
+                  {{ members.length }}
+                </strong>
+                <div class="summary-copy">
+                  <strong class="summary-heading">Members</strong>
+                  <span class="text-deemphasis">resolved objects</span>
+                </div>
+              </div>
+
+              <div class="summary-metric members-summary">
+                <strong class="summary-count quarantine-color">
+                  {{ quarantineObjects.length }}
+                </strong>
+                <div class="summary-copy">
+                  <strong class="summary-heading">Quarantined</strong>
+                  <span class="text-deemphasis">resolution conflicts</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <section class="labelled-box virtual-resolution-panel">
           <div class="content no-label">
             <div class="card-header member-list virtual-resolution-header">
@@ -494,6 +582,10 @@
                   <div>
                     <h4>{{ getVirtualObjectTitle(item) }}</h4>
                     <p>{{ getVirtualObjectSubtitle(item) }}</p>
+                    <p *ngIf="item.object_modified">
+                      Revision:
+                      {{ item.object_modified | date: 'MMM d, y, h:mm:ss a' }}
+                    </p>
                   </div>
                   <button
                     mat-stroked-button
@@ -531,6 +623,16 @@
                   <div>
                     <h4>{{ getVirtualObjectTitle(item) }}</h4>
                     <p>{{ getVirtualObjectSubtitle(item) }}</p>
+                    <p *ngIf="item.source_track_name || item.source_track_id">
+                      Source:
+                      {{ item.source_track_name || item.source_track_id }}
+                      <ng-container *ngIf="item.source_snapshot_version">
+                        ({{ getVirtualSourceVersion(item) }})
+                      </ng-container>
+                    </p>
+                    <p *ngIf="item.conflict_reason">
+                      {{ item.conflict_reason }}
+                    </p>
                   </div>
                   <button
                     *ngIf="item.object_ref"

@@ -54,16 +54,16 @@
           <div class="stat">
             <div class="stat-label">COMPONENTS</div>
             <div class="stat-value">
-              {{ track.composition?.component_tracks?.length || 0 }}
+              {{ track.stats?.components ?? 0 }}
             </div>
           </div>
           <div class="stat">
             <div class="stat-label">QUARANTINED</div>
-            <div class="stat-value">{{ track.stats?.quarantined || 0 }}</div>
+            <div class="stat-value">{{ track.stats?.quarantined ?? 0 }}</div>
           </div>
           <div class="stat">
             <div class="stat-label">MEMBERS</div>
-            <div class="stat-value">{{ track.stats?.members || 0 }}</div>
+            <div class="stat-value">{{ track.stats?.members ?? 0 }}</div>
           </div>
         </ng-container>
       </div>
