@@ -1,0 +1,38 @@
+@use '../../../style/globals';
+@use '../../../style/colors';
+
+.add-dialog {
+  .mat-mdc-list-item:hover h3 {
+    color: colors.color(primary);
+  }
+  .mat-mdc-list-item h3 {
+    @extend .subheading;
+    font-weight: 700 !important;
+  }
+  .mat-mdc-list-item + .mat-list-item {
+    .dark & {
+      border-top: 1px solid colors.border-color(dark);
+    }
+    .light & {
+      border-top: 1px solid colors.border-color(light);
+    }
+  }
+
+  min-width: 40vw;
+  max-width: 80vw;
+  max-height: 75vh;
+  padding: 24px;
+
+  .left-button {
+    margin-right: 12px;
+  }
+
+  .right-button {
+    margin-left: 12px;
+  }
+
+  .mat-mdc-checkbox {
+    margin-bottom: 16px;
+    display: block;
+  }
+}

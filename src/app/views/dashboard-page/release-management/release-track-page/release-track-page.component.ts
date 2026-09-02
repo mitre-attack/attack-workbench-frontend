@@ -28,6 +28,7 @@ import {
   ReleaseTrackSnapshotOptions,
   ReleaseTrackType,
   ResolutionStrategy,
+  ReviewPayload,
   SnapshotScheduleMode,
   SnapshotScheduleModeType,
   SnapshotTier,
@@ -37,6 +38,7 @@ import {
 import { StixObject } from 'src/app/classes/stix';
 import { AddDialogComponent } from 'src/app/components/add-dialog/add-dialog.component';
 import { ConfirmationDialogComponent } from 'src/app/components/confirmation-dialog/confirmation-dialog.component';
+import { BulkPromoteDialogComponent } from 'src/app/components/bulk-update-dialog/bulk-update-dialog.component';
 import { DeleteDialogComponent } from 'src/app/components/delete-dialog/delete-dialog.component';
 import { MultipleChoiceDialogComponent } from 'src/app/components/multiple-choice-dialog/multiple-choice-dialog.component';
 import {
@@ -804,6 +806,7 @@ export class ReleaseTrackPageComponent implements OnInit {
         select: selection,
         type: 'all',
         selectionType: 'many',
+        selectAll: true,
         buttonLabel: 'Add',
         title: 'Add candidates',
         clearSelection: true,
@@ -844,6 +847,71 @@ export class ReleaseTrackPageComponent implements OnInit {
     const [stixType] = stixId.split('--');
     const attackType = StixTypeToAttackType[stixType as StixType];
     return attackType ? `/${attackType}/${stixId}` : null;
+  }
+
+  public onBulkUpdate(toStaged: boolean): void {
+    if (!this.id || !this.releaseTrack) return;
+    const laneList = toStaged ? this.candidates : this.staged;
+
+    const candidateIds = laneList
+      .map(item => ({
+        stixID: item.object_ref,
+        attackID: item.attack_id,
+        modified: item.object_modified,
+        attackType: this.formatStixType(item.object_ref),
+        ...item,
+      }))
+      .filter((item: any) =>
+        toStaged
+          ? this.getObjectStatus(item) === WorkflowStatus.AwaitingReview
+          : this.getObjectStatus(item) === WorkflowStatus.Reviewed
+      );
+
+    const selection = new SelectionModel<string>(true);
+    const dialogRef = this.dialog.open(BulkPromoteDialogComponent, {
+      data: {
+        select: selection,
+        selectAll: true,
+        type: 'all',
+        selectionType: 'many',
+        canPromote: toStaged ? true : false,
+        canDemote: toStaged ? false : true,
+        title: 'Select candidates',
+        clearSelection: true,
+        stixListConfig: {
+          stixObjects: candidateIds,
+          select: 'many',
+          selectionModel: selection,
+        },
+      },
+      maxWidth: '90vw',
+      width: '70vw',
+      maxHeight: '85vh',
+    });
+
+    dialogRef.afterClosed().subscribe({
+      next: result => {
+        if (!result || !selection.selected.length) return;
+
+        const body: ReviewPayload = {
+          from: toStaged
+            ? WorkflowStatus.AwaitingReview
+            : WorkflowStatus.Reviewed,
+          to: toStaged
+            ? WorkflowStatus.Reviewed
+            : WorkflowStatus.AwaitingReview,
+          object_refs: selection.selected,
+        };
+        this.connector.reviewCandidates(this.id, body).subscribe({
+          next: () => {
+            this.refreshReleaseTrackState();
+          },
+          error: err => {
+            console.error('Failed to change status', err);
+          },
+        });
+      },
+    });
   }
 
   public promote(objectIds: string[]): void {
@@ -1004,6 +1072,14 @@ export class ReleaseTrackPageComponent implements OnInit {
       lane.type === 'candidate' &&
       this.getLaneStatus(item, lane) === WorkflowStatus.AwaitingReview
     );
+  }
+
+  public canBulkDemoteStatus(lane: ReleaseTrackWorkspaceLane): boolean {
+    return lane.key === 'staged';
+  }
+
+  public canBulkPromoteStatus(lane: ReleaseTrackWorkspaceLane): boolean {
+    return lane.key === 'candidates-awaiting-review';
   }
 
   public canManuallyPromote(lane: ReleaseTrackWorkspaceLane): boolean {

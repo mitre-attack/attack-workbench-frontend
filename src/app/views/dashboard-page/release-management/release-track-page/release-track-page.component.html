@@ -344,6 +344,22 @@
                         Add
                       </button>
                       <button
+                        *ngIf="canBulkPromoteStatus(lane)"
+                        class="view-color"
+                        mat-stroked-button
+                        (click)="onBulkUpdate(true)">
+                        <mat-icon>edit</mat-icon>
+                        Edit
+                      </button>
+                      <button
+                        *ngIf="canBulkDemoteStatus(lane)"
+                        class="view-color"
+                        mat-stroked-button
+                        (click)="onBulkUpdate(false)">
+                        <mat-icon>edit</mat-icon>
+                        Edit
+                      </button>
+                      <button
                         *ngIf="lane.isReleasedMembers"
                         mat-stroked-button
                         type="button"

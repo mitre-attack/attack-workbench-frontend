@@ -245,6 +245,7 @@ import { NewTrackDialogComponent } from './components/new-track-dialog/new-track
 import { ReleaseTrackPageComponent } from './views/dashboard-page/release-management/release-track-page/release-track-page.component';
 import { StatusChipComponent } from './components/status-chip/status-chip.component';
 import { WorkbenchChipComponent } from './components/workbench-chip/workbench-chip.component';
+import { BulkPromoteDialogComponent } from './components/bulk-update-dialog/bulk-update-dialog.component';
 
 export function initConfig(appConfigService: AppConfigService) {
   return () => appConfigService.loadAppConfig();
@@ -267,6 +268,7 @@ export function initConfig(appConfigService: AppConfigService) {
     SaveDialogComponent,
     WorkflowStatusDialogComponent,
     AddDialogComponent,
+    BulkPromoteDialogComponent,
     DeleteDialogComponent,
     HistoryTimelineComponent,
     MembershipSectionComponent,
