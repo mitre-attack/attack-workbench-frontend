@@ -29,6 +29,8 @@ export interface StixBundlePayload {
 export interface UpdateMetadataPayload {
   name?: string;
   description?: string;
+  /** URL-safe slug accepted wherever the track ID is; null clears it. */
+  alias?: string | null;
 }
 
 export interface UpdateContentsPayload {
@@ -58,8 +60,8 @@ export interface PromoteQuarantinePayload {
 
 export interface ReleaseTrackSnapshotOptions {
   format?: ExportFormatType;
+  /** Workbench responses only; bundles reject it (they replay the sealed manifest). */
   include?: 'members' | 'staged' | 'candidates' | 'quarantine' | 'all';
-  state?: string | string[];
   stixVersion?: '2.0' | '2.1';
 }
 

@@ -47,6 +47,21 @@ $released-members-disabled-dark: colors.on-color-deemphasis(dark);
     gap: 8px;
   }
 
+  .release-preview-status {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: -6px 0 18px;
+    font-size: 14px;
+    opacity: 0.85;
+
+    mat-icon {
+      font-size: 18px;
+      width: 18px;
+      height: 18px;
+    }
+  }
+
   .review-tpl-wrapper {
     margin-top: 20px;
   }
@@ -70,6 +85,14 @@ $released-members-disabled-dark: colors.on-color-deemphasis(dark);
     display: flex;
     flex-direction: column;
     gap: 16px;
+  }
+
+  .config-card.danger-zone {
+    border-color: colors.color(error);
+
+    h3 {
+      color: colors.color(error);
+    }
   }
 
   .config-card > .content {

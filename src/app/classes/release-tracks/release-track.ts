@@ -4,6 +4,8 @@ export interface ReleaseTrack {
   track_id: string;
   type: ReleaseTrackType;
   name: string;
+  /** Optional URL-safe slug accepted wherever the track ID is. */
+  alias?: string | null;
   description?: string;
   created_at: Date;
   updated_at: Date;

@@ -3,37 +3,32 @@
     <h1>
       {{ releaseTrackName }}
     </h1>
-    <div class="button-group release-track-actions">
-      <button mat-stroked-button (click)="onExport()">
-        Export Latest
-        <mat-icon>file_download</mat-icon>
-      </button>
+    <div
+      *ngIf="isVirtualReleaseTrack"
+      class="button-group release-track-actions">
       <button
-        *ngIf="canEditReleaseTrack"
-        mat-stroked-button
-        color="warn"
-        [disabled]="!id || isDeleting"
-        (click)="onDeleteReleaseTrack()">
-        Delete
-        <mat-icon>delete</mat-icon>
-      </button>
-      <button
-        *ngIf="isVirtualReleaseTrack"
-        mat-stroked-button
+        mat-raised-button
+        color="primary"
         [disabled]="!canCreateDraft"
         (click)="onDraft()">
         Create Draft
         <mat-icon>local_see</mat-icon>
       </button>
-      <button mat-raised-button color="primary" (click)="onPreviewRelease()">
-        Preview & Release
-        <mat-icon>preview</mat-icon>
-      </button>
     </div>
   </div>
+  <p
+    *ngIf="isReleasing"
+    class="release-preview-status"
+    role="status"
+    aria-live="polite">
+    <mat-icon aria-hidden="true">hourglass_top</mat-icon>
+    Preparing the release preview. Large tracks can take a while; stay on this
+    page until the preview opens.
+  </p>
 
   <app-stix-page-tabs
     [detailsTemplate]="detailsTpl"
+    detailsLabel="Board"
     [showHistory]="false"
     [showNotes]="false"
     [showMembership]="false"
@@ -725,8 +720,16 @@
                   mat-stroked-button
                   [disabled]="isReleasing || !item.modified"
                   (click)="onTagSnapshot(item)">
-                  <mat-icon>sell</mat-icon>
-                  Preview &amp; Tag
+                  <mat-spinner
+                    *ngIf="isPreviewingSnapshot(item)"
+                    class="snapshot-action-spinner"
+                    diameter="18"></mat-spinner>
+                  <mat-icon *ngIf="!isPreviewingSnapshot(item)">sell</mat-icon>
+                  {{
+                    isPreviewingSnapshot(item)
+                      ? 'Preparing preview'
+                      : 'Preview & Tag'
+                  }}
                 </button>
                 <button
                   mat-stroked-button
@@ -737,12 +740,12 @@
                   Export&hellip;
                 </button>
                 <button
-                  *ngIf="item.isTagged && canDeleteRelease"
+                  *ngIf="item.isLatestRelease && canDeleteRelease"
                   color="warn"
                   mat-stroked-button
                   [disabled]="isDeletingRelease(item) || !item.modified"
                   [attr.aria-label]="'Delete release ' + item.title"
-                  matTooltip="Administrators may delete the most recent release. Its version becomes available again."
+                  matTooltip="Only the most recent release can be deleted. Its version becomes available again."
                   (click)="onDeleteRelease(item)">
                   <mat-spinner
                     *ngIf="isDeletingRelease(item)"
@@ -892,6 +895,48 @@
       </div>
 
       <form [formGroup]="configForm" class="config-card-list">
+        <section class="labelled-box config-card">
+          <div class="content no-label">
+            <h3>Address</h3>
+
+            <div class="config-row">
+              <div class="config-copy">
+                <div class="config-label">Alias</div>
+                <p>
+                  Optional short name accepted wherever the track ID is,
+                  including this page's URL and API paths. Lowercase letters,
+                  digits, and hyphens; unique across tracks.
+                </p>
+              </div>
+              <ng-container *ngIf="isEditingConfig; else aliasValue">
+                <mat-form-field appearance="outline" class="config-field">
+                  <mat-label>Alias</mat-label>
+                  <input
+                    matInput
+                    formControlName="alias"
+                    autocomplete="off"
+                    placeholder="enterprise-attack" />
+                  <mat-hint>{{ aliasUrlPreview }}</mat-hint>
+                  <mat-error>
+                    Use 2–64 lowercase letters, digits, or hyphens, starting and
+                    ending with a letter or digit.
+                  </mat-error>
+                </mat-form-field>
+              </ng-container>
+              <ng-template #aliasValue>
+                <code
+                  *ngIf="releaseTrack?.alias; else noAlias"
+                  class="config-value"
+                  >{{ releaseTrack.alias }}</code
+                >
+                <ng-template #noAlias>
+                  <span class="text-deemphasis">None</span>
+                </ng-template>
+              </ng-template>
+            </div>
+          </div>
+        </section>
+
         <ng-container *ngIf="isVirtualReleaseTrack; else standardConfigTpl">
           <section class="labelled-box config-card">
             <div class="content no-label">
@@ -1640,6 +1685,33 @@
           </div>
         </section>
       </form>
+
+      <section
+        *ngIf="canEditReleaseTrack"
+        class="labelled-box config-card danger-zone"
+        aria-label="Danger zone">
+        <div class="content no-label">
+          <h3>Danger zone</h3>
+          <div class="config-row">
+            <div class="config-copy">
+              <div class="config-label">Delete this release track</div>
+              <p>
+                Permanently deletes the track with every snapshot and release in
+                its history. You will be asked to type the track ID to confirm.
+              </p>
+            </div>
+            <button
+              mat-stroked-button
+              color="warn"
+              type="button"
+              [disabled]="!id || isDeleting"
+              (click)="onDeleteReleaseTrack()">
+              <mat-icon>delete_forever</mat-icon>
+              Delete release track
+            </button>
+          </div>
+        </div>
+      </section>
     </div>
   </ng-template>
 </div>

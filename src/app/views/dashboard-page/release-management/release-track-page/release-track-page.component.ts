@@ -1,7 +1,7 @@
 import { Clipboard } from '@angular/cdk/clipboard';
 import { SelectionModel } from '@angular/cdk/collections';
 import { Component, OnInit } from '@angular/core';
-import { FormBuilder, FormGroup } from '@angular/forms';
+import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { MatDialog } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { ActivatedRoute, Router } from '@angular/router';
@@ -36,6 +36,7 @@ import {
   SnapshotTier,
   SnapshotTierType,
   StixObjectRef,
+  UpdateMetadataPayload,
 } from 'src/app/classes/release-tracks';
 import { StixObject } from 'src/app/classes/stix';
 import { AddDialogComponent } from 'src/app/components/add-dialog/add-dialog.component';
@@ -93,6 +94,9 @@ interface SnapshotMemberRef {
   object_modified?: string;
 }
 
+/** Mirrors the API's alias rule: 2-64 lowercase letters, digits, and hyphens. */
+export const TRACK_ALIAS_PATTERN = /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])$/;
+
 interface SnapshotHistoryViewModel {
   snapshot: ReleaseTrackSnapshotHistoryItem;
   title: string;
@@ -101,6 +105,8 @@ interface SnapshotHistoryViewModel {
   taggedAt: Date | null;
   isTagged: boolean;
   isLatest: boolean;
+  /** The track's most recent release: the only one that can be deleted. */
+  isLatestRelease: boolean;
   isCurrentDraft: boolean;
   stats: SnapshotHistoryStat[];
   contentStats: SnapshotHistoryStat[];
@@ -211,6 +217,8 @@ export class ReleaseTrackPageComponent implements OnInit {
   public isDeleting = false;
   public isLoadingSnapshotHistory = false;
   public isReleasing = false;
+  /** Snapshot whose release preview is being prepared ('latest' for the header action). */
+  public previewingSnapshotModified: string | null = null;
   public isLoadingConfig = false;
   public isEditingConfig = false;
   public isSavingConfig = false;
@@ -262,6 +270,10 @@ export class ReleaseTrackPageComponent implements OnInit {
     private fb: FormBuilder
   ) {
     this.configForm = this.fb.group({
+      alias: [
+        '',
+        [Validators.maxLength(64), Validators.pattern(TRACK_ALIAS_PATTERN)],
+      ],
       autoPromote: [true],
       candidacyThreshold: [WorkflowStatus.Reviewed],
       memberSyncStrategy: [MemberSyncStrategy.Manual],
@@ -536,12 +548,6 @@ export class ReleaseTrackPageComponent implements OnInit {
     );
   }
 
-  private get latestDraftSnapshot(): SnapshotHistoryViewModel | undefined {
-    return this.snapshotHistory.find((snapshot, index) =>
-      this.isCurrentDraftHistoryItem(snapshot, index)
-    );
-  }
-
   private isCurrentDraftHistoryItem(
     item: SnapshotHistoryViewModel,
     index: number
@@ -601,6 +607,12 @@ export class ReleaseTrackPageComponent implements OnInit {
   private setReleaseTrack(track: any): void {
     this.releaseTrack = track;
     if (!this.releaseTrack) return;
+    // The route may carry the track's alias; work with the canonical id from
+    // here on so confirmations and comparisons never see the alias.
+    if (this.releaseTrack.id && this.releaseTrack.id !== this.id) {
+      this.id = this.releaseTrack.id;
+    }
+    this.syncAliasControl();
     this.hydrateDynamicEntryDates();
 
     this.breadcrumbService.changeBreadcrumb(
@@ -1560,18 +1572,6 @@ export class ReleaseTrackPageComponent implements OnInit {
     return `${typeLabel.replace(/\b\w/g, char => char.toUpperCase())} ${id.slice(0, 8)}`;
   }
 
-  public onExport(): void {
-    if (!this.id) return;
-
-    this.openExportFormatDialog('Export latest release snapshot')
-      .pipe(take(1))
-      .subscribe(choice => {
-        const selection = this.getSnapshotExportSelection(choice);
-        if (!selection) return;
-        this.downloadLatestReleaseTrack(selection);
-      });
-  }
-
   private openExportFormatDialog(
     title: string,
     includeSummary = false
@@ -1649,38 +1649,6 @@ export class ReleaseTrackPageComponent implements OnInit {
       return { format: ExportFormat.Workbench };
     }
     return null;
-  }
-
-  private downloadLatestReleaseTrack(selection: SnapshotExportSelection): void {
-    const options: Omit<ReleaseTrackSnapshotOptions, 'format'> = {
-      include: 'all',
-      ...(selection.stixVersion ? { stixVersion: selection.stixVersion } : {}),
-    };
-    this.connector
-      .exportLatestSnapshot(this.id, selection.format, options)
-      .pipe(take(1))
-      .subscribe({
-        next: result => {
-          this.restApiConnectorService.triggerBrowserDownload(
-            result,
-            this.getExportFilename(selection)
-          );
-        },
-        error: err => {
-          console.error('Failed to export release track', err);
-        },
-      });
-  }
-
-  private getExportFilename(selection: SnapshotExportSelection): string {
-    const name = this.releaseTrackName || this.id || 'release-track';
-    const safeName =
-      name
-        .trim()
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, '-')
-        .replace(/^-+|-+$/g, '') || 'release-track';
-    return `${safeName}-latest-${this.getExportFilenameSuffix(selection)}.json`;
   }
 
   public onDraft(): void {
@@ -1803,6 +1771,7 @@ export class ReleaseTrackPageComponent implements OnInit {
   public onEditConfig(): void {
     if (this.isVirtualReleaseTrack) this.setVirtualConfig();
     this.loadPublicationOptions();
+    this.syncAliasControl();
     this.isEditingConfig = true;
   }
 
@@ -1812,20 +1781,57 @@ export class ReleaseTrackPageComponent implements OnInit {
     } else {
       this.setConfig(this.releaseTrackConfig);
     }
+    this.syncAliasControl();
     this.isEditingConfig = false;
+  }
+
+  public get aliasUrlPreview(): string {
+    const alias = (this.configForm.get('alias')?.value ?? '').trim();
+    return `/dashboard/release-management/${alias || '<alias>'}`;
+  }
+
+  private syncAliasControl(): void {
+    this.configForm
+      .get('alias')
+      ?.setValue(this.releaseTrack?.alias ?? '', { emitEvent: false });
+  }
+
+  /** The metadata update that brings the registry alias in line with the form, if any. */
+  private getAliasUpdate(): UpdateMetadataPayload | null {
+    const draft = (this.configForm.get('alias')?.value ?? '').trim();
+    const current = this.releaseTrack?.alias ?? '';
+    if (draft === current) return null;
+    return { alias: draft || null };
+  }
+
+  /**
+   * The alias is registry metadata saved through the metadata endpoint, so a
+   * config save first applies any alias change, then runs the config write.
+   */
+  private withAliasUpdate<T>(next: () => Observable<T>): Observable<T> {
+    const update = this.getAliasUpdate();
+    if (!update) return next();
+    return this.connector
+      .updateMetadataByLatest(this.id, update)
+      .pipe(switchMap(() => next()));
   }
 
   public onSaveConfig(): void {
     if (!this.id || this.isSavingConfig) return;
+    const aliasControl = this.configForm.get('alias');
+    if (aliasControl?.invalid) {
+      aliasControl.markAsTouched();
+      return;
+    }
     if (this.isVirtualReleaseTrack) {
       this.saveVirtualConfig();
       return;
     }
 
     const payload = this.getConfigPayload();
+    const aliasChanged = !!this.getAliasUpdate();
     this.isSavingConfig = true;
-    this.connector
-      .updateConfig(this.id, payload)
+    this.withAliasUpdate(() => this.connector.updateConfig(this.id, payload))
       .pipe(
         take(1),
         finalize(() => {
@@ -1840,6 +1846,7 @@ export class ReleaseTrackPageComponent implements OnInit {
             this.releaseTrack.config = this.releaseTrackConfig;
           this.refreshReleaseTrackState();
           this.getConfig();
+          if (aliasChanged) this.getReleaseTrack();
         },
         error: err => {
           console.error('Failed to update release track config', err);
@@ -1847,65 +1854,33 @@ export class ReleaseTrackPageComponent implements OnInit {
       });
   }
 
-  public onPreviewRelease(): void {
-    if (!this.latestDraftSnapshot && this.releaseTrack?.version != null) {
-      this.openNoDraftSnapshotDialog();
-      return;
-    }
-
-    this.previewRelease(this.latestDraftSnapshot);
-  }
-
-  private openNoDraftSnapshotDialog(): void {
-    this.dialog.open(MultipleChoiceDialogComponent, {
-      width: '30em',
-      autoFocus: false,
-      restoreFocus: true,
-      data: {
-        title: 'No draft snapshot available',
-        description:
-          'The latest snapshot has already been released. Modify the release track to create a new draft before previewing another release.',
-        choices: [
-          {
-            label: 'Close',
-            value: 'close',
-          },
-        ],
-      },
-    });
-  }
-
+  /**
+   * Tagging is the second step of the draft-then-tag flow: a draft snapshot
+   * (implicit for standard tracks, materialized for virtual ones) is
+   * previewed and then tagged from its card on the Releases tab.
+   */
   public onTagSnapshot(item: SnapshotHistoryViewModel): void {
     if (!item || item.isTagged || !item.modified) return;
     this.previewRelease(item);
   }
 
-  private previewRelease(item?: SnapshotHistoryViewModel): void {
-    if (!this.id || this.isReleasing) return;
+  private previewRelease(item: SnapshotHistoryViewModel): void {
+    if (!this.id || !item.modified || this.isReleasing) return;
 
     this.isReleasing = true;
+    this.previewingSnapshotModified = item.modified;
     const selection: ReleasePayload = { increment: 'minor' };
+    // The workbench snapshot already carries each entry's name, ATT&CK ID,
+    // type, and version, so no catalogue download is needed for the dialog.
     const preview = forkJoin({
-      preview: item?.modified
-        ? this.connector.previewRelease(
-            this.id,
-            { format: ReleasePreviewFormat.Summary, ...selection },
-            item.modified
-          )
-        : this.connector.previewRelease(this.id, {
-            format: ReleasePreviewFormat.Summary,
-            ...selection,
-          }),
-      track: item?.modified
-        ? this.connector.retrieveSnapshotByModified(this.id, item.modified, {
-            format: ExportFormat.Workbench,
-            include: 'all',
-          })
-        : of(this.releaseTrack),
-      objects: this.restApiConnectorService.getAllObjects({
-        revoked: true,
-        deprecated: true,
-        versions: 'all',
+      preview: this.connector.previewRelease(
+        this.id,
+        { format: ReleasePreviewFormat.Summary, ...selection },
+        item.modified
+      ),
+      track: this.connector.retrieveSnapshotByModified(this.id, item.modified, {
+        format: ExportFormat.Workbench,
+        include: 'all',
       }),
     });
 
@@ -1914,6 +1889,7 @@ export class ReleaseTrackPageComponent implements OnInit {
         take(1),
         finalize(() => {
           this.isReleasing = false;
+          this.previewingSnapshotModified = null;
         })
       )
       .subscribe({
@@ -1932,7 +1908,7 @@ export class ReleaseTrackPageComponent implements OnInit {
 
           this.openReleasePreviewDialog(
             result.preview,
-            this.enrichReleasePreviewTrack(result.track, result.objects),
+            this.enrichReleasePreviewTrack(result.track),
             item
           );
         },
@@ -2111,7 +2087,7 @@ export class ReleaseTrackPageComponent implements OnInit {
         this.id,
         modified,
         selection.format,
-        this.getSnapshotExportOptions(item, selection)
+        this.getSnapshotExportOptions(selection)
       )
       .pipe(take(1))
       .subscribe({
@@ -2155,25 +2131,27 @@ export class ReleaseTrackPageComponent implements OnInit {
     );
   }
 
+  /**
+   * Workbench exports select every tier; bundle exports replay the sealed
+   * content manifest and accept only the STIX version.
+   */
   private getSnapshotExportOptions(
-    item: SnapshotHistoryViewModel,
     selection: SnapshotExportSelection
   ): Omit<ReleaseTrackSnapshotOptions, 'format'> | undefined {
     if (selection.format === ExportFormat.Workbench) {
       return { include: 'all' };
     }
-
-    const stixVersionOptions = selection.stixVersion
+    return selection.stixVersion
       ? { stixVersion: selection.stixVersion }
-      : {};
-    const trackType =
-      this.getSnapshotType(item.snapshot) || this.releaseTrack?.type;
-    if (trackType === ReleaseTrackType.Standard && !item.isTagged) {
-      return { include: 'staged', ...stixVersionOptions };
-    }
-    return Object.keys(stixVersionOptions).length
-      ? stixVersionOptions
       : undefined;
+  }
+
+  public isPreviewingSnapshot(item: SnapshotHistoryViewModel): boolean {
+    return (
+      this.isReleasing &&
+      !!item.modified &&
+      this.previewingSnapshotModified === item.modified
+    );
   }
 
   private reviewCandidateStatus(
@@ -2488,9 +2466,11 @@ export class ReleaseTrackPageComponent implements OnInit {
     const publication = this.getPublicationPayload(
       this.configForm.getRawValue() as ReleaseTrackConfigFormValue
     );
+    const aliasChanged = !!this.getAliasUpdate();
     this.isSavingConfig = true;
-    this.connector
-      .updateComposition(this.id, payload)
+    this.withAliasUpdate(() =>
+      this.connector.updateComposition(this.id, payload)
+    )
       .pipe(
         take(1),
         switchMap(result =>
@@ -2516,6 +2496,7 @@ export class ReleaseTrackPageComponent implements OnInit {
           );
           this.refreshReleaseTrackState();
           this.getConfig();
+          if (aliasChanged) this.getReleaseTrack();
         },
         error: err => {
           console.error('Failed to update virtual release track config', err);
@@ -2817,7 +2798,7 @@ export class ReleaseTrackPageComponent implements OnInit {
   private openReleasePreviewDialog(
     preview: any,
     track: ReleaseTrackSnapshot,
-    item?: SnapshotHistoryViewModel
+    item: SnapshotHistoryViewModel
   ): void {
     const releaseRef = this.dialog.open(ReleasePreviewDialogComponent, {
       maxWidth: 'none',
@@ -2843,59 +2824,20 @@ export class ReleaseTrackPageComponent implements OnInit {
       });
   }
 
+  /**
+   * Tier entries arrive with name, ATT&CK ID, STIX type, and version from the
+   * API; only the Workbench attack type has to be derived for the dialog.
+   */
   private enrichReleasePreviewTrack(
-    track: ReleaseTrackSnapshot,
-    response: any
-  ) {
-    const objects = Array.isArray(response)
-      ? response
-      : Array.isArray(response?.data)
-        ? response.data
-        : [];
-    const objectsByRevision = new Map<string, any>();
-
-    objects.forEach((object: any) => {
-      const objectRef = object?.stix?.id ?? object?.stixID ?? object?.id;
-      const modified =
-        object?.stix?.modified ?? object?.modified ?? object?.object_modified;
-      if (objectRef && modified) {
-        objectsByRevision.set(
-          this.getReleasePreviewRevisionKey(objectRef, modified),
-          object
-        );
-      }
+    track: ReleaseTrackSnapshot
+  ): ReleaseTrackSnapshot {
+    const enrich = (entry: any) => ({
+      ...entry,
+      attack_type:
+        entry?.attack_type ??
+        StixTypeToAttackType[entry?.type as StixType] ??
+        entry?.attack_type,
     });
-
-    const enrich = (entry: any) => {
-      const object = objectsByRevision.get(
-        this.getReleasePreviewRevisionKey(
-          entry?.object_ref,
-          entry?.object_modified
-        )
-      );
-      if (!object) return entry;
-
-      const stix = object?.stix ?? object;
-      return {
-        ...entry,
-        name: object?.name ?? stix?.name ?? entry?.name,
-        attack_id:
-          object?.attackID ??
-          object?.attack_id ??
-          object?.workspace?.attack_id ??
-          entry?.attack_id,
-        attack_type:
-          object?.attackType ??
-          StixTypeToAttackType[stix?.type as StixType] ??
-          entry?.attack_type,
-        type: stix?.type ?? entry?.type,
-        x_mitre_version:
-          object?.version?.toString?.() ??
-          object?.version ??
-          stix?.x_mitre_version ??
-          entry?.x_mitre_version,
-      };
-    };
 
     return {
       ...track,
@@ -2905,26 +2847,15 @@ export class ReleaseTrackPageComponent implements OnInit {
     } as ReleaseTrackSnapshot;
   }
 
-  private getReleasePreviewRevisionKey(
-    objectRef: unknown,
-    modified: unknown
-  ): string {
-    const timestamp = new Date(modified as any).getTime();
-    return `${String(objectRef ?? '')}::${timestamp}`;
-  }
-
   private releaseSnapshot(
     selection: ReleasePayload,
-    item?: SnapshotHistoryViewModel
+    item: SnapshotHistoryViewModel
   ): void {
-    if (!this.id) return;
+    if (!this.id || !item.modified) return;
 
     this.isReleasing = true;
-    const release = item?.modified
-      ? this.connector.releaseSnapshot(this.id, item.modified, selection)
-      : this.connector.releaseLatest(this.id, selection);
-
-    release
+    this.connector
+      .releaseSnapshot(this.id, item.modified, selection)
       .pipe(
         take(1),
         finalize(() => {
@@ -2933,7 +2864,7 @@ export class ReleaseTrackPageComponent implements OnInit {
       )
       .subscribe({
         next: () => {
-          if (item?.modified === this.createdDraftSnapshot?.modified) {
+          if (item.modified === this.createdDraftSnapshot?.modified) {
             this.createdDraftSnapshot = null;
           }
           this.refreshReleaseTrackState();
@@ -2957,6 +2888,9 @@ export class ReleaseTrackPageComponent implements OnInit {
     const latestSnapshot =
       sorted.find(snapshot => this.isLatestHistorySnapshot(snapshot)) ??
       sorted[0];
+    const latestRelease = sorted.find(snapshot =>
+      this.isTaggedSnapshot(snapshot)
+    );
 
     return sorted.map((snapshot, index) => {
       const previousSnapshot = sorted[index + 1];
@@ -2989,6 +2923,7 @@ export class ReleaseTrackPageComponent implements OnInit {
         taggedAt: this.getSnapshotTaggedAt(snapshot),
         isTagged,
         isLatest,
+        isLatestRelease: isTagged && snapshot === latestRelease,
         isCurrentDraft: !isTagged && isLatest,
         stats: this.getSnapshotStats(snapshot, addedCount, modifiedCount),
         contentStats: this.getContentStats(snapshot),

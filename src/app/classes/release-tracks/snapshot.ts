@@ -18,6 +18,8 @@ export class ReleaseTrackSnapshot {
   public modified: Date = new Date();
   public version?: string | null;
   public name = '';
+  /** Registry alias for the track, attached to workbench responses. */
+  public alias?: string | null;
   public description?: string;
   public snapshot_description?: string;
   public created: Date = new Date();
@@ -95,6 +97,7 @@ export class ReleaseTrackSnapshot {
     if ('modified' in raw) this.modified = new Date(raw.modified);
     if ('version' in raw) this.version = raw.version;
     if ('name' in raw) this.name = raw.name;
+    if ('alias' in raw) this.alias = raw.alias;
     if ('description' in raw) this.description = raw.description;
     if ('snapshot_description' in raw)
       this.snapshot_description = raw.snapshot_description;
