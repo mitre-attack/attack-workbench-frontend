@@ -1702,6 +1702,47 @@ describe('ReleaseTrackPageComponent', () => {
     expect(component.isReleasing).toBe(false);
   });
 
+  it('should describe in-flight work in the activity bar', () => {
+    expect(component.activityMessage).toBeNull();
+
+    component.isCreatingDraft = true;
+    expect(component.activityMessage).toContain('Creating the draft snapshot');
+    component.isCreatingDraft = false;
+
+    component.isReleasing = true;
+    component.previewingSnapshotModified = '2026-07-30T14:00:00.000Z';
+    expect(component.activityMessage).toContain(
+      'Preparing the release preview'
+    );
+    component.previewingSnapshotModified = null;
+    expect(component.activityMessage).toContain('Tagging the release');
+    component.isReleasing = false;
+
+    component.isDeleting = true;
+    expect(component.activityMessage).toContain('Deleting the release track');
+    component.isDeleting = false;
+
+    component.isSavingConfig = true;
+    expect(component.activityMessage).toContain(
+      'Saving the track configuration'
+    );
+    component.isSavingConfig = false;
+
+    expect(component.activityMessage).toBeNull();
+  });
+
+  it('should show the activity bar while a draft is being created', () => {
+    component.id = 'release-track--123';
+    component.releaseTrack = { id: 'release-track--123' } as any;
+    component.isCreatingDraft = true;
+    fixture.detectChanges();
+
+    const activity = fixture.nativeElement.querySelector('.page-activity');
+    expect(activity).toBeTruthy();
+    expect(activity.querySelector('mat-progress-bar')).toBeTruthy();
+    expect(activity.textContent).toContain('Creating the draft snapshot');
+  });
+
   it('should ignore tagging requests for released snapshots', () => {
     component.id = 'release-track--123';
 

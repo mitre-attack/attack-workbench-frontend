@@ -11,20 +11,28 @@
         color="primary"
         [disabled]="!canCreateDraft"
         (click)="onDraft()">
-        Create Draft
-        <mat-icon>local_see</mat-icon>
+        <mat-spinner
+          *ngIf="isCreatingDraft"
+          class="snapshot-action-spinner"
+          diameter="18"></mat-spinner>
+        {{ isCreatingDraft ? 'Creating draft' : 'Create Draft' }}
+        <mat-icon *ngIf="!isCreatingDraft">local_see</mat-icon>
       </button>
     </div>
   </div>
-  <p
-    *ngIf="isReleasing"
-    class="release-preview-status"
+  <div
+    *ngIf="activityMessage as message"
+    class="page-activity"
     role="status"
     aria-live="polite">
-    <mat-icon aria-hidden="true">hourglass_top</mat-icon>
-    Preparing the release preview. Large tracks can take a while; stay on this
-    page until the preview opens.
-  </p>
+    <mat-progress-bar
+      mode="indeterminate"
+      aria-hidden="true"></mat-progress-bar>
+    <p class="page-activity-message">
+      <mat-spinner diameter="16" aria-hidden="true"></mat-spinner>
+      {{ message }} Stay on this page until it finishes.
+    </p>
+  </div>
 
   <app-stix-page-tabs
     [detailsTemplate]="detailsTpl"

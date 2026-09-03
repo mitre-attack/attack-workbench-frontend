@@ -47,18 +47,16 @@ $released-members-disabled-dark: colors.on-color-deemphasis(dark);
     gap: 8px;
   }
 
-  .release-preview-status {
-    display: flex;
-    align-items: center;
-    gap: 8px;
+  .page-activity {
     margin: -6px 0 18px;
-    font-size: 14px;
-    opacity: 0.85;
 
-    mat-icon {
-      font-size: 18px;
-      width: 18px;
-      height: 18px;
+    .page-activity-message {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin: 10px 0 0;
+      font-size: 14px;
+      opacity: 0.85;
     }
   }
 

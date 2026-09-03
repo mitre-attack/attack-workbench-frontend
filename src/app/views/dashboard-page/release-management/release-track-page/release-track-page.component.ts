@@ -1785,6 +1785,32 @@ export class ReleaseTrackPageComponent implements OnInit {
     this.isEditingConfig = false;
   }
 
+  /**
+   * Message for the page-level activity bar while a long-running operation is
+   * in flight, or null. Each operation names what the server is doing so a
+   * multi-second wait reads as work, not as a frozen page.
+   */
+  public get activityMessage(): string | null {
+    if (this.isCreatingDraft) {
+      return 'Creating the draft snapshot. Materializing a virtual track resolves every component track and can take a while.';
+    }
+    if (this.isReleasing) {
+      return this.previewingSnapshotModified
+        ? 'Preparing the release preview. Large tracks can take a while.'
+        : 'Tagging the release and sealing its content.';
+    }
+    if (this.deletingReleaseModified.size > 0) {
+      return 'Deleting the release and reconciling the track.';
+    }
+    if (this.isDeleting) {
+      return 'Deleting the release track and its history.';
+    }
+    if (this.isSavingConfig) {
+      return 'Saving the track configuration.';
+    }
+    return null;
+  }
+
   public get aliasUrlPreview(): string {
     const alias = (this.configForm.get('alias')?.value ?? '').trim();
     return `/dashboard/release-management/${alias || '<alias>'}`;
