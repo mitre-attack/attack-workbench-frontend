@@ -14,8 +14,6 @@ export interface CreateReleaseTrackPayload {
   name: string;
   description?: string;
   snapshot_description?: string;
-  external_references?: any[];
-  object_marking_refs?: string[];
   type?: ReleaseTrackType;
   config?: ReleaseTrackConfig;
   composition?: Composition;
@@ -31,8 +29,6 @@ export interface StixBundlePayload {
 export interface UpdateMetadataPayload {
   name?: string;
   description?: string;
-  external_references?: any[];
-  object_marking_refs?: string[];
 }
 
 export interface UpdateContentsPayload {
@@ -65,7 +61,6 @@ export interface ReleaseTrackSnapshotOptions {
   include?: 'members' | 'staged' | 'candidates' | 'quarantine' | 'all';
   state?: string | string[];
   stixVersion?: '2.0' | '2.1';
-  includeToc?: boolean;
 }
 
 export interface SnapshotHistoryOptions {
@@ -74,13 +69,40 @@ export interface SnapshotHistoryOptions {
   offset?: number;
 }
 
-export interface SnapshotGraphStatistics {
+export interface SnapshotContentStatistics {
   primary_count: number;
   secondary_count: number;
   relationship_count: number;
   supporting_count: number;
   link_target_count: number;
   total_count: number;
+}
+
+export interface SnapshotPublication {
+  collection_id: string;
+  created: string;
+  created_by_ref: string;
+  object_marking_refs: string[];
+  attack_spec_version: string;
+}
+
+export interface PreviewRelationshipChange {
+  object_ref: string;
+  object_modified: string;
+  relationship_type?: string;
+  source_ref?: string;
+  target_ref?: string;
+  stale_endpoints?: ('source' | 'target')[];
+}
+
+export interface PreviewRelationshipChanges {
+  selected_count: number;
+  added_count: number;
+  removed_count: number;
+  unchanged_count: number;
+  added: PreviewRelationshipChange[];
+  removed: PreviewRelationshipChange[];
+  stale_endpoints: PreviewRelationshipChange[];
 }
 
 export type ReleasePreviewOptions = ReleasePayload & {
@@ -115,6 +137,7 @@ export interface StandardReleasePreviewSummary extends ReleasePreviewSummaryBase
   changes: {
     promoted_count: number;
   };
+  relationships?: PreviewRelationshipChanges;
 }
 
 export interface VirtualReleasePreviewSummary extends ReleasePreviewSummaryBase {
@@ -152,9 +175,11 @@ export interface ReleaseTrackSnapshotHistoryItem {
   id?: string;
   modified?: string | Date;
   version?: string | null;
-  graph_manifest_id?: string;
+  content_manifest_id?: string;
+  publication?: SnapshotPublication;
+  bundle_id?: string;
   bundle_hashes?: SnapshotBundleHashes;
-  graph_statistics?: SnapshotGraphStatistics;
+  content_statistics?: SnapshotContentStatistics;
   snapshot_description?: string;
   type?: ReleaseTrackType;
   name?: string;

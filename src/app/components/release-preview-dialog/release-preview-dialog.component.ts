@@ -170,6 +170,29 @@ export class ReleasePreviewDialogComponent {
     return this.data.previewSummary?.changes?.removed_count ?? 0;
   }
 
+  /**
+   * Relationship inventory the release commit would seal (standard tracks).
+   */
+  public get relationshipChanges(): any | null {
+    return this.data.previewSummary?.relationships ?? null;
+  }
+
+  public get relationshipSelectedCount(): number {
+    return this.relationshipChanges?.selected_count ?? 0;
+  }
+
+  public get relationshipAddedCount(): number {
+    return this.relationshipChanges?.added_count ?? 0;
+  }
+
+  public get relationshipRemovedCount(): number {
+    return this.relationshipChanges?.removed_count ?? 0;
+  }
+
+  public get staleEndpointRelationships(): any[] {
+    return this.relationshipChanges?.stale_endpoints ?? [];
+  }
+
   public get quarantinedObjectCount(): number {
     return this.data.previewSummary?.changes?.quarantined_count ?? 0;
   }

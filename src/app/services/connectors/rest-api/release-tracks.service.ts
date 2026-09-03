@@ -474,55 +474,6 @@ export class ReleaseTracksConnectorService extends ApiConnector {
   }
 
   /**
-   * POST /api/release-tracks/:id/snapshots/:modified/graph
-   * Materialize the deterministic member graph for a tagged snapshot.
-   * @param id Release track id
-   * @param modified Snapshot modified timestamp
-   * @returns Observable snapshot containing its opaque graph manifest id
-   */
-  public createSnapshotGraph(
-    id: string,
-    modified: string
-  ): Observable<ReleaseTrackSnapshotHistoryItem> {
-    const url = `${this.apiUrl}/release-tracks/${id}/snapshots/${encodeURIComponent(modified)}/graph`;
-    return this.http.post<ReleaseTrackSnapshotHistoryItem>(url, {}).pipe(
-      tap(result =>
-        logger.log(
-          `created deterministic graph for snapshot ${modified}`,
-          result
-        )
-      ),
-      catchError(
-        this.handleError_raise<ReleaseTrackSnapshotHistoryItem>(false)
-      ),
-      share()
-    );
-  }
-
-  /**
-   * DELETE /api/release-tracks/:id/snapshots/:modified/graph
-   * Remove the deterministic member graph from a tagged snapshot.
-   * @param id Release track id
-   * @param modified Snapshot modified timestamp
-   * @returns Observable<unknown>
-   */
-  public deleteSnapshotGraph(
-    id: string,
-    modified: string
-  ): Observable<unknown> {
-    const url = `${this.apiUrl}/release-tracks/${id}/snapshots/${encodeURIComponent(modified)}/graph`;
-    return this.http.delete(url).pipe(
-      tap(() =>
-        logger.log(
-          `deleted deterministic graph for snapshot ${modified} from track ${id}`
-        )
-      ),
-      catchError(this.handleError_raise()),
-      share()
-    );
-  }
-
-  /**
    * POST /api/release-tracks/:id/snapshots/:modified/clone
    * Clone a new release track from a specific snapshot.
    * @param id Release track id
@@ -552,10 +503,14 @@ export class ReleaseTracksConnectorService extends ApiConnector {
    */
   public deleteSnapshotByModified(
     id: string,
-    modified: string
+    modified: string,
+    options?: { confirmVersion?: string }
   ): Observable<unknown> {
     const url = `${this.apiUrl}/release-tracks/${id}/snapshots/${encodeURIComponent(modified)}`;
-    return this.http.delete(url).pipe(
+    const params = options?.confirmVersion
+      ? this.buildHttpParams({ confirm_version: options.confirmVersion })
+      : undefined;
+    return this.http.delete(url, params ? { params } : {}).pipe(
       tap(() => logger.log(`deleted snapshot ${modified} from track ${id}`)),
       catchError(this.handleError_raise()),
       share()

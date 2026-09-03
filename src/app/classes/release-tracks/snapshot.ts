@@ -1,3 +1,4 @@
+import type { SnapshotBundleHashes, SnapshotPublication } from './api';
 import { Composition, CompositionResolution } from './composition';
 import { ReleaseTrackConfig } from './config';
 import { ReleaseTrackType } from './enums';
@@ -21,7 +22,10 @@ export class ReleaseTrackSnapshot {
   public snapshot_description?: string;
   public created: Date = new Date();
   public created_by_ref?: string;
-  public object_marking_refs?: string[];
+  public content_manifest_id?: string;
+  public publication?: SnapshotPublication;
+  public bundle_id?: string;
+  public bundle_hashes?: SnapshotBundleHashes;
 
   public config: ReleaseTrackConfig = {} as ReleaseTrackConfig;
   public version_history: VersionHistoryEntry[] = [];
@@ -96,8 +100,11 @@ export class ReleaseTrackSnapshot {
       this.snapshot_description = raw.snapshot_description;
     if ('created' in raw) this.created = new Date(raw.created);
     if ('created_by_ref' in raw) this.created_by_ref = raw.created_by_ref;
-    if ('object_marking_refs' in raw && Array.isArray(raw.object_marking_refs))
-      this.object_marking_refs = raw.object_marking_refs.slice();
+    if ('content_manifest_id' in raw)
+      this.content_manifest_id = raw.content_manifest_id;
+    if ('publication' in raw) this.publication = raw.publication;
+    if ('bundle_id' in raw) this.bundle_id = raw.bundle_id;
+    if ('bundle_hashes' in raw) this.bundle_hashes = raw.bundle_hashes;
 
     if ('config' in raw) this.config = raw.config;
     if ('summary' in raw) this.summary = raw.summary;
@@ -196,7 +203,10 @@ export class ReleaseTrackSnapshot {
       snapshot_description: this.snapshot_description,
       created: this.created ? this.created.toISOString() : undefined,
       created_by_ref: this.created_by_ref,
-      object_marking_refs: this.object_marking_refs,
+      content_manifest_id: this.content_manifest_id,
+      publication: this.publication,
+      bundle_id: this.bundle_id,
+      bundle_hashes: this.bundle_hashes,
       config: this.config,
       summary: this.summary,
       version_history: this.version_history?.map(v => ({

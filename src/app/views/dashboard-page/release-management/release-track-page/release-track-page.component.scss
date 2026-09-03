@@ -1828,3 +1828,30 @@ $released-members-disabled-dark: colors.on-color-deemphasis(dark);
     }
   }
 }
+
+// Publication configuration and sealed-content additions
+.config-section-intro {
+  margin: 0 0 1rem;
+  color: var(--text-secondary, rgba(0, 0, 0, 0.6));
+  font-size: 0.9rem;
+}
+
+.config-source {
+  margin-top: 0.25rem;
+  font-size: 0.8rem;
+  opacity: 0.75;
+}
+
+.config-inherit-editor {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.5rem;
+}
+
+.snapshot-bundle-id {
+  margin-left: auto;
+  font-size: 0.8rem;
+  opacity: 0.8;
+  word-break: break-all;
+}

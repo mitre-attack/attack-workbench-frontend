@@ -6,7 +6,7 @@ import { MatDialog } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { ActivatedRoute, Router } from '@angular/router';
 import { forkJoin, Observable, of } from 'rxjs';
-import { finalize, map, take } from 'rxjs/operators';
+import { finalize, map, switchMap, take } from 'rxjs/operators';
 import {
   ConflictPolicy,
   ConflictPolicyType,
@@ -22,6 +22,9 @@ import {
   MemberSyncStrategyType,
   ReleasePayload,
   ReleasePreviewFormat,
+  PublicationConfig,
+  PublicationResolved,
+  PublicationSource,
   ReleaseTrackConfig,
   ReleaseTrackSnapshot,
   ReleaseTrackSnapshotHistoryItem,
@@ -36,7 +39,6 @@ import {
 } from 'src/app/classes/release-tracks';
 import { StixObject } from 'src/app/classes/stix';
 import { AddDialogComponent } from 'src/app/components/add-dialog/add-dialog.component';
-import { ConfirmationDialogComponent } from 'src/app/components/confirmation-dialog/confirmation-dialog.component';
 import { DeleteDialogComponent } from 'src/app/components/delete-dialog/delete-dialog.component';
 import { MultipleChoiceDialogComponent } from 'src/app/components/multiple-choice-dialog/multiple-choice-dialog.component';
 import {
@@ -100,11 +102,9 @@ interface SnapshotHistoryViewModel {
   isTagged: boolean;
   isLatest: boolean;
   isCurrentDraft: boolean;
-  isBundleCached: boolean;
-  canCacheBundle: boolean;
   stats: SnapshotHistoryStat[];
-  graphCacheStats: SnapshotHistoryStat[];
-  graphCacheTotal: number;
+  contentStats: SnapshotHistoryStat[];
+  contentTotal: number;
   addedCount: number;
   modifiedCount: number;
   totalObjects: number;
@@ -125,8 +125,17 @@ interface ReleaseTrackConfigFormValue {
   memberSyncSupplantStatusPolicy: MemberSyncPolicyType;
   candidatesToStagedConflict: ConflictPolicyType;
   stagedToMembersConflict: ConflictPolicyType;
-  includeSecondaryObjects: boolean;
-  secondaryObjectThreshold: WorkflowStatusType;
+  publicationCollectionId: string;
+  publicationCreated: string;
+  publicationIdentityInherit: boolean;
+  publicationIdentityValue: string;
+  publicationMarkingsInherit: boolean;
+  publicationMarkingsValue: string[];
+}
+
+interface PublicationOption {
+  id: string;
+  label: string;
 }
 
 interface VirtualReleaseTrackConfigFormValue {
@@ -215,9 +224,11 @@ export class ReleaseTrackPageComponent implements OnInit {
   public virtualComponentTrackOptions: VirtualComponentTrackOption[] = [];
   public virtualConfigComponentTracks: any[] = [];
   private createdDraftSnapshot: ReleaseTrackSnapshotHistoryItem | null = null;
-  private cachingSnapshotModified = new Set<string>();
-  private deletingSnapshotCacheModified = new Set<string>();
   private updatingSnapshotDescriptionModified = new Set<string>();
+  private deletingReleaseModified = new Set<string>();
+  public publicationResolved: PublicationResolved | null = null;
+  public publicationIdentityOptions: PublicationOption[] = [];
+  public publicationMarkingOptions: PublicationOption[] = [];
 
   public candidacyOptions = Object.values(WorkflowStatus);
   public memberSyncStrategyOptions = Object.values(MemberSyncStrategy);
@@ -258,8 +269,12 @@ export class ReleaseTrackPageComponent implements OnInit {
       memberSyncSupplantStatusPolicy: [MemberSyncPolicy.Preserve],
       candidatesToStagedConflict: [ConflictPolicy.PreferLatest],
       stagedToMembersConflict: [ConflictPolicy.Abort],
-      includeSecondaryObjects: [false],
-      secondaryObjectThreshold: [WorkflowStatus.Reviewed],
+      publicationCollectionId: [''],
+      publicationCreated: [''],
+      publicationIdentityInherit: [true],
+      publicationIdentityValue: [''],
+      publicationMarkingsInherit: [true],
+      publicationMarkingsValue: [[] as string[]],
       virtualDeduplicationStrategy: [
         DeduplicationStrategy.PrioritizeLatestObject,
       ],
@@ -272,12 +287,6 @@ export class ReleaseTrackPageComponent implements OnInit {
     this.configForm.get('autoPromote')?.valueChanges.subscribe(autoPromote => {
       this.syncCandidacyThresholdControl(!!autoPromote);
     });
-    this.configForm
-      .get('includeSecondaryObjects')
-      ?.valueChanges.subscribe(includeSecondaryObjects => {
-        this.syncSecondaryObjectThresholdControl(!!includeSecondaryObjects);
-      });
-    this.syncSecondaryObjectThresholdControl(false);
   }
 
   ngOnInit(): void {
@@ -551,6 +560,10 @@ export class ReleaseTrackPageComponent implements OnInit {
     return this.authenticationService.canEdit();
   }
 
+  public get canDeleteRelease(): boolean {
+    return this.authenticationService.canDelete();
+  }
+
   public getReleaseTrack(): void {
     this.connector
       .getLatestSnapshot(this.id, {
@@ -715,6 +728,74 @@ export class ReleaseTrackPageComponent implements OnInit {
       });
   }
 
+  public isDeletingRelease(item: SnapshotHistoryViewModel): boolean {
+    return !!item.modified && this.deletingReleaseModified.has(item.modified);
+  }
+
+  /**
+   * Delete the track's most recent release. Only administrators may do this,
+   * and they confirm by typing the release version.
+   */
+  public onDeleteRelease(item: SnapshotHistoryViewModel): void {
+    if (
+      !this.id ||
+      !item.modified ||
+      !item.isTagged ||
+      !this.canDeleteRelease ||
+      this.isDeletingRelease(item)
+    ) {
+      return;
+    }
+    const version = item.snapshot.version || '';
+    const modified = item.modified;
+    const prompt = this.dialog.open(DeleteDialogComponent, {
+      maxWidth: '35em',
+      disableClose: true,
+      autoFocus: false,
+      data: {
+        title: `Delete release ${version}?`,
+        warning: `Release ${version} of ${this.releaseTrackName || 'this track'} will be permanently deleted. Its version becomes available again and later drafts are kept.`,
+        stixId: version,
+      },
+    });
+
+    prompt
+      .afterClosed()
+      .pipe(take(1))
+      .subscribe(confirm => {
+        if (!confirm) return;
+
+        this.deletingReleaseModified.add(modified);
+        this.connector
+          .deleteSnapshotByModified(this.id, modified, {
+            confirmVersion: version,
+          })
+          .pipe(
+            take(1),
+            finalize(() => {
+              this.deletingReleaseModified.delete(modified);
+            })
+          )
+          .subscribe({
+            next: () => {
+              this.snackbar.open(`Release ${version} deleted.`, null, {
+                duration: 5000,
+              });
+              this.getReleaseTrack();
+              this.getSnapshotHistory();
+            },
+            error: err => {
+              console.error('Failed to delete release', err);
+              this.snackbar.open(
+                'Unable to delete this release. Please try again.',
+                null,
+                { duration: 5000, panelClass: 'error' }
+              );
+            },
+          });
+      });
+  }
+
   public getSnapshotHistory(): void {
     if (!this.id) return;
 
@@ -757,6 +838,9 @@ export class ReleaseTrackPageComponent implements OnInit {
           if (!this.isEditingConfig) {
             if (this.isVirtualReleaseTrack) {
               this.setVirtualConfig();
+              this.setConfig(
+                this.getConfigFromResponse(config, this.releaseTrack?.config)
+              );
             } else {
               this.setConfig(
                 this.getConfigFromResponse(config, this.releaseTrack?.config)
@@ -1522,7 +1606,7 @@ export class ReleaseTrackPageComponent implements OnInit {
         label: 'Summary',
         value: 'copy-summary',
         description:
-          'Copy lightweight snapshot metadata, object counts, and graph-cache statistics to the clipboard.',
+          'Copy lightweight snapshot metadata, object counts, and content statistics to the clipboard.',
       });
     }
 
@@ -1718,6 +1802,7 @@ export class ReleaseTrackPageComponent implements OnInit {
 
   public onEditConfig(): void {
     if (this.isVirtualReleaseTrack) this.setVirtualConfig();
+    this.loadPublicationOptions();
     this.isEditingConfig = true;
   }
 
@@ -1754,6 +1839,7 @@ export class ReleaseTrackPageComponent implements OnInit {
           if (this.releaseTrack)
             this.releaseTrack.config = this.releaseTrackConfig;
           this.refreshReleaseTrackState();
+          this.getConfig();
         },
         error: err => {
           console.error('Failed to update release track config', err);
@@ -1920,24 +2006,12 @@ export class ReleaseTrackPageComponent implements OnInit {
       tagged: item.isTagged,
       latest: item.isLatest,
       counts,
-      graph_cache: item.isBundleCached
-        ? {
-            cached: true,
-            manifest_id: snapshot.graph_manifest_id,
-            statistics: snapshot.graph_statistics,
-          }
-        : { cached: false },
+      content: {
+        manifest_id: snapshot.content_manifest_id ?? null,
+        statistics: snapshot.content_statistics ?? null,
+      },
+      bundle_id: snapshot.bundle_id ?? null,
     };
-  }
-
-  public isCachingSnapshot(item: SnapshotHistoryViewModel): boolean {
-    return !!item.modified && this.cachingSnapshotModified.has(item.modified);
-  }
-
-  public isDeletingSnapshotCache(item: SnapshotHistoryViewModel): boolean {
-    return (
-      !!item.modified && this.deletingSnapshotCacheModified.has(item.modified)
-    );
   }
 
   public isUpdatingSnapshotDescription(
@@ -1954,8 +2028,7 @@ export class ReleaseTrackPageComponent implements OnInit {
       !this.id ||
       !item.modified ||
       !this.canEditReleaseTrack ||
-      item.isBundleCached ||
-      !!item.snapshot.graph_manifest_id ||
+      item.isTagged ||
       this.isUpdatingSnapshotDescription(item)
     ) {
       return;
@@ -1970,7 +2043,7 @@ export class ReleaseTrackPageComponent implements OnInit {
           : 'Add snapshot notes',
         description: item.snapshot.snapshot_description || '',
         message:
-          'These notes are visible on this snapshot in history and in its STIX bundles. Notes cannot be changed while the bundle is cached.',
+          'These notes are visible on this snapshot in history and become the collection description in its STIX bundles. Notes are fixed once the snapshot is released.',
         confirmLabel: 'Save notes',
       },
     });
@@ -2028,131 +2101,6 @@ export class ReleaseTrackPageComponent implements OnInit {
       });
   }
 
-  public getBundleCacheTooltip(item: SnapshotHistoryViewModel): string {
-    if (item.isBundleCached) {
-      return 'Member-only bundle exports use exact object and relationship revisions, so repeated exports are deterministic. Candidate and staged content remains live.';
-    }
-    if (!item.isTagged) {
-      return 'Draft snapshots cannot be cached. Tag this snapshot before caching it for deterministic member-only bundle exports.';
-    }
-    return 'Member-only bundle exports are not guaranteed to be deterministic until this snapshot is cached.';
-  }
-
-  public onCacheSnapshotBundle(item: SnapshotHistoryViewModel): void {
-    if (
-      !this.id ||
-      !item.modified ||
-      !item.isTagged ||
-      item.isBundleCached ||
-      !this.canEditReleaseTrack ||
-      this.isCachingSnapshot(item)
-    ) {
-      return;
-    }
-
-    const modified = item.modified;
-    this.cachingSnapshotModified.add(modified);
-    this.connector
-      .createSnapshotGraph(this.id, modified)
-      .pipe(
-        take(1),
-        finalize(() => {
-          this.cachingSnapshotModified.delete(modified);
-        })
-      )
-      .subscribe({
-        next: snapshot => {
-          item.snapshot = { ...item.snapshot, ...snapshot };
-          item.isBundleCached = !!snapshot.graph_manifest_id;
-          item.canCacheBundle = item.isTagged && !item.isBundleCached;
-          this.getSnapshotHistory();
-          this.snackbar.open(
-            'Bundle cached. Member-only bundle exports are now deterministic.',
-            null,
-            { duration: 5000 }
-          );
-        },
-        error: err => {
-          console.error('Failed to cache snapshot bundle graph', err);
-          this.snackbar.open(
-            'Unable to cache this snapshot. Please try again.',
-            null,
-            { duration: 5000, panelClass: 'error' }
-          );
-        },
-      });
-  }
-
-  public onDeleteSnapshotCache(item: SnapshotHistoryViewModel): void {
-    if (
-      !this.id ||
-      !item.modified ||
-      !item.isBundleCached ||
-      !this.canEditReleaseTrack ||
-      this.isCachingSnapshot(item) ||
-      this.isDeletingSnapshotCache(item)
-    ) {
-      return;
-    }
-
-    const modified = item.modified;
-    const dialogRef = this.dialog.open(ConfirmationDialogComponent, {
-      width: '30em',
-      autoFocus: false,
-      data: {
-        title: 'Delete bundle cache?',
-        message: `Delete the bundle cache for ${item.title}? Member-only bundle exports will no longer be guaranteed to be deterministic until the cache is rebuilt.`,
-        no_label: 'Cancel',
-        yes_label: 'Delete Cache',
-        confirm_color: 'warn',
-        confirm_appearance: 'raised',
-        layout: 'simple',
-      },
-    });
-
-    dialogRef
-      .afterClosed()
-      .pipe(take(1))
-      .subscribe(confirmed => {
-        if (!confirmed || !this.id) return;
-
-        this.deletingSnapshotCacheModified.add(modified);
-        this.connector
-          .deleteSnapshotGraph(this.id, modified)
-          .pipe(
-            take(1),
-            finalize(() => {
-              this.deletingSnapshotCacheModified.delete(modified);
-            })
-          )
-          .subscribe({
-            next: () => {
-              delete item.snapshot.graph_manifest_id;
-              delete item.snapshot.bundle_hashes;
-              delete item.snapshot.graph_statistics;
-              item.isBundleCached = false;
-              item.canCacheBundle = item.isTagged;
-              item.graphCacheStats = [];
-              item.graphCacheTotal = 0;
-              this.getSnapshotHistory();
-              this.snackbar.open(
-                'Bundle cache deleted. Member-only bundle exports are no longer guaranteed to be deterministic.',
-                null,
-                { duration: 5000 }
-              );
-            },
-            error: err => {
-              console.error('Failed to delete snapshot bundle graph', err);
-              this.snackbar.open(
-                'Unable to delete this bundle cache. Please try again.',
-                null,
-                { duration: 5000, panelClass: 'error' }
-              );
-            },
-          });
-      });
-  }
-
   private downloadSnapshot(
     item: SnapshotHistoryViewModel,
     modified: string,
@@ -2184,7 +2132,7 @@ export class ReleaseTrackPageComponent implements OnInit {
     stixVersion: StixVersion
   ): string | null {
     const hashes = item.snapshot.bundle_hashes;
-    if (!hashes || hashes.manifest_id !== item.snapshot.graph_manifest_id) {
+    if (!hashes || hashes.manifest_id !== item.snapshot.content_manifest_id) {
       return null;
     }
     return stixVersion === '2.0' ? hashes.stix_2_0 : hashes.stix_2_1;
@@ -2501,13 +2449,13 @@ export class ReleaseTrackPageComponent implements OnInit {
   private setConfig(config: any): void {
     const normalizedConfig = this.normalizeConfig(config);
     this.releaseTrackConfig = normalizedConfig;
+    if (normalizedConfig.publication_resolved) {
+      this.publicationResolved = normalizedConfig.publication_resolved;
+    }
     this.configForm.patchValue(this.getConfigFormValue(normalizedConfig), {
       emitEvent: false,
     });
     this.syncCandidacyThresholdControl(!!normalizedConfig.auto_promote);
-    this.syncSecondaryObjectThresholdControl(
-      !!normalizedConfig.include_secondary_objects?.enabled
-    );
   }
 
   private setVirtualConfig(): void {
@@ -2537,17 +2485,25 @@ export class ReleaseTrackPageComponent implements OnInit {
 
   private saveVirtualConfig(): void {
     const payload = this.getVirtualCompositionPayload();
+    const publication = this.getPublicationPayload(
+      this.configForm.getRawValue() as ReleaseTrackConfigFormValue
+    );
     this.isSavingConfig = true;
     this.connector
       .updateComposition(this.id, payload)
       .pipe(
         take(1),
+        switchMap(result =>
+          this.connector
+            .updateConfig(this.id, { publication })
+            .pipe(map(configResult => ({ result, configResult })))
+        ),
         finalize(() => {
           this.isSavingConfig = false;
         })
       )
       .subscribe({
-        next: result => {
+        next: ({ result, configResult }) => {
           this.isEditingConfig = false;
           if (this.releaseTrack) {
             this.releaseTrack.composition = this.getCompositionFromResponse(
@@ -2555,7 +2511,11 @@ export class ReleaseTrackPageComponent implements OnInit {
               payload
             );
           }
+          this.setConfig(
+            this.getConfigFromResponse(configResult, { publication })
+          );
           this.refreshReleaseTrackState();
+          this.getConfig();
         },
         error: err => {
           console.error('Failed to update virtual release track config', err);
@@ -2570,15 +2530,6 @@ export class ReleaseTrackPageComponent implements OnInit {
 
   private syncCandidacyThresholdControl(autoPromote: boolean): void {
     this.syncWorkflowStatusControl('candidacyThreshold', autoPromote);
-  }
-
-  private syncSecondaryObjectThresholdControl(
-    includeSecondaryObjects: boolean
-  ): void {
-    this.syncWorkflowStatusControl(
-      'secondaryObjectThreshold',
-      includeSecondaryObjects
-    );
   }
 
   private syncWorkflowStatusControl(
@@ -2616,9 +2567,9 @@ export class ReleaseTrackPageComponent implements OnInit {
     const configKeys = [
       'auto_promote',
       'candidacy_threshold',
-      'include_secondary_objects',
       'promotion_conflicts',
       'member_sync',
+      'publication',
     ];
     return configKeys.some(key => key in response) ? response : fallback || {};
   }
@@ -2634,20 +2585,10 @@ export class ReleaseTrackPageComponent implements OnInit {
       source.promotion_conflicts?.candidates_to_staged === ConflictPolicy.Abort
         ? ConflictPolicy.PreferLatest
         : source.promotion_conflicts?.candidates_to_staged;
-    const includeSecondaryObjects =
-      typeof source.include_secondary_objects === 'boolean'
-        ? { enabled: source.include_secondary_objects }
-        : source.include_secondary_objects;
-
     return {
       auto_promote: source.auto_promote ?? true,
       candidacy_threshold:
         source.candidacy_threshold ?? WorkflowStatus.Reviewed,
-      include_secondary_objects: {
-        enabled: includeSecondaryObjects?.enabled ?? false,
-        status_threshold:
-          includeSecondaryObjects?.status_threshold ?? WorkflowStatus.Reviewed,
-      },
       promotion_conflicts: {
         candidates_to_staged:
           candidatesToStagedConflict ?? ConflictPolicy.PreferLatest,
@@ -2661,6 +2602,15 @@ export class ReleaseTrackPageComponent implements OnInit {
           status_policy: supplant?.status_policy ?? MemberSyncPolicy.Preserve,
         },
       },
+      publication: {
+        collection_id: source.publication?.collection_id ?? null,
+        created: source.publication?.created ?? null,
+        created_by_ref: source.publication?.created_by_ref ?? { inherit: true },
+        object_marking_refs: source.publication?.object_marking_refs ?? {
+          inherit: true,
+        },
+      },
+      publication_resolved: source.publication_resolved,
     };
   }
 
@@ -2683,22 +2633,142 @@ export class ReleaseTrackPageComponent implements OnInit {
         ConflictPolicy.PreferLatest,
       stagedToMembersConflict:
         config.promotion_conflicts?.staged_to_members ?? ConflictPolicy.Abort,
-      includeSecondaryObjects:
-        config.include_secondary_objects?.enabled ?? false,
-      secondaryObjectThreshold:
-        config.include_secondary_objects?.status_threshold ??
-        WorkflowStatus.Reviewed,
+      publicationCollectionId: config.publication?.collection_id ?? '',
+      publicationCreated: config.publication?.created ?? '',
+      publicationIdentityInherit:
+        config.publication?.created_by_ref?.inherit !== false,
+      publicationIdentityValue:
+        config.publication?.created_by_ref?.inherit === false
+          ? config.publication.created_by_ref.value
+          : '',
+      publicationMarkingsInherit:
+        config.publication?.object_marking_refs?.inherit !== false,
+      publicationMarkingsValue:
+        config.publication?.object_marking_refs?.inherit === false
+          ? [...config.publication.object_marking_refs.value]
+          : [],
     };
+  }
+
+  private getPublicationPayload(
+    value: ReleaseTrackConfigFormValue
+  ): PublicationConfig {
+    const identityValue = value.publicationIdentityValue?.trim();
+    const markingValues = (value.publicationMarkingsValue || []).filter(
+      Boolean
+    );
+    const payload: PublicationConfig = {
+      created_by_ref:
+        value.publicationIdentityInherit || !identityValue
+          ? { inherit: true }
+          : { inherit: false, value: identityValue },
+      object_marking_refs:
+        value.publicationMarkingsInherit || markingValues.length === 0
+          ? { inherit: true }
+          : { inherit: false, value: markingValues },
+    };
+    // Collection identity is immutable once released; only send it while it
+    // can still change so an unchanged form never triggers a conflict.
+    if (!this.hasTaggedRelease) {
+      payload.collection_id = value.publicationCollectionId?.trim() || null;
+      payload.created = value.publicationCreated?.trim() || null;
+    }
+    return payload;
+  }
+
+  public get hasTaggedRelease(): boolean {
+    return (this.releaseTrack?.version_history?.length ?? 0) > 0;
+  }
+
+  public get publicationIdentityLabel(): string {
+    const resolved = this.publicationResolved;
+    if (!resolved) return '';
+    const option = this.publicationIdentityOptions.find(
+      candidate => candidate.id === resolved.created_by_ref
+    );
+    return option?.label || resolved.created_by_ref;
+  }
+
+  public get publicationMarkingLabels(): string[] {
+    const resolved = this.publicationResolved;
+    if (!resolved) return [];
+    return resolved.object_marking_refs.map(
+      ref =>
+        this.publicationMarkingOptions.find(candidate => candidate.id === ref)
+          ?.label || ref
+    );
+  }
+
+  public formatPublicationSource(source?: PublicationSource): string {
+    switch (source) {
+      case 'track':
+        return 'Track override';
+      case 'global':
+        return 'Inherited from organization settings';
+      case 'content':
+        return 'Derived from bundle contents';
+      case 'derived':
+        return 'Derived from this track';
+      default:
+        return '';
+    }
+  }
+
+  private loadPublicationOptions(): void {
+    // The connector exposes these as getters returning bound-by-call functions,
+    // so they must be invoked as methods on the service.
+    const service = this.restApiConnectorService as any;
+    if (typeof service?.getAllIdentities === 'function') {
+      service
+        .getAllIdentities()
+        .pipe(take(1))
+        .subscribe({
+          next: (result: any) => {
+            this.publicationIdentityOptions = (result?.data ?? []).map(
+              (identity: any) => ({
+                id: identity.stixID ?? identity.stix?.id,
+                label:
+                  identity.name ??
+                  identity.stix?.name ??
+                  identity.stixID ??
+                  identity.stix?.id,
+              })
+            );
+          },
+          error: err =>
+            console.error('Failed to load identities for publication', err),
+        });
+    }
+    if (typeof service?.getAllMarkingDefinitions === 'function') {
+      service
+        .getAllMarkingDefinitions()
+        .pipe(take(1))
+        .subscribe({
+          next: (result: any) => {
+            this.publicationMarkingOptions = (result?.data ?? []).map(
+              (marking: any) => ({
+                id: marking.stixID ?? marking.stix?.id,
+                label:
+                  marking.definition_string ??
+                  marking.stix?.definition?.tlp ??
+                  marking.stixID ??
+                  marking.stix?.id,
+              })
+            );
+          },
+          error: err =>
+            console.error(
+              'Failed to load marking definitions for publication',
+              err
+            ),
+        });
+    }
   }
 
   private getConfigPayload(): ReleaseTrackConfig {
     const value = this.configForm.getRawValue() as ReleaseTrackConfigFormValue;
     const payload: ReleaseTrackConfig = {
       auto_promote: value.autoPromote,
-      include_secondary_objects: {
-        enabled: value.includeSecondaryObjects,
-        status_threshold: value.secondaryObjectThreshold,
-      },
       promotion_conflicts: {
         candidates_to_staged: value.candidatesToStagedConflict,
         staged_to_members: value.stagedToMembersConflict,
@@ -2715,6 +2785,7 @@ export class ReleaseTrackPageComponent implements OnInit {
     if (value.autoPromote && value.candidacyThreshold) {
       payload.candidacy_threshold = value.candidacyThreshold;
     }
+    payload.publication = this.getPublicationPayload(value);
 
     return payload;
   }
@@ -2890,7 +2961,6 @@ export class ReleaseTrackPageComponent implements OnInit {
     return sorted.map((snapshot, index) => {
       const previousSnapshot = sorted[index + 1];
       const isTagged = this.isTaggedSnapshot(snapshot);
-      const isBundleCached = !!snapshot.graph_manifest_id;
       const isLatest = snapshot === latestSnapshot;
       const currentMembers = this.getSnapshotMembers(snapshot);
       const previousMembers = previousSnapshot
@@ -2920,11 +2990,9 @@ export class ReleaseTrackPageComponent implements OnInit {
         isTagged,
         isLatest,
         isCurrentDraft: !isTagged && isLatest,
-        isBundleCached,
-        canCacheBundle: isTagged && !isBundleCached,
         stats: this.getSnapshotStats(snapshot, addedCount, modifiedCount),
-        graphCacheStats: this.getGraphCacheStats(snapshot),
-        graphCacheTotal: snapshot.graph_statistics?.total_count ?? 0,
+        contentStats: this.getContentStats(snapshot),
+        contentTotal: snapshot.content_statistics?.total_count ?? 0,
         addedCount,
         modifiedCount,
         totalObjects,
@@ -3051,35 +3119,40 @@ export class ReleaseTrackPageComponent implements OnInit {
     ];
   }
 
-  private getGraphCacheStats(
+  private getContentStats(
     snapshot: ReleaseTrackSnapshotHistoryItem
   ): SnapshotHistoryStat[] {
-    const statistics = snapshot.graph_statistics;
-    if (!snapshot.graph_manifest_id || !statistics) return [];
+    const statistics = snapshot.content_statistics;
+    if (!snapshot.content_manifest_id || !statistics) return [];
 
-    return [
+    const stats: SnapshotHistoryStat[] = [
       {
-        label: 'Primary',
+        label: 'Members',
         value: statistics.primary_count,
-        tooltip: 'Objects deliberately included as snapshot members.',
-      },
-      {
-        label: 'Secondary',
-        value: statistics.secondary_count,
-        tooltip: 'Related objects pulled in while resolving the member graph.',
+        tooltip: 'Exact object revisions selected as snapshot members.',
       },
       {
         label: 'Relationships',
         value: statistics.relationship_count,
-        tooltip: 'Connections pinned between cached graph objects.',
+        tooltip:
+          'Relationships whose source and target are both members, pinned to those member revisions.',
       },
       {
         label: 'Dependencies',
         value: statistics.supporting_count + statistics.link_target_count,
         tooltip:
-          'Supporting identities, markings, and LinkById targets used by the cache.',
+          'Supporting identities, markings, and LinkById targets sealed with the content.',
       },
     ];
+    if (statistics.secondary_count > 0) {
+      stats.push({
+        label: 'Legacy secondary',
+        value: statistics.secondary_count,
+        tooltip:
+          'Historical non-member objects carried by a source-attested manifest.',
+      });
+    }
+    return stats;
   }
 
   private getSnapshotType(
