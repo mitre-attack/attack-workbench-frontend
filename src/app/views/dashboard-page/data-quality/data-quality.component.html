@@ -54,6 +54,72 @@
     No parallel relationships found.
   </div>
 
+  <!-- Domain consistency Section -->
+  <h1>Cross-Domain Relationships</h1>
+  <p class="data-quality-note">
+    Release-track bundles only include a relationship when both of its objects
+    are members of the same track, so a relationship whose objects share no
+    domain can never be published. Add the missing domain to the object or
+    deprecate the relationship.
+  </p>
+  <app-loading-overlay *ngIf="loadingDomainConsistency"></app-loading-overlay>
+  <div *ngIf="domainConsistencyError" class="error">
+    {{ domainConsistencyError }}
+  </div>
+  <div
+    *ngIf="!loadingDomainConsistency && crossDomainRelationships.length > 0"
+    class="dq-domain-table-wrapper">
+    <table class="dq-domain-table" aria-label="Cross-domain relationships">
+      <thead>
+        <tr>
+          <th>Source</th>
+          <th>Source domains</th>
+          <th>Relationship</th>
+          <th>Target</th>
+          <th>Target domains</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let row of crossDomainRelationships">
+          <td>
+            <a [routerLink]="objectLink(row.source)">{{ row.sourceId }}</a>
+            <span class="dq-object-name">{{ row.sourceName }}</span>
+          </td>
+          <td>{{ row.sourceDomains.join(', ') }}</td>
+          <td>{{ row.relationshipType }}</td>
+          <td>
+            <a [routerLink]="objectLink(row.target)">{{ row.targetId }}</a>
+            <span class="dq-object-name">{{ row.targetName }}</span>
+          </td>
+          <td>{{ row.targetDomains.join(', ') }}</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  <div
+    *ngIf="!loadingDomainConsistency && crossDomainRelationships.length === 0">
+    No cross-domain relationships found.
+  </div>
+
+  <h1>Objects Without Domains</h1>
+  <app-loading-overlay *ngIf="loadingDomainConsistency"></app-loading-overlay>
+  <mat-accordion
+    class="dq-accordion"
+    *ngIf="!loadingDomainConsistency && objectsWithoutDomains.length > 0">
+    <mat-expansion-panel>
+      <mat-expansion-panel-header>
+        <mat-panel-title>
+          Objects without a domain ({{ objectsWithoutDomains.length }})
+        </mat-panel-title>
+      </mat-expansion-panel-header>
+      <app-stix-list
+        [config]="stixConfigForObjectsWithoutDomains()"></app-stix-list>
+    </mat-expansion-panel>
+  </mat-accordion>
+  <div *ngIf="!loadingDomainConsistency && objectsWithoutDomains.length === 0">
+    No objects without domains found.
+  </div>
+
   <!-- Missing Links Section -->
   <h1>Missing LinkByIds Status</h1>
   <app-loading-overlay *ngIf="loadingMissingLinks"></app-loading-overlay>
