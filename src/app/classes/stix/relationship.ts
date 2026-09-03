@@ -689,8 +689,9 @@ export class Relationship extends StixObject {
   }
 
   /**
-   * Creates a WIP revision of a related object. Existing revisions may be
-   * pinned by deterministic snapshot graphs and must remain immutable.
+   * Resets a related object's workflow state to WIP in place. Workflow state
+   * is workspace metadata, not STIX content, so a PUT never changes a sealed
+   * revision and never creates a new object revision.
    * @param restAPIService the rest api service
    * @param object the relationship source object
    */
@@ -704,6 +705,6 @@ export class Relationship extends StixObject {
       object.workflow = { state: WorkflowStatus.WorkInProgress };
     }
     object.workflow.state = WorkflowStatus.WorkInProgress;
-    return object.save(restAPIService);
+    return object.update(restAPIService);
   }
 }
