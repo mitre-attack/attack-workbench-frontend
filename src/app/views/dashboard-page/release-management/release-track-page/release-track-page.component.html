@@ -337,7 +337,25 @@
                       }">
                       {{ lane.title }} ({{ lane.items.length }})
                     </h3>
-                    <div class="small-buttons">
+                    <div class="small-buttons lane-actions">
+                      <button
+                        *ngIf="canReviewLane(lane)"
+                        class="review-color"
+                        mat-stroked-button
+                        type="button"
+                        (click)="onReviewAll(lane.items)">
+                        <mat-icon>fact_check</mat-icon>
+                        Review all
+                      </button>
+                      <button
+                        *ngIf="canReviewLane(lane)"
+                        class="review-color"
+                        mat-stroked-button
+                        type="button"
+                        (click)="onApproveAll(lane.items)">
+                        <mat-icon>done_all</mat-icon>
+                        Approve all
+                      </button>
                       <button
                         *ngIf="canAddCandidates(lane)"
                         class="view-color"

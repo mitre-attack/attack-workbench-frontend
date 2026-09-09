@@ -1616,6 +1616,23 @@ $released-members-disabled-dark: colors.on-color-deemphasis(dark);
     }
   }
 
+  .lane-actions {
+    justify-content: flex-end;
+    max-width: 100%;
+  }
+
+  @media (max-width: 720px) {
+    .card-header.member-list {
+      align-items: flex-start;
+      gap: 8px;
+    }
+
+    .lane-actions {
+      width: 100%;
+      justify-content: flex-start;
+    }
+  }
+
   .empty-state {
     border: 1px dashed;
     border-radius: 4px;

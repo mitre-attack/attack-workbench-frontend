@@ -6,7 +6,12 @@ import {
 } from 'src/app/utils/types';
 
 export type WorkbenchChipVariant =
-  'standard' | 'virtual' | 'tagged' | 'draft' | 'latest' | WorkflowStatusType;
+  | 'standard'
+  | 'virtual'
+  | 'tagged'
+  | 'draft'
+  | 'latest'
+  | WorkflowStatusType;
 
 const WORKBENCH_CHIP_LABELS: Record<WorkbenchChipVariant, string> = {
   standard: 'Standard',
