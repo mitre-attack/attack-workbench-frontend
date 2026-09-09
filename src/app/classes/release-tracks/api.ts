@@ -43,6 +43,10 @@ export type ReleasePayload = (
   | { increment?: undefined; version?: undefined }
 ) & { description?: string };
 
+export interface RetagReleasePayload {
+  version: string;
+}
+
 export interface ClonePayload {
   name?: string;
 }
@@ -115,6 +119,7 @@ export interface ReleasePreviewSummaryBase {
   track_id: string;
   type: ReleaseTrackType;
   source_snapshot_modified: string;
+  release_snapshot_modified?: string;
   version: string;
   version_bounds: {
     lower: { version: string; modified: string } | null;
@@ -177,6 +182,8 @@ export interface ReleaseTrackSnapshotHistoryItem {
   id?: string;
   modified?: string | Date;
   version?: string | null;
+  /** Exact draft snapshot retained when a standard release was created. */
+  release_source_modified?: string | Date;
   content_manifest_id?: string;
   publication?: SnapshotPublication;
   bundle_id?: string;

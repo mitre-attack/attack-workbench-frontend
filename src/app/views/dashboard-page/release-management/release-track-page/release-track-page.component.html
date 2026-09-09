@@ -766,12 +766,38 @@
                   Export&hellip;
                 </button>
                 <button
+                  *ngIf="item.isTagged && canDeleteRelease"
+                  mat-stroked-button
+                  [disabled]="isRetaggingRelease(item) || !item.modified"
+                  [attr.aria-label]="'Change version for ' + item.title"
+                  matTooltip="Change this release version while preserving its snapshot identity and semantic-version order."
+                  (click)="onRetagRelease(item)">
+                  <mat-spinner
+                    *ngIf="isRetaggingRelease(item)"
+                    class="snapshot-action-spinner"
+                    diameter="18"></mat-spinner>
+                  <mat-icon *ngIf="!isRetaggingRelease(item)">edit</mat-icon>
+                  {{
+                    isRetaggingRelease(item)
+                      ? 'Changing version'
+                      : 'Change version'
+                  }}
+                </button>
+                <button
                   *ngIf="item.isLatestRelease && canDeleteRelease"
                   color="warn"
                   mat-stroked-button
                   [disabled]="isDeletingRelease(item) || !item.modified"
-                  [attr.aria-label]="'Delete release ' + item.title"
-                  matTooltip="Only the most recent release can be deleted. Its version becomes available again."
+                  [attr.aria-label]="
+                    (isVirtualReleaseTrack
+                      ? 'Delete release '
+                      : 'Roll back release ') + item.title
+                  "
+                  [matTooltip]="
+                    isVirtualReleaseTrack
+                      ? 'Permanently delete the most recent virtual release.'
+                      : 'Remove the most recent release and restore its exact pre-release draft. Virtual snapshot dependencies block rollback.'
+                  "
                   (click)="onDeleteRelease(item)">
                   <mat-spinner
                     *ngIf="isDeletingRelease(item)"
@@ -781,8 +807,12 @@
                   <mat-icon *ngIf="!isDeletingRelease(item)">delete</mat-icon>
                   {{
                     isDeletingRelease(item)
-                      ? 'Deleting release'
-                      : 'Delete release'
+                      ? isVirtualReleaseTrack
+                        ? 'Deleting release'
+                        : 'Rolling back release'
+                      : isVirtualReleaseTrack
+                        ? 'Delete release'
+                        : 'Roll back release'
                   }}
                 </button>
               </div>

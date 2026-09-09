@@ -76,6 +76,7 @@ import { MultipleChoiceDialogComponent } from './components/multiple-choice-dial
 import { NavigationComponent } from './components/navigation/navigation.component';
 import { ReferenceEditDialogComponent } from './components/reference-edit-dialog/reference-edit-dialog.component';
 import { ReleasePreviewDialogComponent } from './components/release-preview-dialog/release-preview-dialog.component';
+import { ReleaseVersionDialogComponent } from './components/release-version-dialog/release-version-dialog.component';
 import { SnapshotDescriptionDialogComponent } from './components/snapshot-description-dialog/snapshot-description-dialog.component';
 import { HistoryTimelineComponent } from './components/stix/stix-page-tabs/history-timeline/history-timeline.component';
 import { MembershipSectionComponent } from './components/stix/stix-page-tabs/membership-section/membership-section.component';
@@ -274,6 +275,7 @@ export function initConfig(appConfigService: AppConfigService) {
     ReferenceSidebarComponent,
     ReferenceEditDialogComponent,
     ReleasePreviewDialogComponent,
+    ReleaseVersionDialogComponent,
     SnapshotDescriptionDialogComponent,
     MultipleChoiceDialogComponent,
     ValidationResultsComponent,

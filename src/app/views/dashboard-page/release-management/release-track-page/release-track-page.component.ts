@@ -49,6 +49,7 @@ import {
   ReleasePreviewDialogComponent,
   ReleasePreviewSelection,
 } from 'src/app/components/release-preview-dialog/release-preview-dialog.component';
+import { ReleaseVersionDialogComponent } from 'src/app/components/release-version-dialog/release-version-dialog.component';
 import {
   ReleaseReviewDialogComponent,
   ReleaseReviewDialogResult,
@@ -242,6 +243,7 @@ export class ReleaseTrackPageComponent implements OnInit {
   private createdDraftSnapshot: ReleaseTrackSnapshotHistoryItem | null = null;
   private updatingSnapshotDescriptionModified = new Set<string>();
   private deletingReleaseModified = new Set<string>();
+  private retaggingReleaseModified = new Set<string>();
   public publicationResolved: PublicationResolved | null = null;
   public publicationIdentityOptions: PublicationOption[] = [];
   public publicationMarkingOptions: PublicationOption[] = [];
@@ -752,6 +754,58 @@ export class ReleaseTrackPageComponent implements OnInit {
     return !!item.modified && this.deletingReleaseModified.has(item.modified);
   }
 
+  public isRetaggingRelease(item: SnapshotHistoryViewModel): boolean {
+    return !!item.modified && this.retaggingReleaseModified.has(item.modified);
+  }
+
+  public onRetagRelease(item: SnapshotHistoryViewModel): void {
+    if (
+      !this.id ||
+      !item.modified ||
+      !item.isTagged ||
+      !this.canDeleteRelease ||
+      this.isRetaggingRelease(item)
+    ) {
+      return;
+    }
+
+    const currentVersion = item.snapshot.version || '';
+    const modified = item.modified;
+    const prompt = this.dialog.open(ReleaseVersionDialogComponent, {
+      maxWidth: '35em',
+      disableClose: true,
+      autoFocus: false,
+      data: { currentVersion },
+    });
+
+    prompt
+      .afterClosed()
+      .pipe(take(1))
+      .subscribe(version => {
+        if (!version || version === currentVersion) return;
+
+        this.retaggingReleaseModified.add(modified);
+        this.connector
+          .retagRelease(this.id, modified, { version })
+          .pipe(
+            take(1),
+            finalize(() => this.retaggingReleaseModified.delete(modified))
+          )
+          .subscribe({
+            next: () => {
+              this.snackbar.open(
+                `Release ${currentVersion} changed to ${version}.`,
+                null,
+                { duration: 5000 }
+              );
+              this.refreshReleaseTrackState();
+            },
+            error: err =>
+              console.error('Failed to change release version', err),
+          });
+      });
+  }
+
   /**
    * Delete the track's most recent release. Only administrators may do this,
    * and they confirm by typing the release version.
@@ -768,13 +822,18 @@ export class ReleaseTrackPageComponent implements OnInit {
     }
     const version = item.snapshot.version || '';
     const modified = item.modified;
+    const rollsBackToDraft = !this.isVirtualReleaseTrack;
     const prompt = this.dialog.open(DeleteDialogComponent, {
       maxWidth: '35em',
       disableClose: true,
       autoFocus: false,
       data: {
-        title: `Delete release ${version}?`,
-        warning: `Release ${version} of ${this.releaseTrackName || 'this track'} will be permanently deleted. Its version becomes available again and later drafts are kept.`,
+        title: rollsBackToDraft
+          ? `Roll back release ${version}?`
+          : `Delete release ${version}?`,
+        warning: rollsBackToDraft
+          ? `Release ${version} of ${this.releaseTrackName || 'this track'} will be removed and its exact pre-release draft restored. This is blocked if a virtual snapshot depends on the release.`
+          : `Release ${version} of ${this.releaseTrackName || 'this track'} will be permanently deleted.`,
         stixId: version,
       },
     });
@@ -798,16 +857,26 @@ export class ReleaseTrackPageComponent implements OnInit {
           )
           .subscribe({
             next: () => {
-              this.snackbar.open(`Release ${version} deleted.`, null, {
-                duration: 5000,
-              });
+              this.snackbar.open(
+                rollsBackToDraft
+                  ? `Release ${version} rolled back to draft.`
+                  : `Release ${version} deleted.`,
+                null,
+                {
+                  duration: 5000,
+                }
+              );
               this.getReleaseTrack();
               this.getSnapshotHistory();
             },
             error: err => {
               console.error('Failed to delete release', err);
+              const dependents = err?.error?.dependent_snapshots;
               this.snackbar.open(
-                'Unable to delete this release. Please try again.',
+                Array.isArray(dependents) && dependents.length
+                  ? `Unable to roll back: ${dependents.length} virtual snapshot${dependents.length === 1 ? '' : 's'} depend on this release.`
+                  : err?.error?.message ||
+                      'Unable to roll back this release. Please try again.',
                 null,
                 { duration: 5000, panelClass: 'error' }
               );
@@ -1857,7 +1926,12 @@ export class ReleaseTrackPageComponent implements OnInit {
         : 'Tagging the release and sealing its content.';
     }
     if (this.deletingReleaseModified.size > 0) {
-      return 'Deleting the release and reconciling the track.';
+      return this.isVirtualReleaseTrack
+        ? 'Deleting the virtual release and reconciling the track.'
+        : 'Rolling back the release and restoring its preserved draft.';
+    }
+    if (this.retaggingReleaseModified.size > 0) {
+      return 'Changing the release version and rebuilding its exports.';
     }
     if (this.isDeleting) {
       return 'Deleting the release track and its history.';
@@ -3064,7 +3138,21 @@ export class ReleaseTrackPageComponent implements OnInit {
   private buildSnapshotHistory(
     snapshots: ReleaseTrackSnapshotHistoryItem[]
   ): SnapshotHistoryViewModel[] {
-    const sorted = [...snapshots].sort(
+    const retainedSourceDrafts = new Set(
+      snapshots
+        .filter(snapshot => this.isTaggedSnapshot(snapshot))
+        .map(snapshot => snapshot.release_source_modified)
+        .filter((modified): modified is string | Date => !!modified)
+        .map(modified =>
+          modified instanceof Date ? modified.toISOString() : String(modified)
+        )
+    );
+    const visibleSnapshots = snapshots.filter(snapshot => {
+      if (this.isTaggedSnapshot(snapshot)) return true;
+      const modified = this.getSnapshotModified(snapshot);
+      return !modified || !retainedSourceDrafts.has(modified);
+    });
+    const sorted = [...visibleSnapshots].sort(
       (a, b) => this.getSnapshotTime(b) - this.getSnapshotTime(a)
     );
     const latestSnapshot =

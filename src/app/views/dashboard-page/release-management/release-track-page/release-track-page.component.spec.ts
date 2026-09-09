@@ -19,6 +19,7 @@ import { AddDialogComponent } from 'src/app/components/add-dialog/add-dialog.com
 import { ConfirmationDialogComponent } from 'src/app/components/confirmation-dialog/confirmation-dialog.component';
 import { DeleteDialogComponent } from 'src/app/components/delete-dialog/delete-dialog.component';
 import { ReleasePreviewDialogComponent } from 'src/app/components/release-preview-dialog/release-preview-dialog.component';
+import { ReleaseVersionDialogComponent } from 'src/app/components/release-version-dialog/release-version-dialog.component';
 import { SnapshotDescriptionDialogComponent } from 'src/app/components/snapshot-description-dialog/snapshot-description-dialog.component';
 import { ReleaseReviewDialogComponent } from 'src/app/components/release-review-dialog/release-review-dialog.component';
 import { AuthenticationService } from 'src/app/services/connectors/authentication/authentication.service';
@@ -63,6 +64,7 @@ describe('ReleaseTrackPageComponent', () => {
       previewRelease: vi.fn(() => createAsyncObservable({})),
       releaseLatest: vi.fn(() => createAsyncObservable({})),
       releaseSnapshot: vi.fn(() => createAsyncObservable({})),
+      retagRelease: vi.fn(() => createAsyncObservable({})),
       getConfig: vi.fn(() => createAsyncObservable(null)),
       updateConfig: vi.fn(() => createAsyncObservable({})),
       updateComposition: vi.fn(() => createAsyncObservable({})),
@@ -974,7 +976,7 @@ describe('ReleaseTrackPageComponent', () => {
       DeleteDialogComponent,
       expect.objectContaining({
         data: expect.objectContaining({
-          title: 'Delete release 1.1?',
+          title: 'Roll back release 1.1?',
           stixId: '1.1',
         }),
       })
@@ -987,10 +989,73 @@ describe('ReleaseTrackPageComponent', () => {
     expect(trackSpy).toHaveBeenCalled();
     expect(historySpy).toHaveBeenCalled();
     expect(mockSnackbar.open).toHaveBeenCalledWith(
-      'Release 1.1 deleted.',
+      'Release 1.1 rolled back to draft.',
       null,
       { duration: 5000 }
     );
+  });
+
+  it('should change a tagged release version as an administrator', () => {
+    const item = {
+      snapshot: { version: '1.1' },
+      title: 'v1.1',
+      modified: '2026-07-23T13:37:28.000Z',
+      isTagged: true,
+    } as any;
+    mockDialog.open.mockReturnValue({ afterClosed: () => of('1.2') });
+    mockReleaseTrackApiConnector.retagRelease.mockReturnValue(
+      of({ version: '1.2' })
+    );
+    const refreshSpy = vi
+      .spyOn(component as any, 'refreshReleaseTrackState')
+      .mockImplementation(() => undefined);
+    component.id = 'release-track--123';
+
+    component.onRetagRelease(item);
+
+    expect(mockDialog.open).toHaveBeenCalledWith(
+      ReleaseVersionDialogComponent,
+      expect.objectContaining({ data: { currentVersion: '1.1' } })
+    );
+    expect(mockReleaseTrackApiConnector.retagRelease).toHaveBeenCalledWith(
+      'release-track--123',
+      item.modified,
+      { version: '1.2' }
+    );
+    expect(refreshSpy).toHaveBeenCalled();
+    expect(mockSnackbar.open).toHaveBeenCalledWith(
+      'Release 1.1 changed to 1.2.',
+      null,
+      { duration: 5000 }
+    );
+  });
+
+  it('should hide a preserved release-source draft until rollback', () => {
+    const sourceModified = '2026-07-23T13:37:27.000Z';
+    mockReleaseTrackApiConnector.listSnapshots.mockReturnValue(
+      of({
+        data: [
+          {
+            id: 'release-track--123',
+            modified: '2026-07-23T13:37:28.000Z',
+            version: '1.0',
+            release_source_modified: sourceModified,
+          },
+          {
+            id: 'release-track--123',
+            modified: sourceModified,
+            version: null,
+          },
+        ],
+      })
+    );
+    component.id = 'release-track--123';
+
+    component.getSnapshotHistory();
+
+    expect(component.snapshotHistory).toHaveLength(1);
+    expect(component.snapshotHistory[0].title).toBe('v1.0');
+    expect(component.hasCurrentDraftSnapshot).toBe(false);
   });
 
   it('should not offer release deletion to non-administrators or for drafts', () => {
