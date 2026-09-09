@@ -75,6 +75,7 @@ describe('ReleaseTrackPageComponent', () => {
       addCandidates: vi.fn(() => createAsyncObservable({})),
       deleteReleaseTrack: vi.fn(() => createAsyncObservable({})),
       deleteSnapshotByModified: vi.fn(() => createAsyncObservable(undefined)),
+      convertReleaseToDraft: vi.fn(() => createAsyncObservable({})),
     });
     mockDialog = {
       open: vi.fn(),
@@ -1080,7 +1081,7 @@ describe('ReleaseTrackPageComponent', () => {
     ).toBe('1.3');
   });
 
-  it('should delete the most recent release after typed confirmation', () => {
+  it('should convert the most recent release to draft after typed confirmation', () => {
     const item = {
       snapshot: {
         version: '1.1',
@@ -1089,9 +1090,10 @@ describe('ReleaseTrackPageComponent', () => {
       title: 'v1.1',
       modified: '2026-07-23T13:37:28.000Z',
       isTagged: true,
+      isLatestRelease: true,
     } as any;
     mockDialog.open.mockReturnValue({ afterClosed: () => of(true) });
-    mockReleaseTrackApiConnector.deleteSnapshotByModified.mockReturnValue(
+    mockReleaseTrackApiConnector.convertReleaseToDraft.mockReturnValue(
       of(undefined)
     );
     const trackSpy = vi
@@ -1102,26 +1104,24 @@ describe('ReleaseTrackPageComponent', () => {
       .mockImplementation(() => undefined);
     component.id = 'release-track--123';
 
-    component.onDeleteRelease(item);
+    component.onConvertReleaseToDraft(item);
 
     expect(mockDialog.open).toHaveBeenCalledWith(
       DeleteDialogComponent,
       expect.objectContaining({
         data: expect.objectContaining({
-          title: 'Roll back release 1.1?',
+          title: 'Convert release 1.1 to draft?',
           stixId: '1.1',
         }),
       })
     );
     expect(
-      mockReleaseTrackApiConnector.deleteSnapshotByModified
-    ).toHaveBeenCalledWith('release-track--123', item.modified, {
-      confirmVersion: '1.1',
-    });
+      mockReleaseTrackApiConnector.convertReleaseToDraft
+    ).toHaveBeenCalledWith('release-track--123', item.modified, '1.1');
     expect(trackSpy).toHaveBeenCalled();
     expect(historySpy).toHaveBeenCalled();
     expect(mockSnackbar.open).toHaveBeenCalledWith(
-      'Release 1.1 rolled back to draft.',
+      'Release 1.1 converted to draft.',
       null,
       { duration: 5000 }
     );
@@ -1133,6 +1133,7 @@ describe('ReleaseTrackPageComponent', () => {
       title: 'v1.1',
       modified: '2026-07-23T13:37:28.000Z',
       isTagged: true,
+      isLatestRelease: true,
     } as any;
     mockDialog.open.mockReturnValue({ afterClosed: () => of('1.2') });
     mockReleaseTrackApiConnector.retagRelease.mockReturnValue(
@@ -1190,16 +1191,17 @@ describe('ReleaseTrackPageComponent', () => {
     expect(component.hasCurrentDraftSnapshot).toBe(false);
   });
 
-  it('should not offer release deletion to non-administrators or for drafts', () => {
+  it('should not offer release conversion to non-administrators or for drafts', () => {
     mockAuthenticationService.canDelete.mockReturnValue(false);
     component.id = 'release-track--123';
-    component.onDeleteRelease({
+    component.onConvertReleaseToDraft({
       snapshot: { version: '1.0' },
       modified: '2026-07-23T13:37:28.000Z',
       isTagged: true,
+      isLatestRelease: true,
     } as any);
     mockAuthenticationService.canDelete.mockReturnValue(true);
-    component.onDeleteRelease({
+    component.onConvertReleaseToDraft({
       snapshot: {},
       modified: '2026-07-23T13:37:28.000Z',
       isTagged: false,
@@ -1207,8 +1209,81 @@ describe('ReleaseTrackPageComponent', () => {
 
     expect(mockDialog.open).not.toHaveBeenCalled();
     expect(
+      mockReleaseTrackApiConnector.convertReleaseToDraft
+    ).not.toHaveBeenCalled();
+  });
+
+  it('should delete only the current draft and refresh snapshot history', () => {
+    component.id = 'release-track--123';
+    const item = {
+      snapshot: { version: null },
+      modified: '2026-07-23T13:37:28.000Z',
+      isTagged: false,
+      isCurrentDraft: true,
+    } as any;
+    mockDialog.open.mockReturnValue({ afterClosed: () => of(true) });
+    mockReleaseTrackApiConnector.deleteSnapshotByModified.mockReturnValue(
+      of(undefined)
+    );
+    const trackSpy = vi
+      .spyOn(component, 'getReleaseTrack')
+      .mockImplementation(() => undefined);
+    const historySpy = vi
+      .spyOn(component, 'getSnapshotHistory')
+      .mockImplementation(() => undefined);
+    component.onDeleteDraft(item);
+    expect(
+      mockReleaseTrackApiConnector.deleteSnapshotByModified
+    ).toHaveBeenCalledWith(component.id, item.modified);
+    expect(
+      mockReleaseTrackApiConnector.convertReleaseToDraft
+    ).not.toHaveBeenCalled();
+    expect(trackSpy).toHaveBeenCalled();
+    expect(historySpy).toHaveBeenCalled();
+    expect(mockSnackbar.open).toHaveBeenCalledWith(
+      'Draft snapshot deleted.',
+      null,
+      expect.anything()
+    );
+  });
+
+  it('should not offer deletion for tagged or historical snapshots', () => {
+    component.id = 'release-track--123';
+    for (const flags of [
+      { isTagged: true, isCurrentDraft: true },
+      { isTagged: false, isCurrentDraft: false },
+    ]) {
+      component.onDeleteDraft({
+        snapshot: {},
+        modified: '2026-07-23T13:37:28.000Z',
+        ...flags,
+      } as any);
+    }
+    expect(mockDialog.open).not.toHaveBeenCalled();
+    expect(
       mockReleaseTrackApiConnector.deleteSnapshotByModified
     ).not.toHaveBeenCalled();
+  });
+
+  it('should preserve the draft card and explain a dependency rejection', () => {
+    component.id = 'release-track--123';
+    const item = {
+      snapshot: {},
+      modified: '2026-07-23T13:37:28.000Z',
+      isTagged: false,
+      isCurrentDraft: true,
+    } as any;
+    mockDialog.open.mockReturnValue({ afterClosed: () => of(true) });
+    mockReleaseTrackApiConnector.deleteSnapshotByModified.mockReturnValue(
+      throwError(() => ({ error: { dependent_snapshots: [{}] } }))
+    );
+    component.onDeleteDraft(item);
+    expect(component.isDeletingDraft(item)).toBe(false);
+    expect(mockSnackbar.open).toHaveBeenCalledWith(
+      expect.stringContaining('downstream virtual snapshots depend on it'),
+      null,
+      expect.anything()
+    );
   });
 
   it('should edit notes on a draft snapshot', () => {
@@ -1274,6 +1349,7 @@ describe('ReleaseTrackPageComponent', () => {
       title: 'v1.0',
       modified: '2026-07-23T13:37:28.000Z',
       isTagged: true,
+      isLatestRelease: true,
     } as any;
     component.id = 'release-track--123';
 
@@ -1299,6 +1375,7 @@ describe('ReleaseTrackPageComponent', () => {
       title: 'v1.0',
       modified,
       isTagged: true,
+      isLatestRelease: true,
     } as any;
 
     component.copySnapshotBundleHash(item, '2.1');

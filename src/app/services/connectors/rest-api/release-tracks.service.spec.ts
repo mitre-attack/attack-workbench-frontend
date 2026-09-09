@@ -129,22 +129,36 @@ describe('ReleaseTracksConnectorService', () => {
     expect(options.params.get('offset')).toBe('50');
   });
 
-  it('should pass the release confirmation when deleting a release', () => {
-    http.delete.mockReturnValue(of(undefined));
+  it('should pass the release confirmation to the separate draft conversion endpoint', () => {
+    http.post.mockReturnValue(of({ version: null }));
 
     service
-      .deleteSnapshotByModified(
+      .convertReleaseToDraft(
         'release-track--standard',
         '2026-07-23T13:37:28.000Z',
-        { confirmVersion: '1.1' }
+        '1.1'
       )
       .subscribe();
 
-    const [url, options] = http.delete.mock.calls[0];
+    const [url, body] = http.post.mock.calls[0];
     expect(url).toBe(
+      `${environment.integrations.rest_api.url}/release-tracks/release-track--standard/snapshots/2026-07-23T13%3A37%3A28.000Z/draft`
+    );
+    expect(body).toEqual({ confirm_version: '1.1' });
+  });
+
+  it('should delete a draft by snapshot identity without release confirmation', () => {
+    service
+      .deleteSnapshotByModified(
+        'release-track--standard',
+        '2026-07-23T13:37:28.000Z'
+      )
+      .subscribe();
+
+    expect(http.delete).toHaveBeenCalledWith(
       `${environment.integrations.rest_api.url}/release-tracks/release-track--standard/snapshots/2026-07-23T13%3A37%3A28.000Z`
     );
-    expect(options.params.get('confirm_version')).toBe('1.1');
+    expect(http.post).not.toHaveBeenCalled();
   });
 
   it('should change a release version by snapshot identity', () => {

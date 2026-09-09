@@ -506,18 +506,28 @@ export class ReleaseTracksConnectorService extends ApiConnector {
    */
   public deleteSnapshotByModified(
     id: string,
-    modified: string,
-    options?: { confirmVersion?: string }
+    modified: string
   ): Observable<unknown> {
     const url = `${this.apiUrl}/release-tracks/${id}/snapshots/${encodeURIComponent(modified)}`;
-    const params = options?.confirmVersion
-      ? this.buildHttpParams({ confirm_version: options.confirmVersion })
-      : undefined;
-    return this.http.delete(url, params ? { params } : {}).pipe(
+    return this.http.delete(url).pipe(
       tap(() => logger.log(`deleted snapshot ${modified} from track ${id}`)),
       catchError(this.handleError_raise()),
       share()
     );
+  }
+
+  /** Convert a release to a draft; the returned draft may have a different timestamp. */
+  public convertReleaseToDraft(
+    id: string,
+    modified: string,
+    confirmVersion: string
+  ): Observable<ReleaseTrackSnapshotHistoryItem> {
+    const url = `${this.apiUrl}/release-tracks/${id}/snapshots/${encodeURIComponent(modified)}/draft`;
+    return this.http
+      .post<ReleaseTrackSnapshotHistoryItem>(url, {
+        confirm_version: confirmVersion,
+      })
+      .pipe(catchError(this.handleError_raise()), share());
   }
 
   /** Change a tagged snapshot's semantic version without changing its identity. */

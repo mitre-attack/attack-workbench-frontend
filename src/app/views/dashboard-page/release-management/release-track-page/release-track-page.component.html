@@ -683,7 +683,7 @@
                   Export&hellip;
                 </button>
                 <button
-                  *ngIf="item.isTagged && canDeleteRelease"
+                  *ngIf="item.isTagged && canManageTaggedReleases"
                   mat-stroked-button
                   [disabled]="isRetaggingRelease(item) || !item.modified"
                   [attr.aria-label]="'Change version for ' + item.title"
@@ -701,35 +701,42 @@
                   }}
                 </button>
                 <button
-                  *ngIf="item.isLatestRelease && canDeleteRelease"
+                  *ngIf="item.isLatestRelease && canManageTaggedReleases"
                   color="warn"
                   mat-stroked-button
-                  [disabled]="isDeletingRelease(item) || !item.modified"
-                  [attr.aria-label]="
-                    (isVirtualReleaseTrack
-                      ? 'Delete release '
-                      : 'Roll back release ') + item.title
+                  [disabled]="
+                    isConvertingRelease(item) ||
+                    isRetaggingRelease(item) ||
+                    !item.modified
                   "
-                  [matTooltip]="
-                    isVirtualReleaseTrack
-                      ? 'Permanently delete the most recent virtual release.'
-                      : 'Remove the most recent release and restore its exact pre-release draft. Virtual snapshot dependencies block rollback.'
-                  "
-                  (click)="onDeleteRelease(item)">
+                  [attr.aria-label]="'Convert ' + item.title + ' to draft'"
+                  matTooltip="Convert the most recent release back to a draft. Downstream virtual dependencies block conversion."
+                  (click)="onConvertReleaseToDraft(item)">
                   <mat-spinner
-                    *ngIf="isDeletingRelease(item)"
+                    *ngIf="isConvertingRelease(item)"
                     class="snapshot-action-spinner"
                     color="warn"
                     diameter="18"></mat-spinner>
-                  <mat-icon *ngIf="!isDeletingRelease(item)">delete</mat-icon>
+                  <mat-icon *ngIf="!isConvertingRelease(item)">undo</mat-icon>
                   {{
-                    isDeletingRelease(item)
-                      ? isVirtualReleaseTrack
-                        ? 'Deleting release'
-                        : 'Rolling back release'
-                      : isVirtualReleaseTrack
-                        ? 'Delete release'
-                        : 'Roll back release'
+                    isConvertingRelease(item)
+                      ? 'Converting to draft'
+                      : 'Convert to draft'
+                  }}
+                </button>
+                <button
+                  *ngIf="
+                    item.isCurrentDraft && !item.isTagged && canEditReleaseTrack
+                  "
+                  color="warn"
+                  mat-stroked-button
+                  [disabled]="isDeletingDraft(item) || !item.modified"
+                  aria-label="Delete draft snapshot"
+                  matTooltip="Delete this draft and return to the previous snapshot. Protected drafts cannot be deleted."
+                  (click)="onDeleteDraft(item)">
+                  <mat-icon>delete</mat-icon>
+                  {{
+                    isDeletingDraft(item) ? 'Deleting draft' : 'Delete draft'
                   }}
                 </button>
               </div>

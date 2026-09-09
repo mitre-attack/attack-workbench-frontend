@@ -113,7 +113,7 @@ interface SnapshotHistoryViewModel {
   taggedAt: Date | null;
   isTagged: boolean;
   isLatest: boolean;
-  /** The track's most recent release: the only one that can be deleted. */
+  /** The track's most recent release: the only one that can be converted to a draft. */
   isLatestRelease: boolean;
   isCurrentDraft: boolean;
   stats: SnapshotHistoryStat[];
@@ -288,7 +288,8 @@ export class ReleaseTrackPageComponent implements OnInit {
   public virtualConfigComponentTracks: any[] = [];
   private createdDraftSnapshot: ReleaseTrackSnapshotHistoryItem | null = null;
   private updatingSnapshotDescriptionModified = new Set<string>();
-  private deletingReleaseModified = new Set<string>();
+  private convertingReleaseModified = new Set<string>();
+  private deletingDraftModified = new Set<string>();
   private retaggingReleaseModified = new Set<string>();
   public publicationResolved: PublicationResolved | null = null;
   public publicationIdentityOptions: PublicationOption[] = [];
@@ -697,7 +698,7 @@ export class ReleaseTrackPageComponent implements OnInit {
     return this.authenticationService.canEdit();
   }
 
-  public get canDeleteRelease(): boolean {
+  public get canManageTaggedReleases(): boolean {
     return this.authenticationService.canDelete();
   }
 
@@ -871,8 +872,8 @@ export class ReleaseTrackPageComponent implements OnInit {
       });
   }
 
-  public isDeletingRelease(item: SnapshotHistoryViewModel): boolean {
-    return !!item.modified && this.deletingReleaseModified.has(item.modified);
+  public isConvertingRelease(item: SnapshotHistoryViewModel): boolean {
+    return !!item.modified && this.convertingReleaseModified.has(item.modified);
   }
 
   public isRetaggingRelease(item: SnapshotHistoryViewModel): boolean {
@@ -884,7 +885,7 @@ export class ReleaseTrackPageComponent implements OnInit {
       !this.id ||
       !item.modified ||
       !item.isTagged ||
-      !this.canDeleteRelease ||
+      !this.canManageTaggedReleases ||
       this.isRetaggingRelease(item)
     ) {
       return;
@@ -928,82 +929,123 @@ export class ReleaseTrackPageComponent implements OnInit {
   }
 
   /**
-   * Delete the track's most recent release. Only administrators may do this,
+   * Convert the track's most recent release to draft. Only administrators may do this,
    * and they confirm by typing the release version.
    */
-  public onDeleteRelease(item: SnapshotHistoryViewModel): void {
+  public onConvertReleaseToDraft(item: SnapshotHistoryViewModel): void {
     if (
       !this.id ||
       !item.modified ||
       !item.isTagged ||
-      !this.canDeleteRelease ||
-      this.isDeletingRelease(item)
-    ) {
+      !item.isLatestRelease ||
+      !this.canManageTaggedReleases ||
+      this.isConvertingRelease(item) ||
+      this.isRetaggingRelease(item)
+    )
       return;
-    }
     const version = item.snapshot.version || '';
     const modified = item.modified;
-    const rollsBackToDraft = !this.isVirtualReleaseTrack;
-    const prompt = this.dialog.open(DeleteDialogComponent, {
-      maxWidth: '35em',
-      disableClose: true,
-      autoFocus: false,
-      data: {
-        title: rollsBackToDraft
-          ? `Roll back release ${version}?`
-          : `Delete release ${version}?`,
-        warning: rollsBackToDraft
-          ? `Release ${version} of ${this.releaseTrackName || 'this track'} will be removed and its exact pre-release draft restored. This is blocked if a virtual snapshot depends on the release.`
-          : `Release ${version} of ${this.releaseTrackName || 'this track'} will be permanently deleted.`,
-        stixId: version,
-      },
-    });
-
-    prompt
+    this.dialog
+      .open(DeleteDialogComponent, {
+        maxWidth: '35em',
+        disableClose: true,
+        autoFocus: false,
+        data: {
+          title: `Convert release ${version} to draft?`,
+          confirmLabel: 'Convert to draft',
+          warning: `Release ${version} of ${this.releaseTrackName || 'this track'} will become a draft. Standard tracks restore the exact pre-release draft; virtual tracks retain the materialized snapshot. Downstream virtual dependencies block conversion. Draft deletion is a separate action.`,
+          stixId: version,
+        },
+      })
       .afterClosed()
       .pipe(take(1))
       .subscribe(confirm => {
         if (!confirm) return;
-
-        this.deletingReleaseModified.add(modified);
+        this.convertingReleaseModified.add(modified);
         this.connector
-          .deleteSnapshotByModified(this.id, modified, {
-            confirmVersion: version,
-          })
+          .convertReleaseToDraft(this.id, modified, version)
           .pipe(
             take(1),
-            finalize(() => {
-              this.deletingReleaseModified.delete(modified);
-            })
+            finalize(() => this.convertingReleaseModified.delete(modified))
           )
           .subscribe({
             next: () => {
               this.snackbar.open(
-                rollsBackToDraft
-                  ? `Release ${version} rolled back to draft.`
-                  : `Release ${version} deleted.`,
+                `Release ${version} converted to draft.`,
                 null,
-                {
-                  duration: 5000,
-                }
+                { duration: 5000 }
               );
-              this.getReleaseTrack();
-              this.getSnapshotHistory();
+              this.refreshReleaseTrackState();
             },
-            error: err => {
-              console.error('Failed to delete release', err);
-              const dependents = err?.error?.dependent_snapshots;
-              this.snackbar.open(
-                Array.isArray(dependents) && dependents.length
-                  ? `Unable to roll back: ${dependents.length} virtual snapshot${dependents.length === 1 ? '' : 's'} depend on this release.`
-                  : err?.error?.message ||
-                      'Unable to roll back this release. Please try again.',
-                null,
-                { duration: 5000, panelClass: 'error' }
-              );
-            },
+            error: err =>
+              this.showSnapshotOperationError(
+                err,
+                'convert this release to a draft'
+              ),
           });
       });
+  }
+
+  public isDeletingDraft(item: SnapshotHistoryViewModel): boolean {
+    return !!item.modified && this.deletingDraftModified.has(item.modified);
+  }
+
+  public onDeleteDraft(item: SnapshotHistoryViewModel): void {
+    if (
+      !this.id ||
+      !item.modified ||
+      item.isTagged ||
+      !item.isCurrentDraft ||
+      !this.canEditReleaseTrack ||
+      this.isDeletingDraft(item)
+    )
+      return;
+    const modified = item.modified;
+    this.dialog
+      .open(DeleteDialogComponent, {
+        maxWidth: '35em',
+        disableClose: true,
+        autoFocus: false,
+        data: {
+          title: 'Delete draft snapshot?',
+          warning:
+            'This draft will be permanently deleted. The previous snapshot becomes current. The only snapshot, preserved release sources, and snapshots used by downstream virtual snapshots cannot be deleted.',
+          stixId: modified,
+        },
+      })
+      .afterClosed()
+      .pipe(take(1))
+      .subscribe(confirm => {
+        if (!confirm) return;
+        this.deletingDraftModified.add(modified);
+        this.connector
+          .deleteSnapshotByModified(this.id, modified)
+          .pipe(
+            take(1),
+            finalize(() => this.deletingDraftModified.delete(modified))
+          )
+          .subscribe({
+            next: () => {
+              this.snackbar.open('Draft snapshot deleted.', null, {
+                duration: 5000,
+              });
+              this.refreshReleaseTrackState();
+            },
+            error: err =>
+              this.showSnapshotOperationError(err, 'delete this draft'),
+          });
+      });
+  }
+
+  private showSnapshotOperationError(err: any, operation: string): void {
+    const dependents = err?.error?.dependent_snapshots;
+    this.snackbar.open(
+      Array.isArray(dependents) && dependents.length
+        ? `Unable to ${operation}: ${dependents.length} downstream virtual snapshots depend on it.`
+        : err?.error?.message || `Unable to ${operation}. Please try again.`,
+      null,
+      { duration: 5000, panelClass: 'error' }
+    );
   }
 
   public getSnapshotHistory(): void {
@@ -2046,11 +2088,11 @@ export class ReleaseTrackPageComponent implements OnInit {
         ? 'Preparing the release preview. Large tracks can take a while.'
         : 'Tagging the release and sealing its content.';
     }
-    if (this.deletingReleaseModified.size > 0) {
-      return this.isVirtualReleaseTrack
-        ? 'Deleting the virtual release and reconciling the track.'
-        : 'Rolling back the release and restoring its preserved draft.';
+    if (this.convertingReleaseModified.size > 0) {
+      return 'Converting the latest release back to a draft snapshot.';
     }
+    if (this.deletingDraftModified.size > 0)
+      return 'Deleting the latest draft snapshot.';
     if (this.retaggingReleaseModified.size > 0) {
       return 'Changing the release version and rebuilding its exports.';
     }
