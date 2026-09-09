@@ -412,89 +412,6 @@
 
     <ng-template #virtualDetailsTpl>
       <div class="virtual-track-layout">
-        <section class="labelled-box virtual-resolution-panel">
-          <div class="content no-label">
-            <div class="card-header member-list virtual-resolution-header">
-              <h3 class="view-color">Composition Resolution</h3>
-              <span *ngIf="virtualResolvedAt" class="text-deemphasis">
-                Resolved at:
-                {{ virtualResolvedAt | date: 'MMM d, y, h:mm:ss a' }}
-              </span>
-            </div>
-
-            <mat-divider></mat-divider>
-
-            <div class="virtual-resolution-table">
-              <table>
-                <colgroup>
-                  <col class="virtual-resolution-component-col" />
-                  <col class="virtual-resolution-strategy-col" />
-                  <col class="virtual-resolution-version-col" />
-                  <col class="virtual-resolution-count-col" />
-                  <col class="virtual-resolution-count-col" />
-                  <col class="virtual-resolution-count-col" />
-                </colgroup>
-                <thead>
-                  <tr>
-                    <th>Component Track</th>
-                    <th>Strategy</th>
-                    <th>Resolved Version</th>
-                    <th>Candidates</th>
-                    <th>Staged</th>
-                    <th>Members</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr *ngIf="!virtualResolutionRows.length">
-                    <td colspan="6" class="virtual-empty-cell">
-                      No component tracks configured.
-                    </td>
-                  </tr>
-                  <tr
-                    *ngFor="
-                      let row of virtualResolutionRows;
-                      trackBy: trackByVirtualResolutionRow
-                    "
-                    class="virtual-resolution-row clickable-row"
-                    role="button"
-                    tabindex="0"
-                    (click)="onOpenComponentTrack(row)"
-                    (keydown.enter)="onOpenComponentTrack(row)"
-                    (keydown.space)="
-                      onOpenComponentTrack(row); $event.preventDefault()
-                    ">
-                    <td>
-                      <strong>{{ row.trackName }}</strong>
-                      <span class="component-track-id">{{ row.trackId }}</span>
-                    </td>
-                    <td>{{ formatConfigOption(row.strategy) }}</td>
-                    <td>
-                      <strong class="view-color">
-                        {{ getVirtualResolvedVersion(row) }}
-                      </strong>
-                    </td>
-                    <td>
-                      <strong>{{
-                        getVirtualTierCount(row.candidatesCount)
-                      }}</strong>
-                    </td>
-                    <td>
-                      <strong>{{
-                        getVirtualTierCount(row.stagedCount)
-                      }}</strong>
-                    </td>
-                    <td>
-                      <strong>{{
-                        getVirtualTierCount(row.membersCount)
-                      }}</strong>
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </section>
-
         <div class="virtual-object-panels">
           <section class="labelled-box virtual-object-panel">
             <div class="content no-label">
@@ -800,6 +717,114 @@
                 <div class="snapshot-history-stat-label">{{ stat.label }}</div>
               </div>
             </div>
+
+            <section
+              *ngIf="item.snapshot.type === 'virtual'"
+              class="snapshot-composition-resolution"
+              aria-label="Composition resolution provenance">
+              <div class="snapshot-composition-header">
+                <div class="snapshot-composition-title">
+                  <mat-icon aria-hidden="true">account_tree</mat-icon>
+                  <span>Composition Resolution</span>
+                </div>
+                <span
+                  *ngIf="item.compositionResolvedAt"
+                  class="snapshot-composition-resolved-at">
+                  Resolved:
+                  {{ item.compositionResolvedAt | date: 'MMM d, y, h:mm:ss a' }}
+                </span>
+              </div>
+
+              <div
+                *ngIf="!item.hasCompositionResolution"
+                class="snapshot-composition-empty">
+                This snapshot has not been materialized, so it has no component
+                snapshot provenance yet.
+              </div>
+
+              <div
+                *ngIf="item.hasCompositionResolution"
+                class="snapshot-composition-components">
+                <div
+                  *ngIf="!item.compositionResolutionRows.length"
+                  class="snapshot-composition-empty">
+                  No component snapshots were recorded.
+                </div>
+
+                <article
+                  *ngFor="
+                    let row of item.compositionResolutionRows;
+                    trackBy: trackByVirtualResolutionRow
+                  "
+                  class="snapshot-component-provenance">
+                  <header class="snapshot-component-identity">
+                    <button
+                      type="button"
+                      class="snapshot-component-track"
+                      (click)="onOpenComponentTrack(row)">
+                      <strong>{{ row.trackName }}</strong>
+                      <code>{{ row.trackId }}</code>
+                    </button>
+                    <span class="snapshot-component-version">
+                      {{ getVirtualResolvedVersion(row) }}
+                    </span>
+                  </header>
+
+                  <div class="snapshot-component-body">
+                    <dl class="snapshot-component-details">
+                      <div>
+                        <dt>Snapshot created</dt>
+                        <dd>
+                          <strong
+                            *ngIf="row.resolvedSnapshotId; else noSnapshot">
+                            {{
+                              row.resolvedSnapshotId
+                                | date: 'MMM d, y, h:mm:ss a'
+                            }}
+                          </strong>
+                          <ng-template #noSnapshot>-</ng-template>
+                          <code *ngIf="row.resolvedSnapshotId">
+                            {{ row.resolvedSnapshotId }}
+                          </code>
+                        </dd>
+                      </div>
+                      <div>
+                        <dt>Resolution strategy</dt>
+                        <dd>
+                          <strong>{{
+                            formatConfigOption(row.strategy)
+                          }}</strong>
+                          <span *ngIf="row.filters?.length">
+                            Filters: {{ row.filters?.join(', ') }}
+                          </span>
+                        </dd>
+                      </div>
+                    </dl>
+
+                    <dl class="snapshot-component-metrics">
+                      <div>
+                        <dt>Source members</dt>
+                        <dd>
+                          {{ getVirtualTierCount(row.totalObjectsInSource) }}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt>After filters</dt>
+                        <dd>
+                          {{ getVirtualTierCount(row.objectsAfterFilter) }}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt>Contributed</dt>
+                        <dd>
+                          {{ getVirtualTierCount(row.objectsContributed) }}
+                        </dd>
+                      </div>
+                    </dl>
+                  </div>
+                </article>
+              </div>
+            </section>
 
             <section
               *ngIf="item.contentStats.length"

@@ -16,7 +16,7 @@ export interface Composition {
 }
 
 export interface CompositionResolution {
-  resolved_at?: Date;
+  resolved_at?: Date | string;
   component_snapshots?: ComponentSnapshotResolution[];
   deduplication?: {
     total_objects_before?: number;

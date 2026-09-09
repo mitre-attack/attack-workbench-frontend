@@ -885,6 +885,36 @@ describe('ReleaseTrackPageComponent', () => {
             name: 'Combined',
             members_count: 5,
             quarantine_count: 1,
+            composition_resolution: {
+              resolved_at: '2024-04-15T05:55:00.000Z',
+              component_snapshots: [
+                {
+                  track_id: 'release-track--component-one',
+                  track_name: 'Component One At Resolution',
+                  track_type: 'standard',
+                  resolved_snapshot_id: '2024-04-01T08:15:30.000Z',
+                  resolved_version: '2.4',
+                  strategy_used: 'latest_tagged',
+                  filters_applied: {
+                    object_types: ['attack-pattern'],
+                    domains: ['enterprise'],
+                  },
+                  total_objects_in_source: 30,
+                  objects_after_filter: 12,
+                  objects_contributed: 10,
+                },
+              ],
+              deduplication: {
+                total_objects_before: 12,
+                total_objects_after: 10,
+                duplicates_found: 2,
+                conflicts_resolved: [],
+              },
+              summary: {
+                total_objects: 10,
+                quarantined_objects: 1,
+              },
+            },
             content_statistics: {
               primary_count: 5,
               secondary_count: 8,
@@ -931,6 +961,21 @@ describe('ReleaseTrackPageComponent', () => {
         totalObjects: 6,
         taggedAt: new Date('2024-04-15T06:30:00.000Z'),
         isTagged: true,
+        hasCompositionResolution: true,
+        compositionResolvedAt: new Date('2024-04-15T05:55:00.000Z'),
+        compositionResolutionRows: [
+          {
+            trackId: 'release-track--component-one',
+            trackName: 'Component One At Resolution',
+            strategy: 'latest_tagged',
+            resolvedVersion: '2.4',
+            resolvedSnapshotId: '2024-04-01T08:15:30.000Z',
+            filters: ['attack pattern', 'enterprise'],
+            totalObjectsInSource: 30,
+            objectsAfterFilter: 12,
+            objectsContributed: 10,
+          },
+        ],
         contentTotal: 28,
         contentStats: [
           expect.objectContaining({ label: 'Members', value: 5 }),
@@ -946,6 +991,91 @@ describe('ReleaseTrackPageComponent', () => {
     );
     expect(component.taggedSnapshotCount).toBe(1);
     expect(component.hasCurrentDraftSnapshot).toBe(true);
+  });
+
+  it('should keep composition provenance scoped to each virtual snapshot', () => {
+    component.releaseTrack = {
+      type: ReleaseTrackType.Virtual,
+      modified: new Date('2024-06-01T00:00:00.000Z'),
+      composition_resolution: {
+        component_snapshots: [
+          {
+            track_id: 'release-track--component',
+            resolved_version: '9.9',
+          },
+        ],
+      },
+    } as any;
+    mockReleaseTrackApiConnector.listSnapshots.mockReturnValue(
+      of({
+        data: [
+          {
+            modified: '2024-06-01T00:00:00.000Z',
+            version: null,
+            type: ReleaseTrackType.Virtual,
+            composition_resolution: null,
+          },
+          {
+            modified: '2024-05-01T00:00:00.000Z',
+            version: '2.0',
+            type: ReleaseTrackType.Virtual,
+            composition_resolution: {
+              resolved_at: '2024-04-30T23:59:00.000Z',
+              component_snapshots: [
+                {
+                  track_id: 'release-track--component',
+                  track_name: 'Component',
+                  track_type: 'standard',
+                  resolved_snapshot_id: '2024-04-20T10:00:00.000Z',
+                  resolved_version: '2.7',
+                  strategy_used: 'specific_version',
+                  total_objects_in_source: 40,
+                  objects_after_filter: 40,
+                  objects_contributed: 38,
+                },
+              ],
+            },
+          },
+          {
+            modified: '2024-03-01T00:00:00.000Z',
+            version: '1.0',
+            type: ReleaseTrackType.Virtual,
+            composition_resolution: {
+              resolved_at: '2024-02-29T23:59:00.000Z',
+              component_snapshots: [
+                {
+                  track_id: 'release-track--component',
+                  track_name: 'Component',
+                  track_type: 'standard',
+                  resolved_snapshot_id: '2024-02-15T10:00:00.000Z',
+                  resolved_version: '1.3',
+                  strategy_used: 'latest_tagged',
+                  total_objects_in_source: 30,
+                  objects_after_filter: 30,
+                  objects_contributed: 30,
+                },
+              ],
+            },
+          },
+        ],
+      })
+    );
+    component.id = 'release-track--virtual';
+
+    component.getSnapshotHistory();
+
+    expect(component.snapshotHistory[0].hasCompositionResolution).toBe(false);
+    expect(component.snapshotHistory[0].compositionResolutionRows).toEqual([]);
+    expect(
+      component.snapshotHistory[1].compositionResolutionRows[0].resolvedVersion
+    ).toBe('2.7');
+    expect(
+      component.snapshotHistory[1].compositionResolutionRows[0]
+        .resolvedSnapshotId
+    ).toBe('2024-04-20T10:00:00.000Z');
+    expect(
+      component.snapshotHistory[2].compositionResolutionRows[0].resolvedVersion
+    ).toBe('1.3');
   });
 
   it('should delete the most recent release after typed confirmation', () => {

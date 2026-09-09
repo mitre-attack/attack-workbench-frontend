@@ -121,6 +121,9 @@ interface SnapshotHistoryViewModel {
   addedCount: number;
   modifiedCount: number;
   totalObjects: number;
+  hasCompositionResolution: boolean;
+  compositionResolvedAt: Date | null;
+  compositionResolutionRows: VirtualResolutionRow[];
 }
 
 interface SnapshotHistoryStat {
@@ -180,6 +183,11 @@ interface VirtualResolutionRow {
   trackName: string;
   strategy: string;
   resolvedVersion?: string | null;
+  resolvedSnapshotId?: string | null;
+  filters?: string[];
+  totalObjectsInSource?: number | null;
+  objectsAfterFilter?: number | null;
+  objectsContributed?: number | null;
   candidatesCount?: number | null;
   stagedCount?: number | null;
   membersCount?: number | null;
@@ -498,7 +506,9 @@ export class ReleaseTrackPageComponent implements OnInit {
   }
 
   public get virtualResolvedAt(): Date | null {
-    return this.releaseTrack?.composition_resolution?.resolved_at ?? null;
+    const value = this.releaseTrack?.composition_resolution?.resolved_at;
+    if (!value) return null;
+    return value instanceof Date ? value : new Date(value);
   }
 
   public get virtualResolutionRows(): VirtualResolutionRow[] {
@@ -3514,8 +3524,46 @@ export class ReleaseTrackPageComponent implements OnInit {
         addedCount,
         modifiedCount,
         totalObjects,
+        hasCompositionResolution: snapshot.composition_resolution != null,
+        compositionResolvedAt: this.getCompositionResolvedAt(snapshot),
+        compositionResolutionRows:
+          this.getSnapshotCompositionResolutionRows(snapshot),
       };
     });
+  }
+
+  private getCompositionResolvedAt(
+    snapshot: ReleaseTrackSnapshotHistoryItem
+  ): Date | null {
+    const value = snapshot.composition_resolution?.resolved_at;
+    if (!value) return null;
+    const date = value instanceof Date ? value : new Date(value);
+    return Number.isNaN(date.getTime()) ? null : date;
+  }
+
+  private getSnapshotCompositionResolutionRows(
+    snapshot: ReleaseTrackSnapshotHistoryItem
+  ): VirtualResolutionRow[] {
+    const components = snapshot.composition_resolution?.component_snapshots;
+    if (!Array.isArray(components)) return [];
+
+    return components.map(component => ({
+      trackId: component.track_id,
+      trackName: component.track_name || component.track_id,
+      strategy: component.strategy_used || '',
+      resolvedVersion: component.resolved_version || null,
+      resolvedSnapshotId: component.resolved_snapshot_id
+        ? this.toIsoString(component.resolved_snapshot_id)
+        : null,
+      filters: this.getComponentTrackFilters({
+        filters: component.filters_applied,
+      }),
+      totalObjectsInSource: this.toOptionalNumber(
+        component.total_objects_in_source
+      ),
+      objectsAfterFilter: this.toOptionalNumber(component.objects_after_filter),
+      objectsContributed: this.toOptionalNumber(component.objects_contributed),
+    }));
   }
 
   private getSnapshotTitle(snapshot: ReleaseTrackSnapshotHistoryItem): string {
@@ -3808,8 +3856,11 @@ export class ReleaseTrackPageComponent implements OnInit {
     ) {
       return (membersCount ?? 0) + (stagedCount ?? 0) + (candidatesCount ?? 0);
     }
-    if (typeof snapshot.composition_resolution?.total_objects === 'number') {
-      return snapshot.composition_resolution.total_objects;
+    const resolution = snapshot.composition_resolution as any;
+    const resolvedTotalObjects =
+      resolution?.summary?.total_objects ?? resolution?.total_objects;
+    if (typeof resolvedTotalObjects === 'number') {
+      return resolvedTotalObjects;
     }
     if (members.length) return members.length;
 

@@ -1,5 +1,5 @@
 import type { WorkflowStatusType } from 'src/app/utils/types';
-import type { Composition } from './composition';
+import type { Composition, CompositionResolution } from './composition';
 import type { ReleaseTrackConfig } from './config';
 import {
   ReleaseTrackType,
@@ -219,10 +219,7 @@ export interface ReleaseTrackSnapshotHistoryItem {
     [key: string]: any;
   };
   statistics?: Record<string, any>;
-  composition_resolution?: {
-    total_objects?: number;
-    [key: string]: any;
-  };
+  composition_resolution?: CompositionResolution | null;
   stix?: {
     id?: string;
     modified?: string | Date;
