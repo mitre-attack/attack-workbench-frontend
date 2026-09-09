@@ -147,6 +147,21 @@ describe('ReleaseTracksConnectorService', () => {
     expect(options.params.get('confirm_version')).toBe('1.1');
   });
 
+  it('should change a release version by snapshot identity', () => {
+    http.put.mockReturnValue(of({ version: '1.2' }));
+
+    service
+      .retagRelease('release-track--standard', '2026-07-23T13:37:28.000Z', {
+        version: '1.2',
+      })
+      .subscribe();
+
+    expect(http.put).toHaveBeenCalledWith(
+      `${environment.integrations.rest_api.url}/release-tracks/release-track--standard/snapshots/2026-07-23T13%3A37%3A28.000Z/release`,
+      { version: '1.2' }
+    );
+  });
+
   it('should create virtual snapshots through the virtual namespace', () => {
     service
       .createVirtualSnapshot('release-track--virtual', {

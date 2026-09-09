@@ -17,6 +17,7 @@ import type {
   ExportFormatType,
   PromoteQuarantinePayload,
   ReleasePayload,
+  RetagReleasePayload,
   ReleasePreviewOptions,
   ReleaseTrackConfig,
   ReleaseTrackSnapshotHistoryItem,
@@ -36,6 +37,7 @@ export type {
   CreateReleaseTrackPayload,
   PromoteQuarantinePayload,
   ReleasePayload,
+  RetagReleasePayload,
   ReleasePreviewOptions,
   ReleaseTrackSnapshotHistoryItem,
   ReleaseTrackSnapshotOptions,
@@ -513,6 +515,20 @@ export class ReleaseTracksConnectorService extends ApiConnector {
       : undefined;
     return this.http.delete(url, params ? { params } : {}).pipe(
       tap(() => logger.log(`deleted snapshot ${modified} from track ${id}`)),
+      catchError(this.handleError_raise()),
+      share()
+    );
+  }
+
+  /** Change a tagged snapshot's semantic version without changing its identity. */
+  public retagRelease(
+    id: string,
+    modified: string,
+    body: RetagReleasePayload
+  ): Observable<ReleaseTrackSnapshotHistoryItem> {
+    const url = `${this.apiUrl}/release-tracks/${id}/snapshots/${encodeURIComponent(modified)}/release`;
+    return this.http.put<ReleaseTrackSnapshotHistoryItem>(url, body).pipe(
+      tap(result => logger.log(`retagged snapshot ${modified}`, result)),
       catchError(this.handleError_raise()),
       share()
     );
