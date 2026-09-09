@@ -35,6 +35,8 @@ import {
   StixObjectRef,
 } from 'src/app/classes/release-tracks';
 import { StixObject } from 'src/app/classes/stix';
+import { Note } from 'src/app/classes/stix/note';
+import { Role } from 'src/app/classes/authn/role';
 import { AddDialogComponent } from 'src/app/components/add-dialog/add-dialog.component';
 import { ConfirmationDialogComponent } from 'src/app/components/confirmation-dialog/confirmation-dialog.component';
 import { DeleteDialogComponent } from 'src/app/components/delete-dialog/delete-dialog.component';
@@ -43,6 +45,11 @@ import {
   ReleasePreviewDialogComponent,
   ReleasePreviewSelection,
 } from 'src/app/components/release-preview-dialog/release-preview-dialog.component';
+import {
+  ReleaseReviewDialogComponent,
+  ReleaseReviewDialogResult,
+  ReleaseReviewItem,
+} from 'src/app/components/release-review-dialog/release-review-dialog.component';
 import { ReleaseTrackObjectItem } from 'src/app/components/release-track-object-card/release-track-object-card.component';
 import { SnapshotDescriptionDialogComponent } from 'src/app/components/snapshot-description-dialog/snapshot-description-dialog.component';
 import { AuthenticationService } from 'src/app/services/connectors/authentication/authentication.service';
@@ -984,11 +991,50 @@ export class ReleaseTrackPageComponent implements OnInit {
   }
 
   public onReviewAndApprove(item: any): void {
-    this.reviewCandidateStatus(
-      WorkflowStatus.AwaitingReview,
-      WorkflowStatus.Reviewed,
-      [item]
+    this.openReviewDialog([item]);
+  }
+
+  public onReviewAll(items: ReleaseTrackObjectItem[]): void {
+    this.openReviewDialog(items);
+  }
+
+  public onApproveAll(items: ReleaseTrackObjectItem[]): void {
+    const awaitingReview = items.filter(
+      item => this.getObjectStatus(item) === WorkflowStatus.AwaitingReview
     );
+    if (!this.canReviewReleaseTrack || !awaitingReview.length) return;
+
+    this.dialog
+      .open(ConfirmationDialogComponent, {
+        width: '32em',
+        autoFocus: false,
+        data: {
+          title: 'Approve all awaiting-review objects?',
+          message:
+            'This will approve every awaiting-review object without stepping through its changes. Bulk approval is dangerous and cannot be undone from this review screen.',
+          no_label: 'Cancel',
+          yes_label: `Approve all (${awaitingReview.length})`,
+          confirm_color: 'warn',
+          confirm_appearance: 'raised',
+          layout: 'simple',
+        },
+      })
+      .afterClosed()
+      .pipe(take(1))
+      .subscribe(confirmed => {
+        if (!confirmed) return;
+        this.applyReviewResult({
+          approved: awaitingReview,
+          updateRequests: [],
+        });
+      });
+  }
+
+  public get canReviewReleaseTrack(): boolean {
+    return this.authenticationService.isAuthorized([
+      Role.ADMIN,
+      Role.TEAM_LEAD,
+    ]);
   }
 
   public canAddCandidates(lane: ReleaseTrackWorkspaceLane): boolean {
@@ -1000,9 +1046,19 @@ export class ReleaseTrackPageComponent implements OnInit {
     lane: ReleaseTrackWorkspaceLane
   ): boolean {
     return (
-      this.autoPromotionEnabled &&
+      this.canReviewReleaseTrack &&
       lane.type === 'candidate' &&
       this.getLaneStatus(item, lane) === WorkflowStatus.AwaitingReview
+    );
+  }
+
+  public canReviewLane(lane: ReleaseTrackWorkspaceLane): boolean {
+    return (
+      this.canReviewReleaseTrack &&
+      lane.type === 'candidate' &&
+      lane.items.some(
+        item => this.getLaneStatus(item, lane) === WorkflowStatus.AwaitingReview
+      )
     );
   }
 
@@ -2228,30 +2284,130 @@ export class ReleaseTrackPageComponent implements OnInit {
       : undefined;
   }
 
-  private reviewCandidateStatus(
-    from: WorkflowStatusType,
-    to: WorkflowStatusType,
-    items: any[]
-  ): void {
-    if (!this.id || !items.length) return;
+  private openReviewDialog(items: ReleaseTrackObjectItem[]): void {
+    const awaitingReview = items.filter(
+      item => this.getObjectStatus(item) === WorkflowStatus.AwaitingReview
+    );
+    if (!this.canReviewReleaseTrack || !awaitingReview.length) return;
 
-    const objectRefs = items
+    forkJoin(
+      awaitingReview.map(item =>
+        this.resolveReviewDiffObjects(item).pipe(
+          map(({ current, prior }) =>
+            current ? ({ item, current, prior } as ReleaseReviewItem) : null
+          )
+        )
+      )
+    )
+      .pipe(take(1))
+      .subscribe({
+        next: resolvedItems => {
+          const reviewItems = resolvedItems.filter(
+            (item): item is ReleaseReviewItem => !!item
+          );
+          if (!reviewItems.length) {
+            this.snackbar.open(
+              'Unable to load the objects awaiting review.',
+              undefined,
+              { duration: 4000, panelClass: 'error' }
+            );
+            return;
+          }
+
+          if (reviewItems.length !== awaitingReview.length) {
+            this.snackbar.open(
+              'Some objects could not be loaded and were omitted from review.',
+              undefined,
+              { duration: 4000 }
+            );
+          }
+
+          this.openResolvedReviewDialog(reviewItems);
+        },
+        error: err => {
+          console.error('Failed to load objects for review', err);
+          this.snackbar.open(
+            'Unable to load the objects awaiting review.',
+            undefined,
+            { duration: 4000, panelClass: 'error' }
+          );
+        },
+      });
+  }
+
+  /**
+   * Review always compares the proposed candidate revision with the current
+   * released member. A staged entry is deliberately not used as the baseline.
+   */
+  private resolveReviewDiffObjects(item: ReleaseTrackObjectItem): Observable<{
+    current: StixObject | null;
+    prior: StixObject | null;
+  }> {
+    return this.resolveDiffObjects(item, this.findMemberEntry(item.object_ref));
+  }
+
+  private openResolvedReviewDialog(items: ReleaseReviewItem[]): void {
+    this.dialog
+      .open<
+        ReleaseReviewDialogComponent,
+        { items: ReleaseReviewItem[] },
+        ReleaseReviewDialogResult
+      >(ReleaseReviewDialogComponent, {
+        data: { items },
+        panelClass: 'release-review-dialog-panel',
+        maxWidth: 'none',
+        autoFocus: false,
+        restoreFocus: true,
+      })
+      .afterClosed()
+      .pipe(take(1))
+      .subscribe(result => this.applyReviewResult(result));
+  }
+
+  private applyReviewResult(result?: ReleaseReviewDialogResult): void {
+    if (!this.id || !result) return;
+
+    const requests: Observable<unknown>[] = [];
+    const approvedRefs = result.approved
       .map(item => this.getReviewObjectRef(item))
       .filter((ref): ref is StixObjectRef => !!ref);
 
-    if (!objectRefs.length) return;
+    if (approvedRefs.length) {
+      requests.push(
+        this.connector.reviewCandidates(this.id, {
+          from: WorkflowStatus.AwaitingReview,
+          to: WorkflowStatus.Reviewed,
+          object_refs: approvedRefs,
+        })
+      );
+    }
 
-    this.connector
-      .reviewCandidates(this.id, {
-        from,
-        to,
-        object_refs: objectRefs,
-      })
+    result.updateRequests.forEach(request => {
+      const note = new Note();
+      note.title = `Updates requested: ${request.item.name || request.item.attack_id || 'Object'}`;
+      note.content = request.note;
+      note.object_refs = [request.item.object_ref];
+      requests.push(this.restApiConnectorService.postNote(note));
+    });
+
+    if (!requests.length) return;
+
+    forkJoin(requests)
       .pipe(take(1))
       .subscribe({
-        next: () => this.refreshReleaseTrackState(),
+        next: () => {
+          this.snackbar.open('Review updates saved.', undefined, {
+            duration: 3000,
+          });
+          this.refreshReleaseTrackState();
+        },
         error: err => {
-          console.error('Failed to update candidate review status', err);
+          console.error('Failed to save release track review', err);
+          this.snackbar.open('Unable to save all review updates.', undefined, {
+            duration: 5000,
+            panelClass: 'error',
+          });
+          this.refreshReleaseTrackState();
         },
       });
   }
@@ -2312,18 +2468,7 @@ export class ReleaseTrackPageComponent implements OnInit {
       : this.findMemberEntry(item.object_ref);
     const baselineEntry = stagedEntry ?? memberEntry;
 
-    return forkJoin({
-      current: this.fetchObjectVersion(
-        item.object_ref,
-        this.getDiffObjectModified(item)
-      ),
-      prior: baselineEntry
-        ? this.fetchObjectVersion(
-            baselineEntry.object_ref,
-            this.getDiffObjectModified(baselineEntry)
-          )
-        : of(null),
-    }).pipe(
+    return this.resolveDiffObjects(item, baselineEntry).pipe(
       map(({ current, prior }) => ({
         current,
         prior,
@@ -2339,24 +2484,34 @@ export class ReleaseTrackPageComponent implements OnInit {
   }> {
     const memberEntry = this.findMemberEntry(item.object_ref);
 
-    return forkJoin({
-      current: this.fetchObjectVersion(
-        item.object_ref,
-        this.getDiffObjectModified(item)
-      ),
-      prior: memberEntry
-        ? this.fetchObjectVersion(
-            memberEntry.object_ref,
-            this.getDiffObjectModified(memberEntry)
-          )
-        : of(null),
-    }).pipe(
+    return this.resolveDiffObjects(item, memberEntry).pipe(
       map(({ current, prior }) => ({
         current,
         prior,
         expectedBaseline: !!memberEntry,
       }))
     );
+  }
+
+  private resolveDiffObjects(
+    item: ReleaseTrackObjectItem,
+    baselineEntry: ReleaseTrackObjectItem | null
+  ): Observable<{
+    current: StixObject | null;
+    prior: StixObject | null;
+  }> {
+    return forkJoin({
+      current: this.fetchObjectVersion(
+        item.object_ref,
+        this.getDiffObjectModified(item)
+      ),
+      prior: baselineEntry
+        ? this.fetchObjectVersion(
+            baselineEntry.object_ref,
+            this.getDiffObjectModified(baselineEntry)
+          )
+        : of(null),
+    });
   }
 
   private fetchObjectVersion(
