@@ -28,7 +28,9 @@ export class ReleaseTrackCardComponent {
   }
 
   public onViewTrack(): void {
-    const id = this.track?.id || this.track?.track_id || null;
+    // Prefer the alias so the page URL reads as the track's slug.
+    const id =
+      this.track?.alias || this.track?.id || this.track?.track_id || null;
     if (id) this.viewTrack.emit(id);
   }
 }

@@ -2,8 +2,7 @@ import { WorkflowStatusType } from 'src/app/utils/types';
 import { SnapshotTier } from './enums';
 
 export type ReleaseTrackObjectTier =
-  | SnapshotTier.Candidate
-  | SnapshotTier.Staged;
+  SnapshotTier.Candidate | SnapshotTier.Staged;
 
 export type WorkflowRevisionSelector = Date | 'latest';
 
@@ -17,11 +16,15 @@ export interface TierEntryModifiedByUser {
 export interface TierEntryDisplayFields {
   attack_id?: string;
   name?: string;
+  /** STIX object type of the selected revision */
+  type?: string;
+  /** ATT&CK version of the selected revision */
+  x_mitre_version?: string;
   description?: string;
   modified_by_user?: TierEntryModifiedByUser;
 }
 
-export interface MemberEntry {
+export interface MemberEntry extends TierEntryDisplayFields {
   object_ref: string;
   object_modified: Date;
 }

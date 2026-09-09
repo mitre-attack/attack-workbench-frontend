@@ -47,6 +47,19 @@ $released-members-disabled-dark: colors.on-color-deemphasis(dark);
     gap: 8px;
   }
 
+  .page-activity {
+    margin: -6px 0 18px;
+
+    .page-activity-message {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin: 10px 0 0;
+      font-size: 14px;
+      opacity: 0.85;
+    }
+  }
+
   .review-tpl-wrapper {
     margin-top: 20px;
   }
@@ -70,6 +83,14 @@ $released-members-disabled-dark: colors.on-color-deemphasis(dark);
     display: flex;
     flex-direction: column;
     gap: 16px;
+  }
+
+  .config-card.danger-zone {
+    border-color: colors.color(error);
+
+    h3 {
+      color: colors.color(error);
+    }
   }
 
   .config-card > .content {
@@ -1844,4 +1865,31 @@ $released-members-disabled-dark: colors.on-color-deemphasis(dark);
       color: colors.on-color-deemphasis(light);
     }
   }
+}
+
+// Publication configuration and sealed-content additions
+.config-section-intro {
+  margin: 0 0 1rem;
+  color: var(--text-secondary, rgba(0, 0, 0, 0.6));
+  font-size: 0.9rem;
+}
+
+.config-source {
+  margin-top: 0.25rem;
+  font-size: 0.8rem;
+  opacity: 0.75;
+}
+
+.config-inherit-editor {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.5rem;
+}
+
+.snapshot-bundle-id {
+  margin-left: auto;
+  font-size: 0.8rem;
+  opacity: 0.8;
+  word-break: break-all;
 }

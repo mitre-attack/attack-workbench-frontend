@@ -3,42 +3,45 @@
     <h1>
       {{ releaseTrackName }}
     </h1>
-    <div class="button-group release-track-actions">
-      <button mat-stroked-button (click)="onExport()">
-        Export Latest
-        <mat-icon>file_download</mat-icon>
-      </button>
+    <div
+      *ngIf="isVirtualReleaseTrack"
+      class="button-group release-track-actions">
       <button
-        *ngIf="canEditReleaseTrack"
-        mat-stroked-button
-        color="warn"
-        [disabled]="!id || isDeleting"
-        (click)="onDeleteReleaseTrack()">
-        Delete
-        <mat-icon>delete</mat-icon>
-      </button>
-      <button
-        *ngIf="isVirtualReleaseTrack"
-        mat-stroked-button
+        mat-raised-button
+        color="primary"
         [disabled]="!canCreateDraft"
         (click)="onDraft()">
-        Create Draft
-        <mat-icon>local_see</mat-icon>
-      </button>
-      <button mat-raised-button color="primary" (click)="onPreviewRelease()">
-        Preview & Release
-        <mat-icon>preview</mat-icon>
+        <mat-spinner
+          *ngIf="isCreatingDraft"
+          class="snapshot-action-spinner"
+          diameter="18"></mat-spinner>
+        {{ isCreatingDraft ? 'Creating draft' : 'Create Draft' }}
+        <mat-icon *ngIf="!isCreatingDraft">local_see</mat-icon>
       </button>
     </div>
+  </div>
+  <div
+    *ngIf="activityMessage as message"
+    class="page-activity"
+    role="status"
+    aria-live="polite">
+    <mat-progress-bar
+      mode="indeterminate"
+      aria-hidden="true"></mat-progress-bar>
+    <p class="page-activity-message">
+      <mat-spinner diameter="16" aria-hidden="true"></mat-spinner>
+      {{ message }} Stay on this page until it finishes.
+    </p>
   </div>
 
   <app-stix-page-tabs
     [detailsTemplate]="detailsTpl"
+    detailsLabel="Board"
     [showHistory]="false"
     [showNotes]="false"
     [showMembership]="false"
     [customTabs]="[
-      { label: 'History', template: historyTpl },
+      { label: 'Releases', template: historyTpl },
       { label: 'Config', template: configTpl },
     ]"></app-stix-page-tabs>
 
@@ -678,19 +681,6 @@
                     <app-workbench-chip
                       *ngIf="item.isLatest"
                       variant="latest"></app-workbench-chip>
-                    <span
-                      class="snapshot-cache-status"
-                      [class.snapshot-cache-status-cached]="item.isBundleCached"
-                      [matTooltip]="getBundleCacheTooltip(item)"
-                      matTooltipPosition="above"
-                      tabindex="0">
-                      <mat-icon aria-hidden="true">{{
-                        item.isBundleCached ? 'verified' : 'warning_amber'
-                      }}</mat-icon>
-                      <span>{{
-                        item.isBundleCached ? 'Bundle cached' : 'Not cached'
-                      }}</span>
-                    </span>
                   </div>
                 </div>
                 <p *ngIf="item.isTagged; else draftSubtitle">
@@ -724,17 +714,10 @@
 
               <div class="snapshot-history-actions small-buttons">
                 <button
-                  *ngIf="canEditReleaseTrack"
+                  *ngIf="canEditReleaseTrack && !item.isTagged"
                   mat-stroked-button
                   [disabled]="
-                    item.isBundleCached ||
-                    isUpdatingSnapshotDescription(item) ||
-                    !item.modified
-                  "
-                  [matTooltip]="
-                    item.isBundleCached
-                      ? 'Delete the bundle cache before editing snapshot notes.'
-                      : ''
+                    isUpdatingSnapshotDescription(item) || !item.modified
                   "
                   [attr.aria-label]="
                     (item.snapshot.snapshot_description ? 'Edit' : 'Add') +
@@ -758,58 +741,21 @@
                   }}
                 </button>
                 <button
-                  *ngIf="item.canCacheBundle && canEditReleaseTrack"
-                  class="cache-color"
-                  mat-stroked-button
-                  [disabled]="isCachingSnapshot(item) || !item.modified"
-                  [attr.aria-label]="'Cache bundle for ' + item.title"
-                  matTooltip="Pin exact member and relationship revisions so future member-only bundle exports are deterministic."
-                  (click)="onCacheSnapshotBundle(item)">
-                  <mat-spinner
-                    *ngIf="isCachingSnapshot(item)"
-                    class="snapshot-action-spinner"
-                    diameter="18"></mat-spinner>
-                  <mat-icon *ngIf="!isCachingSnapshot(item)">
-                    inventory_2
-                  </mat-icon>
-                  {{
-                    isCachingSnapshot(item) ? 'Caching bundle' : 'Cache bundle'
-                  }}
-                </button>
-                <button
-                  *ngIf="item.isBundleCached && canEditReleaseTrack"
-                  color="warn"
-                  mat-stroked-button
-                  [disabled]="
-                    isDeletingSnapshotCache(item) ||
-                    isCachingSnapshot(item) ||
-                    !item.modified
-                  "
-                  [attr.aria-label]="'Delete bundle cache for ' + item.title"
-                  matTooltip="Remove the pinned member graph. Future member-only bundle exports will not be guaranteed deterministic until it is cached again."
-                  (click)="onDeleteSnapshotCache(item)">
-                  <mat-spinner
-                    *ngIf="isDeletingSnapshotCache(item)"
-                    class="snapshot-action-spinner"
-                    color="warn"
-                    diameter="18"></mat-spinner>
-                  <mat-icon *ngIf="!isDeletingSnapshotCache(item)">
-                    delete
-                  </mat-icon>
-                  {{
-                    isDeletingSnapshotCache(item)
-                      ? 'Deleting cache'
-                      : 'Delete cache'
-                  }}
-                </button>
-                <button
                   *ngIf="!item.isTagged"
                   class="view-color"
                   mat-stroked-button
                   [disabled]="isReleasing || !item.modified"
                   (click)="onTagSnapshot(item)">
-                  <mat-icon>sell</mat-icon>
-                  Preview &amp; Tag
+                  <mat-spinner
+                    *ngIf="isPreviewingSnapshot(item)"
+                    class="snapshot-action-spinner"
+                    diameter="18"></mat-spinner>
+                  <mat-icon *ngIf="!isPreviewingSnapshot(item)">sell</mat-icon>
+                  {{
+                    isPreviewingSnapshot(item)
+                      ? 'Preparing preview'
+                      : 'Preview & Tag'
+                  }}
                 </button>
                 <button
                   mat-stroked-button
@@ -818,6 +764,26 @@
                   (click)="onExportSnapshot(item)">
                   <mat-icon>cloud_download</mat-icon>
                   Export&hellip;
+                </button>
+                <button
+                  *ngIf="item.isLatestRelease && canDeleteRelease"
+                  color="warn"
+                  mat-stroked-button
+                  [disabled]="isDeletingRelease(item) || !item.modified"
+                  [attr.aria-label]="'Delete release ' + item.title"
+                  matTooltip="Only the most recent release can be deleted. Its version becomes available again."
+                  (click)="onDeleteRelease(item)">
+                  <mat-spinner
+                    *ngIf="isDeletingRelease(item)"
+                    class="snapshot-action-spinner"
+                    color="warn"
+                    diameter="18"></mat-spinner>
+                  <mat-icon *ngIf="!isDeletingRelease(item)">delete</mat-icon>
+                  {{
+                    isDeletingRelease(item)
+                      ? 'Deleting release'
+                      : 'Delete release'
+                  }}
                 </button>
               </div>
             </div>
@@ -836,19 +802,19 @@
             </div>
 
             <section
-              *ngIf="item.graphCacheStats.length"
+              *ngIf="item.contentStats.length"
               class="snapshot-graph-cache"
-              aria-label="Graph cache statistics">
+              aria-label="Content statistics">
               <div class="snapshot-graph-cache-header">
                 <div class="snapshot-graph-cache-title">
                   <mat-icon aria-hidden="true">account_tree</mat-icon>
-                  <span>Graph cache</span>
+                  <span>Content</span>
                 </div>
-                <span>{{ item.graphCacheTotal }} cached items</span>
+                <span>{{ item.contentTotal }} objects</span>
               </div>
               <div class="snapshot-graph-cache-stats">
                 <div
-                  *ngFor="let stat of item.graphCacheStats"
+                  *ngFor="let stat of item.contentStats"
                   class="snapshot-graph-cache-stat"
                   [matTooltip]="stat.tooltip || ''"
                   matTooltipPosition="above"
@@ -864,12 +830,18 @@
             </section>
 
             <section
-              *ngIf="item.isBundleCached"
+              *ngIf="item.isTagged && item.snapshot.bundle_hashes"
               class="snapshot-bundle-hashes"
               aria-label="STIX bundle SHA-256 hashes">
               <div class="snapshot-bundle-hashes-header">
                 <mat-icon aria-hidden="true">fingerprint</mat-icon>
                 <span>Bundle SHA-256</span>
+                <code
+                  *ngIf="item.snapshot.bundle_id"
+                  class="snapshot-bundle-id"
+                  matTooltip="Stable STIX bundle identifier assigned at release">
+                  {{ item.snapshot.bundle_id }}
+                </code>
               </div>
 
               <div class="snapshot-bundle-hash-row">
@@ -949,6 +921,48 @@
       </div>
 
       <form [formGroup]="configForm" class="config-card-list">
+        <section class="labelled-box config-card">
+          <div class="content no-label">
+            <h3>Address</h3>
+
+            <div class="config-row">
+              <div class="config-copy">
+                <div class="config-label">Alias</div>
+                <p>
+                  Optional short name accepted wherever the track ID is,
+                  including this page's URL and API paths. Lowercase letters,
+                  digits, and hyphens; unique across tracks.
+                </p>
+              </div>
+              <ng-container *ngIf="isEditingConfig; else aliasValue">
+                <mat-form-field appearance="outline" class="config-field">
+                  <mat-label>Alias</mat-label>
+                  <input
+                    matInput
+                    formControlName="alias"
+                    autocomplete="off"
+                    placeholder="enterprise-attack" />
+                  <mat-hint>{{ aliasUrlPreview }}</mat-hint>
+                  <mat-error>
+                    Use 2–64 lowercase letters, digits, or hyphens, starting and
+                    ending with a letter or digit.
+                  </mat-error>
+                </mat-form-field>
+              </ng-container>
+              <ng-template #aliasValue>
+                <code
+                  *ngIf="releaseTrack?.alias; else noAlias"
+                  class="config-value"
+                  >{{ releaseTrack.alias }}</code
+                >
+                <ng-template #noAlias>
+                  <span class="text-deemphasis">None</span>
+                </ng-template>
+              </ng-template>
+            </div>
+          </div>
+        </section>
+
         <ng-container *ngIf="isVirtualReleaseTrack; else standardConfigTpl">
           <section class="labelled-box config-card">
             <div class="content no-label">
@@ -1509,85 +1523,221 @@
               </div>
             </div>
           </section>
+        </ng-template>
 
-          <section class="labelled-box config-card">
-            <div class="content no-label">
-              <h3>Secondary Objects</h3>
+        <section
+          class="labelled-box config-card"
+          aria-label="Publication metadata">
+          <div class="content no-label">
+            <h3>Publication</h3>
+            <p class="config-section-intro">
+              Metadata for the <code>x-mitre-collection</code> object emitted in
+              STIX 2.1 bundles. Each value inherits the organization settings
+              unless overridden for this track. Values are frozen on every
+              released snapshot.
+            </p>
 
-              <div class="config-row">
-                <div class="config-copy">
-                  <div class="config-label">Include Secondary Objects</div>
-                  <p>
-                    Includes supporting objects when they meet the configured
-                    workflow state threshold.
-                  </p>
-                </div>
-                <ng-container
-                  *ngIf="isEditingConfig; else secondaryObjectsStatus">
-                  <mat-slide-toggle
-                    aria-label="Include secondary objects"
-                    formControlName="includeSecondaryObjects"></mat-slide-toggle>
-                </ng-container>
-                <ng-template #secondaryObjectsStatus>
-                  <span
-                    class="config-state"
-                    [class.config-state-on]="
-                      configForm.get('includeSecondaryObjects')?.value
-                    ">
-                    {{
-                      configForm.get('includeSecondaryObjects')?.value
-                        ? 'ON'
-                        : 'OFF'
-                    }}
-                  </span>
-                </ng-template>
+            <div class="config-row">
+              <div class="config-copy">
+                <div class="config-label">Publishing Identity</div>
+                <p>
+                  Becomes <code>created_by_ref</code> on the collection object
+                  and ships in the bundle as a supporting identity.
+                </p>
+                <p *ngIf="publicationResolved" class="config-source">
+                  {{
+                    formatPublicationSource(
+                      publicationResolved.sources.created_by_ref
+                    )
+                  }}
+                </p>
               </div>
-
-              <mat-divider></mat-divider>
-
-              <div
-                class="config-row"
-                [class.config-row-disabled]="
-                  !configForm.get('includeSecondaryObjects')?.value
-                ">
-                <div class="config-copy">
-                  <div class="config-label">Secondary Object Threshold</div>
-                  <p>
-                    Defines the minimum workflow state for automatically
-                    included supporting objects.
-                  </p>
-                </div>
-                <ng-container
-                  *ngIf="isEditingConfig; else secondaryThresholdValue">
-                  <mat-form-field appearance="outline" class="config-field">
-                    <mat-label>Secondary Object Threshold</mat-label>
-                    <mat-select formControlName="secondaryObjectThreshold">
+              <ng-container *ngIf="isEditingConfig; else identityValue">
+                <div class="config-inherit-editor">
+                  <mat-slide-toggle
+                    aria-label="Inherit publishing identity"
+                    formControlName="publicationIdentityInherit">
+                    Inherit organization identity
+                  </mat-slide-toggle>
+                  <mat-form-field
+                    *ngIf="!configForm.get('publicationIdentityInherit')?.value"
+                    appearance="outline"
+                    class="config-field">
+                    <mat-label>Identity</mat-label>
+                    <mat-select formControlName="publicationIdentityValue">
                       <mat-option
-                        *ngFor="let option of candidacyOptions"
-                        [value]="option">
-                        {{ formatConfigOption(option) }}
+                        *ngFor="let option of publicationIdentityOptions"
+                        [value]="option.id">
+                        {{ option.label }}
                       </mat-option>
                     </mat-select>
                   </mat-form-field>
-                </ng-container>
-                <ng-template #secondaryThresholdValue>
-                  <span
-                    class="config-value"
-                    [class.config-value-disabled]="
-                      !configForm.get('includeSecondaryObjects')?.value
-                    ">
-                    {{
-                      formatConfigOption(
-                        configForm.get('secondaryObjectThreshold')?.value
-                      )
-                    }}
-                  </span>
-                </ng-template>
-              </div>
+                </div>
+              </ng-container>
+              <ng-template #identityValue>
+                <span class="config-value">{{ publicationIdentityLabel }}</span>
+              </ng-template>
             </div>
-          </section>
-        </ng-template>
+
+            <mat-divider></mat-divider>
+
+            <div class="config-row">
+              <div class="config-copy">
+                <div class="config-label">Collection Markings</div>
+                <p>
+                  Becomes <code>object_marking_refs</code> on the collection
+                  object. When neither scope configures markings, the object
+                  carries the markings referenced by its contents.
+                </p>
+                <p *ngIf="publicationResolved" class="config-source">
+                  {{
+                    formatPublicationSource(
+                      publicationResolved.sources.object_marking_refs
+                    )
+                  }}
+                </p>
+              </div>
+              <ng-container *ngIf="isEditingConfig; else markingValue">
+                <div class="config-inherit-editor">
+                  <mat-slide-toggle
+                    aria-label="Inherit collection markings"
+                    formControlName="publicationMarkingsInherit">
+                    Inherit default markings
+                  </mat-slide-toggle>
+                  <mat-form-field
+                    *ngIf="!configForm.get('publicationMarkingsInherit')?.value"
+                    appearance="outline"
+                    class="config-field">
+                    <mat-label>Marking definitions</mat-label>
+                    <mat-select
+                      formControlName="publicationMarkingsValue"
+                      multiple>
+                      <mat-option
+                        *ngFor="let option of publicationMarkingOptions"
+                        [value]="option.id">
+                        {{ option.label }}
+                      </mat-option>
+                    </mat-select>
+                  </mat-form-field>
+                </div>
+              </ng-container>
+              <ng-template #markingValue>
+                <span class="config-value">
+                  <ng-container
+                    *ngIf="publicationMarkingLabels.length; else noMarkings">
+                    {{ publicationMarkingLabels.join(', ') }}
+                  </ng-container>
+                  <ng-template #noMarkings>Derived from contents</ng-template>
+                </span>
+              </ng-template>
+            </div>
+
+            <mat-divider></mat-divider>
+
+            <div class="config-row">
+              <div class="config-copy">
+                <div class="config-label">Collection ID</div>
+                <p>
+                  Stable identifier of the collection object across every
+                  snapshot of this track. Set the canonical ATT&amp;CK value
+                  before the first release when this track replaces a legacy
+                  domain bundle; it cannot change afterwards.
+                </p>
+                <p *ngIf="publicationResolved" class="config-source">
+                  {{
+                    formatPublicationSource(
+                      publicationResolved.sources.collection_id
+                    )
+                  }}
+                </p>
+              </div>
+              <ng-container
+                *ngIf="
+                  isEditingConfig && !hasTaggedRelease;
+                  else collectionIdValue
+                ">
+                <mat-form-field appearance="outline" class="config-field">
+                  <mat-label>Collection ID</mat-label>
+                  <input
+                    matInput
+                    formControlName="publicationCollectionId"
+                    placeholder="x-mitre-collection--uuid" />
+                </mat-form-field>
+              </ng-container>
+              <ng-template #collectionIdValue>
+                <code class="config-value">{{
+                  publicationResolved?.collection_id
+                }}</code>
+              </ng-template>
+            </div>
+
+            <mat-divider></mat-divider>
+
+            <div class="config-row">
+              <div class="config-copy">
+                <div class="config-label">Collection Created</div>
+                <p>
+                  The collection object's <code>created</code> timestamp.
+                  Defaults to when this track was created and cannot change
+                  after the first release.
+                </p>
+                <p *ngIf="publicationResolved" class="config-source">
+                  {{
+                    formatPublicationSource(publicationResolved.sources.created)
+                  }}
+                </p>
+              </div>
+              <ng-container
+                *ngIf="isEditingConfig && !hasTaggedRelease; else createdValue">
+                <mat-form-field appearance="outline" class="config-field">
+                  <mat-label>Created (ISO 8601)</mat-label>
+                  <input
+                    matInput
+                    formControlName="publicationCreated"
+                    placeholder="2018-01-17T12:56:55.080Z" />
+                </mat-form-field>
+              </ng-container>
+              <ng-template #createdValue>
+                <span class="config-value">
+                  <ng-container
+                    *ngIf="publicationResolved?.created; else unknownDate">
+                    {{
+                      publicationResolved?.created | date: 'MMM d, y, h:mm:ss a'
+                    }}
+                  </ng-container>
+                </span>
+              </ng-template>
+            </div>
+          </div>
+        </section>
       </form>
+
+      <section
+        *ngIf="canEditReleaseTrack"
+        class="labelled-box config-card danger-zone"
+        aria-label="Danger zone">
+        <div class="content no-label">
+          <h3>Danger zone</h3>
+          <div class="config-row">
+            <div class="config-copy">
+              <div class="config-label">Delete this release track</div>
+              <p>
+                Permanently deletes the track with every snapshot and release in
+                its history. You will be asked to type the track ID to confirm.
+              </p>
+            </div>
+            <button
+              mat-stroked-button
+              color="warn"
+              type="button"
+              [disabled]="!id || isDeleting"
+              (click)="onDeleteReleaseTrack()">
+              <mat-icon>delete_forever</mat-icon>
+              Delete release track
+            </button>
+          </div>
+        </div>
+      </section>
     </div>
   </ng-template>
 </div>
