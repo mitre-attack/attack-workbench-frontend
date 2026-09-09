@@ -33,8 +33,7 @@ import {
   ResolutionStrategy,
   SnapshotScheduleMode,
   SnapshotScheduleModeType,
-  SnapshotTier,
-  SnapshotTierType,
+  SnapshotSchedule,
   StixObjectRef,
   UpdateMetadataPayload,
 } from 'src/app/classes/release-tracks';
@@ -154,10 +153,26 @@ interface PublicationOption {
 
 interface VirtualReleaseTrackConfigFormValue {
   virtualDeduplicationStrategy: DeduplicationStrategyType;
-  virtualDeduplicationTier: SnapshotTierType;
-  virtualDeduplicationStatus: WorkflowStatusType;
   virtualSnapshotScheduleMode: SnapshotScheduleModeType;
   virtualSnapshotScheduleCron: string;
+  virtualCronCadence: VirtualCronCadence;
+  virtualCronMinute: number;
+  virtualCronHour: number;
+  virtualCronWeekdays: number[];
+  virtualCronMonthDay: number;
+  virtualCronMonths: number[];
+  virtualScheduleDates: string[];
+  virtualScheduleDateDraft: string;
+  virtualScheduleDateHour: number;
+  virtualScheduleDateMinute: number;
+}
+
+type VirtualCronCadence =
+  'interval' | 'hourly' | 'daily' | 'weekly' | 'monthly' | 'yearly';
+
+interface SchedulePreset {
+  label: string;
+  cron: string;
 }
 
 interface VirtualResolutionRow {
@@ -207,6 +222,29 @@ const VIRTUAL_OBJECT_TYPE_OPTIONS: StixType[] = [
 ];
 
 const VIRTUAL_DOMAIN_FILTER_OPTIONS = ['enterprise', 'ics', 'mobile'];
+const VIRTUAL_WEEKDAY_OPTIONS = [
+  { label: 'Sunday', value: 0 },
+  { label: 'Monday', value: 1 },
+  { label: 'Tuesday', value: 2 },
+  { label: 'Wednesday', value: 3 },
+  { label: 'Thursday', value: 4 },
+  { label: 'Friday', value: 5 },
+  { label: 'Saturday', value: 6 },
+];
+const VIRTUAL_MONTH_OPTIONS = [
+  'January',
+  'February',
+  'March',
+  'April',
+  'May',
+  'June',
+  'July',
+  'August',
+  'September',
+  'October',
+  'November',
+  'December',
+].map((label, index) => ({ label, value: index + 1 }));
 
 @Component({
   selector: 'app-release-track-page',
@@ -255,8 +293,6 @@ export class ReleaseTrackPageComponent implements OnInit {
   ).filter(policy => policy !== ConflictPolicy.Abort);
   public stagedToMembersConflictOptions = Object.values(ConflictPolicy);
   public virtualDeduplicationOptions = Object.values(DeduplicationStrategy);
-  public virtualDeduplicationTierOptions = Object.values(SnapshotTier);
-  public virtualDeduplicationStatusOptions = Object.values(WorkflowStatus);
   public virtualSnapshotScheduleModeOptions =
     Object.values(SnapshotScheduleMode);
   public virtualObjectTypeOptions = VIRTUAL_OBJECT_TYPE_OPTIONS.map(type => ({
@@ -264,6 +300,55 @@ export class ReleaseTrackPageComponent implements OnInit {
     value: type,
   }));
   public virtualDomainOptions = VIRTUAL_DOMAIN_FILTER_OPTIONS;
+  public virtualCronCadenceOptions: {
+    label: string;
+    value: VirtualCronCadence;
+  }[] = [
+    { label: 'Every 15 or 30 minutes', value: 'interval' },
+    { label: 'Hourly', value: 'hourly' },
+    { label: 'Daily', value: 'daily' },
+    { label: 'Weekly', value: 'weekly' },
+    { label: 'Monthly', value: 'monthly' },
+    { label: 'Yearly', value: 'yearly' },
+  ];
+  public virtualWeekdayOptions = VIRTUAL_WEEKDAY_OPTIONS;
+  public virtualMonthOptions = VIRTUAL_MONTH_OPTIONS;
+  public virtualHourOptions = Array.from({ length: 24 }, (_, value) => value);
+  public virtualMinuteOptions = Array.from(
+    { length: 12 },
+    (_, index) => index * 5
+  );
+  public virtualMonthDayOptions = Array.from(
+    { length: 28 },
+    (_, index) => index + 1
+  );
+  public virtualCronUsesExistingExpression = false;
+  public readonly schedulePresets: SchedulePreset[] = [
+    { label: 'Hourly — at minute 0', cron: '0 * * * *' },
+    { label: 'Every 15 minutes', cron: '*/15 * * * *' },
+    { label: 'Every 30 minutes', cron: '*/30 * * * *' },
+    { label: 'Daily at midnight UTC', cron: '0 0 * * *' },
+    { label: 'Weekdays at 09:00 UTC', cron: '0 9 * * 1,2,3,4,5' },
+    { label: 'Weekly on Monday at 09:00 UTC', cron: '0 9 * * 1' },
+    { label: 'Monthly on day 1 at midnight UTC', cron: '0 0 1 * *' },
+    { label: 'Yearly on January 1 at midnight UTC', cron: '0 0 1 1 *' },
+  ];
+
+  public displaySchedulePreset = (preset: SchedulePreset | null): string =>
+    preset?.label || '';
+
+  public get filteredSchedulePresets(): SchedulePreset[] {
+    const value = this.configForm.get('virtualScheduleSearch')?.value;
+    const query = typeof value === 'string' ? value.trim().toLowerCase() : '';
+    return this.schedulePresets.filter(preset =>
+      preset.label.toLowerCase().includes(query)
+    );
+  }
+
+  public selectSchedulePreset(preset: SchedulePreset): void {
+    if (!this.schedulePresets.includes(preset)) return;
+    this.configureVirtualCronExpression(preset.cron);
+  }
 
   constructor(
     private connector: ReleaseTracksConnectorService,
@@ -298,14 +383,40 @@ export class ReleaseTrackPageComponent implements OnInit {
       virtualDeduplicationStrategy: [
         DeduplicationStrategy.PrioritizeLatestObject,
       ],
-      virtualDeduplicationTier: [SnapshotTier.Member],
-      virtualDeduplicationStatus: [WorkflowStatus.Reviewed],
       virtualSnapshotScheduleMode: [SnapshotScheduleMode.Manual],
       virtualSnapshotScheduleCron: [''],
+      virtualCronCadence: ['daily' as VirtualCronCadence],
+      virtualCronMinute: [0],
+      virtualCronInterval: [15],
+      virtualScheduleSearch: [null],
+      virtualCronHour: [0],
+      virtualCronWeekdays: [[1]],
+      virtualCronMonthDay: [1],
+      virtualCronMonths: [[1]],
+      virtualScheduleDates: [[] as string[]],
+      virtualScheduleDateDraft: [''],
+      virtualScheduleDateHour: [0],
+      virtualScheduleDateMinute: [0],
       virtualComponentTrackSearch: [''],
     });
     this.configForm.get('autoPromote')?.valueChanges.subscribe(autoPromote => {
       this.syncCandidacyThresholdControl(!!autoPromote);
+    });
+    [
+      'virtualCronCadence',
+      'virtualCronMinute',
+      'virtualCronInterval',
+      'virtualCronHour',
+      'virtualCronWeekdays',
+      'virtualCronMonthDay',
+      'virtualCronMonths',
+    ].forEach(controlName => {
+      this.configForm.get(controlName)?.valueChanges.subscribe(() => {
+        this.virtualCronUsesExistingExpression = false;
+        this.configForm
+          .get('virtualScheduleSearch')
+          ?.reset(null, { emitEvent: false });
+      });
     });
   }
 
@@ -1907,6 +2018,7 @@ export class ReleaseTrackPageComponent implements OnInit {
       return;
     }
     if (this.isVirtualReleaseTrack) {
+      if (!this.isVirtualScheduleValid) return;
       this.saveVirtualConfig();
       return;
     }
@@ -2595,6 +2707,17 @@ export class ReleaseTrackPageComponent implements OnInit {
     return String(value).replace(/[_-]+/g, ' ');
   }
 
+  public getVirtualScheduleModeLabel(mode: SnapshotScheduleMode): string {
+    switch (mode) {
+      case SnapshotScheduleMode.Cron:
+        return 'Recurring';
+      case SnapshotScheduleMode.Dates:
+        return 'Specific dates';
+      default:
+        return 'Manual';
+    }
+  }
+
   public getVirtualTrackPriority(track: any, index: number): number {
     return typeof track?.priority === 'number' ? track.priority : index;
   }
@@ -2604,6 +2727,144 @@ export class ReleaseTrackPageComponent implements OnInit {
     return value === null || value === undefined || value === ''
       ? 'not set'
       : String(value);
+  }
+
+  public formatTwoDigit(value: number): string {
+    return String(value).padStart(2, '0');
+  }
+
+  public get virtualCronExpression(): string {
+    const value =
+      this.configForm.getRawValue() as VirtualReleaseTrackConfigFormValue;
+    if (this.virtualCronUsesExistingExpression) {
+      return value.virtualSnapshotScheduleCron;
+    }
+
+    const prefix = `${value.virtualCronMinute} ${value.virtualCronHour}`;
+    switch (value.virtualCronCadence) {
+      case 'hourly':
+        return `${value.virtualCronMinute} * * * *`;
+      case 'interval':
+        return `*/${this.configForm.get('virtualCronInterval')?.value} * * * *`;
+      case 'weekly':
+        return `${prefix} * * ${[...value.virtualCronWeekdays].sort().join(',')}`;
+      case 'monthly':
+        return `${prefix} ${value.virtualCronMonthDay} * *`;
+      case 'yearly':
+        return `${prefix} ${value.virtualCronMonthDay} ${[
+          ...value.virtualCronMonths,
+        ]
+          .sort((left, right) => left - right)
+          .join(',')} *`;
+      default:
+        return `${prefix} * * *`;
+    }
+  }
+
+  public get virtualScheduleDates(): string[] {
+    return (
+      (this.configForm.get('virtualScheduleDates')?.value as string[]) || []
+    );
+  }
+
+  public get virtualScheduleDateMin(): string {
+    return new Date().toISOString().slice(0, 10);
+  }
+
+  public get isVirtualScheduleValid(): boolean {
+    const value =
+      this.configForm.getRawValue() as VirtualReleaseTrackConfigFormValue;
+    if (value.virtualSnapshotScheduleMode === SnapshotScheduleMode.Dates) {
+      return value.virtualScheduleDates.length > 0;
+    }
+    if (value.virtualSnapshotScheduleMode !== SnapshotScheduleMode.Cron) {
+      return true;
+    }
+    if (
+      typeof this.configForm.get('virtualScheduleSearch')?.value === 'string' &&
+      this.configForm.get('virtualScheduleSearch')?.value.trim()
+    )
+      return false;
+    if (this.virtualCronUsesExistingExpression) return true;
+    if (
+      value.virtualCronCadence === 'weekly' &&
+      !value.virtualCronWeekdays.length
+    ) {
+      return false;
+    }
+    return !(
+      value.virtualCronCadence === 'yearly' && !value.virtualCronMonths.length
+    );
+  }
+
+  public get canAddVirtualScheduleDate(): boolean {
+    const value =
+      this.configForm.getRawValue() as VirtualReleaseTrackConfigFormValue;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(value.virtualScheduleDateDraft)) {
+      return false;
+    }
+    return this.isValidVirtualScheduleDate(
+      value.virtualScheduleDateDraft,
+      value.virtualScheduleDateHour,
+      value.virtualScheduleDateMinute
+    );
+  }
+
+  public addVirtualScheduleDate(): void {
+    if (!this.canAddVirtualScheduleDate) return;
+    const value =
+      this.configForm.getRawValue() as VirtualReleaseTrackConfigFormValue;
+    const date = this.buildVirtualScheduleDate(
+      value.virtualScheduleDateDraft,
+      value.virtualScheduleDateHour,
+      value.virtualScheduleDateMinute
+    ).toISOString();
+    this.configForm.patchValue({
+      virtualScheduleDates: [
+        ...new Set([...value.virtualScheduleDates, date]),
+      ].sort(),
+      virtualScheduleDateDraft: '',
+    });
+  }
+
+  public removeVirtualScheduleDate(date: string): void {
+    this.configForm.patchValue({
+      virtualScheduleDates: this.virtualScheduleDates.filter(
+        item => item !== date
+      ),
+    });
+  }
+
+  public replaceExistingCronExpression(): void {
+    this.virtualCronUsesExistingExpression = false;
+    this.configForm.patchValue({
+      virtualCronCadence: 'daily',
+      virtualCronMinute: 0,
+      virtualCronHour: 0,
+    });
+  }
+
+  private buildVirtualScheduleDate(
+    date: string,
+    hour: number,
+    minute: number
+  ): Date {
+    return new Date(
+      `${date}T${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}:00.000Z`
+    );
+  }
+
+  private isValidVirtualScheduleDate(
+    date: string,
+    hour: number,
+    minute: number
+  ): boolean {
+    const value = this.buildVirtualScheduleDate(date, hour, minute);
+    return (
+      !Number.isNaN(value.getTime()) &&
+      value.toISOString().slice(0, 10) === date &&
+      value.getTime() > Date.now()
+    );
   }
 
   private setConfig(config: any): void {
@@ -2631,16 +2892,123 @@ export class ReleaseTrackPageComponent implements OnInit {
         virtualDeduplicationStrategy:
           deduplication.strategy ??
           DeduplicationStrategy.PrioritizeLatestObject,
-        virtualDeduplicationTier:
-          deduplication.tier_resolution ?? SnapshotTier.Member,
-        virtualDeduplicationStatus:
-          deduplication.status_resolution ?? WorkflowStatus.Reviewed,
         virtualSnapshotScheduleMode:
           snapshotSchedule.mode ?? SnapshotScheduleMode.Manual,
         virtualSnapshotScheduleCron: snapshotSchedule.cron ?? '',
+        virtualScheduleDates: (snapshotSchedule.dates ?? []).map((date: any) =>
+          new Date(date).toISOString()
+        ),
+        virtualScheduleDateDraft: '',
       },
       { emitEvent: false }
     );
+    this.configureVirtualCronExpression(snapshotSchedule.cron);
+    this.initialVirtualComposition = JSON.stringify(
+      this.getVirtualCompositionPayload()
+    );
+  }
+
+  private configureVirtualCronExpression(cron?: string): void {
+    this.configForm
+      .get('virtualScheduleSearch')
+      ?.reset(
+        this.schedulePresets.find(preset => preset.cron === cron) || null,
+        { emitEvent: false }
+      );
+    if (cron && /^(0|5|[1-5][05]|\*\/(15|30)) \* \* \* \*$/.test(cron)) {
+      this.virtualCronUsesExistingExpression = false;
+      this.configForm.patchValue(
+        {
+          virtualCronCadence: cron.startsWith('*/') ? 'interval' : 'hourly',
+          virtualCronMinute: cron.startsWith('*/')
+            ? 0
+            : Number(cron.split(' ')[0]),
+          virtualCronInterval: cron.startsWith('*/30') ? 30 : 15,
+        },
+        { emitEvent: false }
+      );
+      return;
+    }
+    if (!cron) {
+      this.virtualCronUsesExistingExpression = false;
+      return;
+    }
+    const fields = cron.trim().split(/\s+/);
+    const minute = Number(fields[0]);
+    const hour = Number(fields[1]);
+    if (
+      fields.length !== 5 ||
+      !Number.isInteger(minute) ||
+      minute < 0 ||
+      minute > 59 ||
+      !this.virtualMinuteOptions.includes(minute) ||
+      !Number.isInteger(hour) ||
+      hour < 0 ||
+      hour > 23
+    ) {
+      this.virtualCronUsesExistingExpression = true;
+      return;
+    }
+
+    const parseList = (field: string, minimum: number, maximum: number) => {
+      const values = field.split(',').map(Number);
+      return values.length > 0 &&
+        new Set(values).size === values.length &&
+        values.every(
+          value =>
+            Number.isInteger(value) && value >= minimum && value <= maximum
+        )
+        ? values
+        : null;
+    };
+    const [, , dayOfMonth, month, dayOfWeek] = fields;
+    let controls: Record<string, any> | null = null;
+    if (dayOfMonth === '*' && month === '*' && dayOfWeek === '*') {
+      controls = { virtualCronCadence: 'daily' };
+    } else if (dayOfMonth === '*' && month === '*') {
+      const weekdays = parseList(dayOfWeek, 0, 6);
+      if (weekdays) {
+        controls = {
+          virtualCronCadence: 'weekly',
+          virtualCronWeekdays: weekdays,
+        };
+      }
+    } else if (month === '*' && dayOfWeek === '*') {
+      const monthDay = Number(dayOfMonth);
+      if (Number.isInteger(monthDay) && monthDay >= 1 && monthDay <= 28) {
+        controls = {
+          virtualCronCadence: 'monthly',
+          virtualCronMonthDay: monthDay,
+        };
+      }
+    } else if (dayOfWeek === '*') {
+      const monthDay = Number(dayOfMonth);
+      const months = parseList(month, 1, 12);
+      if (
+        Number.isInteger(monthDay) &&
+        monthDay >= 1 &&
+        monthDay <= 28 &&
+        months
+      ) {
+        controls = {
+          virtualCronCadence: 'yearly',
+          virtualCronMonthDay: monthDay,
+          virtualCronMonths: months,
+        };
+      }
+    }
+
+    this.virtualCronUsesExistingExpression = !controls;
+    if (controls) {
+      this.configForm.patchValue(
+        {
+          ...controls,
+          virtualCronMinute: minute,
+          virtualCronHour: hour,
+        },
+        { emitEvent: false }
+      );
+    }
   }
 
   private saveVirtualConfig(): void {
@@ -2649,29 +3017,42 @@ export class ReleaseTrackPageComponent implements OnInit {
       this.configForm.getRawValue() as ReleaseTrackConfigFormValue
     );
     const aliasChanged = !!this.getAliasUpdate();
+    const compositionChanged = this.hasVirtualCompositionChanges(payload);
     this.isSavingConfig = true;
     this.withAliasUpdate(() =>
-      this.connector.updateComposition(this.id, payload)
+      compositionChanged
+        ? this.connector.updateComposition(this.id, payload)
+        : of(this.releaseTrack?.composition)
     )
       .pipe(
         take(1),
         switchMap(result =>
           this.connector
+            .updateSchedule(this.id, this.getVirtualSchedulePayload())
+            .pipe(map(scheduleResult => ({ result, scheduleResult })))
+        ),
+        switchMap(({ result, scheduleResult }) =>
+          this.connector
             .updateConfig(this.id, { publication })
-            .pipe(map(configResult => ({ result, configResult })))
+            .pipe(
+              map(configResult => ({ result, scheduleResult, configResult }))
+            )
         ),
         finalize(() => {
           this.isSavingConfig = false;
         })
       )
       .subscribe({
-        next: ({ result, configResult }) => {
+        next: ({ result, scheduleResult, configResult }) => {
           this.isEditingConfig = false;
           if (this.releaseTrack) {
             this.releaseTrack.composition = this.getCompositionFromResponse(
               result,
               payload
             );
+            this.releaseTrack.snapshot_schedule =
+              scheduleResult?.snapshot_schedule ||
+              this.getVirtualSchedulePayload();
           }
           this.setConfig(
             this.getConfigFromResponse(configResult, { publication })
@@ -2684,6 +3065,31 @@ export class ReleaseTrackPageComponent implements OnInit {
           console.error('Failed to update virtual release track config', err);
         },
       });
+  }
+
+  private getVirtualSchedulePayload(): SnapshotSchedule {
+    const value =
+      this.configForm.getRawValue() as VirtualReleaseTrackConfigFormValue;
+    switch (value.virtualSnapshotScheduleMode) {
+      case SnapshotScheduleMode.Cron:
+        return {
+          mode: SnapshotScheduleMode.Cron,
+          cron: this.virtualCronExpression,
+        };
+      case SnapshotScheduleMode.Dates:
+        return {
+          mode: SnapshotScheduleMode.Dates,
+          dates: value.virtualScheduleDates,
+        };
+      default:
+        return { mode: SnapshotScheduleMode.Manual };
+    }
+  }
+
+  private initialVirtualComposition = '';
+
+  private hasVirtualCompositionChanges(payload: any): boolean {
+    return JSON.stringify(payload) !== this.initialVirtualComposition;
   }
 
   private getCompositionFromResponse(response: any, fallback: any): any {
@@ -2956,10 +3362,8 @@ export class ReleaseTrackPageComponent implements OnInit {
   private getVirtualCompositionPayload(): any {
     const value =
       this.configForm.getRawValue() as VirtualReleaseTrackConfigFormValue;
-    const currentComposition = this.releaseTrack?.composition || {};
 
     return {
-      ...currentComposition,
       component_tracks: this.virtualConfigComponentTracks.map(
         (track, index) => ({
           ...track,
@@ -2970,9 +3374,6 @@ export class ReleaseTrackPageComponent implements OnInit {
         strategy:
           value.virtualDeduplicationStrategy ||
           DeduplicationStrategy.PrioritizeLatestObject,
-        tier_resolution: value.virtualDeduplicationTier || SnapshotTier.Member,
-        status_resolution:
-          value.virtualDeduplicationStatus || WorkflowStatus.Reviewed,
       },
     };
   }

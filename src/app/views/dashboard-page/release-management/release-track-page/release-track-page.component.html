@@ -913,7 +913,10 @@
           <button
             mat-raised-button
             color="primary"
-            [disabled]="isSavingConfig"
+            [disabled]="
+              isSavingConfig ||
+              (isVirtualReleaseTrack && !isVirtualScheduleValid)
+            "
             (click)="onSaveConfig()">
             Save Config
           </button>
@@ -1166,73 +1169,6 @@
                   </span>
                 </ng-template>
               </div>
-
-              <mat-divider></mat-divider>
-
-              <div class="config-row">
-                <div class="config-copy">
-                  <div class="config-label">Preferred Tier</div>
-                  <p>
-                    Breaks ties by preferring objects from the selected tier.
-                  </p>
-                </div>
-                <ng-container
-                  *ngIf="isEditingConfig; else virtualTierResolutionValue">
-                  <mat-form-field appearance="outline" class="config-field">
-                    <mat-label>Preferred Tier</mat-label>
-                    <mat-select formControlName="virtualDeduplicationTier">
-                      <mat-option
-                        *ngFor="let option of virtualDeduplicationTierOptions"
-                        [value]="option">
-                        {{ formatConfigOption(option) }}
-                      </mat-option>
-                    </mat-select>
-                  </mat-form-field>
-                </ng-container>
-                <ng-template #virtualTierResolutionValue>
-                  <span class="config-value">
-                    {{
-                      formatConfigOption(
-                        configForm.get('virtualDeduplicationTier')?.value
-                      )
-                    }}
-                  </span>
-                </ng-template>
-              </div>
-
-              <mat-divider></mat-divider>
-
-              <div class="config-row">
-                <div class="config-copy">
-                  <div class="config-label">Preferred Status</div>
-                  <p>
-                    Breaks ties by preferring objects with the selected workflow
-                    state.
-                  </p>
-                </div>
-                <ng-container
-                  *ngIf="isEditingConfig; else virtualStatusResolutionValue">
-                  <mat-form-field appearance="outline" class="config-field">
-                    <mat-label>Preferred Status</mat-label>
-                    <mat-select formControlName="virtualDeduplicationStatus">
-                      <mat-option
-                        *ngFor="let option of virtualDeduplicationStatusOptions"
-                        [value]="option">
-                        {{ formatConfigOption(option) }}
-                      </mat-option>
-                    </mat-select>
-                  </mat-form-field>
-                </ng-container>
-                <ng-template #virtualStatusResolutionValue>
-                  <span class="config-value">
-                    {{
-                      formatConfigOption(
-                        configForm.get('virtualDeduplicationStatus')?.value
-                      )
-                    }}
-                  </span>
-                </ng-template>
-              </div>
             </div>
           </section>
 
@@ -1245,33 +1181,297 @@
                   <div class="config-label">Mode</div>
                   <p>Controls how draft snapshots are scheduled.</p>
                 </div>
-                <span class="config-value">
-                  {{
-                    formatConfigOption(
-                      configForm.get('virtualSnapshotScheduleMode')?.value
-                    )
-                  }}
-                </span>
+                <ng-container *ngIf="isEditingConfig; else scheduleModeValue">
+                  <mat-form-field appearance="outline" class="config-field">
+                    <mat-label>Schedule mode</mat-label>
+                    <mat-select formControlName="virtualSnapshotScheduleMode">
+                      <mat-option
+                        *ngFor="
+                          let option of virtualSnapshotScheduleModeOptions
+                        "
+                        [value]="option">
+                        {{ getVirtualScheduleModeLabel(option) }}
+                      </mat-option>
+                    </mat-select>
+                  </mat-form-field>
+                </ng-container>
+                <ng-template #scheduleModeValue>
+                  <span class="config-value">
+                    {{
+                      getVirtualScheduleModeLabel(
+                        configForm.get('virtualSnapshotScheduleMode')?.value
+                      )
+                    }}
+                  </span>
+                </ng-template>
               </div>
 
-              <mat-divider></mat-divider>
+              <ng-container
+                *ngIf="
+                  configForm.get('virtualSnapshotScheduleMode')?.value ===
+                  'cron'
+                ">
+                <mat-divider></mat-divider>
 
-              <div class="config-row">
                 <div class="config-copy">
-                  <div class="config-label">Cron Expression</div>
+                  <div class="config-label">Recurring schedule</div>
+                  <p>Choose a recurrence and time. All times are UTC.</p>
+                </div>
+
+                <ng-container *ngIf="isEditingConfig; else cronScheduleValue">
+                  <mat-form-field
+                    appearance="outline"
+                    subscriptSizing="dynamic"
+                    class="schedule-wide-field">
+                    <mat-label>Find a schedule</mat-label>
+                    <input
+                      matInput
+                      formControlName="virtualScheduleSearch"
+                      [matAutocomplete]="scheduleAutocomplete"
+                      placeholder="Try hourly, every 15, or weekdays" />
+                    <mat-autocomplete
+                      #scheduleAutocomplete="matAutocomplete"
+                      [displayWith]="displaySchedulePreset"
+                      [requireSelection]="true"
+                      [autoActiveFirstOption]="true"
+                      (optionSelected)="
+                        selectSchedulePreset($event.option.value)
+                      ">
+                      <mat-option
+                        *ngFor="let preset of filteredSchedulePresets"
+                        [value]="preset">
+                        {{ preset.label }}
+                      </mat-option>
+                      <mat-option
+                        *ngIf="!filteredSchedulePresets.length"
+                        disabled>
+                        No matching schedule. Use the controls below.
+                      </mat-option>
+                    </mat-autocomplete>
+                    <mat-hint
+                      >Select a suggestion to apply it, or customize below. All
+                      times are UTC.</mat-hint
+                    >
+                  </mat-form-field>
+                  <div
+                    *ngIf="virtualCronUsesExistingExpression"
+                    class="schedule-existing-warning">
+                    <div>
+                      This track uses an existing expression that the guided
+                      editor cannot represent:
+                      <code>{{ virtualCronExpression }}</code>
+                    </div>
+                    <button
+                      mat-stroked-button
+                      type="button"
+                      (click)="replaceExistingCronExpression()">
+                      Replace with guided schedule
+                    </button>
+                  </div>
+
+                  <div
+                    *ngIf="!virtualCronUsesExistingExpression"
+                    class="schedule-editor-grid">
+                    <mat-form-field appearance="outline">
+                      <mat-label>Repeats</mat-label>
+                      <mat-select formControlName="virtualCronCadence">
+                        <mat-option
+                          *ngFor="let option of virtualCronCadenceOptions"
+                          [value]="option.value">
+                          {{ option.label }}
+                        </mat-option>
+                      </mat-select>
+                    </mat-form-field>
+
+                    <mat-form-field
+                      appearance="outline"
+                      *ngIf="
+                        configForm.get('virtualCronCadence')?.value !==
+                          'hourly' &&
+                        configForm.get('virtualCronCadence')?.value !==
+                          'interval'
+                      ">
+                      <mat-label>Hour (UTC)</mat-label>
+                      <mat-select formControlName="virtualCronHour">
+                        <mat-option
+                          *ngFor="let hour of virtualHourOptions"
+                          [value]="hour">
+                          {{ formatTwoDigit(hour) }}
+                        </mat-option>
+                      </mat-select>
+                    </mat-form-field>
+
+                    <mat-form-field
+                      appearance="outline"
+                      *ngIf="
+                        configForm.get('virtualCronCadence')?.value !==
+                        'interval'
+                      ">
+                      <mat-label>Minute</mat-label>
+                      <mat-select formControlName="virtualCronMinute">
+                        <mat-option
+                          *ngFor="let minute of virtualMinuteOptions"
+                          [value]="minute">
+                          {{ formatTwoDigit(minute) }}
+                        </mat-option>
+                      </mat-select>
+                    </mat-form-field>
+
+                    <mat-form-field
+                      appearance="outline"
+                      *ngIf="
+                        configForm.get('virtualCronCadence')?.value ===
+                        'interval'
+                      ">
+                      <mat-label>Interval</mat-label>
+                      <mat-select formControlName="virtualCronInterval">
+                        <mat-option [value]="15">Every 15 minutes</mat-option>
+                        <mat-option [value]="30">Every 30 minutes</mat-option>
+                      </mat-select>
+                    </mat-form-field>
+
+                    <mat-form-field
+                      *ngIf="
+                        configForm.get('virtualCronCadence')?.value === 'weekly'
+                      "
+                      appearance="outline"
+                      class="schedule-wide-field">
+                      <mat-label>Days of week</mat-label>
+                      <mat-select
+                        formControlName="virtualCronWeekdays"
+                        multiple>
+                        <mat-option
+                          *ngFor="let day of virtualWeekdayOptions"
+                          [value]="day.value">
+                          {{ day.label }}
+                        </mat-option>
+                      </mat-select>
+                    </mat-form-field>
+
+                    <mat-form-field
+                      *ngIf="
+                        configForm.get('virtualCronCadence')?.value ===
+                          'monthly' ||
+                        configForm.get('virtualCronCadence')?.value === 'yearly'
+                      "
+                      appearance="outline">
+                      <mat-label>Day of month</mat-label>
+                      <mat-select formControlName="virtualCronMonthDay">
+                        <mat-option
+                          *ngFor="let day of virtualMonthDayOptions"
+                          [value]="day">
+                          {{ day }}
+                        </mat-option>
+                      </mat-select>
+                    </mat-form-field>
+
+                    <mat-form-field
+                      *ngIf="
+                        configForm.get('virtualCronCadence')?.value === 'yearly'
+                      "
+                      appearance="outline"
+                      class="schedule-wide-field">
+                      <mat-label>Months</mat-label>
+                      <mat-select formControlName="virtualCronMonths" multiple>
+                        <mat-option
+                          *ngFor="let month of virtualMonthOptions"
+                          [value]="month.value">
+                          {{ month.label }}
+                        </mat-option>
+                      </mat-select>
+                    </mat-form-field>
+                  </div>
+
+                  <div class="schedule-expression-preview">
+                    Generated expression:
+                    <code>{{ virtualCronExpression }}</code>
+                  </div>
+                </ng-container>
+                <ng-template #cronScheduleValue>
+                  <code class="config-value schedule-read-value">{{
+                    getVirtualScheduleValue('cron')
+                  }}</code>
+                </ng-template>
+              </ng-container>
+
+              <ng-container
+                *ngIf="
+                  configForm.get('virtualSnapshotScheduleMode')?.value ===
+                  'dates'
+                ">
+                <mat-divider></mat-divider>
+
+                <div class="config-copy">
+                  <div class="config-label">Specific dates</div>
                   <p>
-                    UTC cron expression used when the schedule mode is cron.
+                    Create one draft at each selected future date. All times are
+                    UTC and survive server restarts.
                   </p>
                 </div>
-                <span
-                  class="config-value"
-                  [class.config-value-disabled]="
-                    configForm.get('virtualSnapshotScheduleMode')?.value !==
-                    'cron'
-                  ">
-                  {{ getVirtualScheduleValue('cron') }}
-                </span>
-              </div>
+
+                <div *ngIf="isEditingConfig" class="schedule-date-editor">
+                  <div class="schedule-date-controls">
+                    <mat-form-field appearance="outline">
+                      <mat-label>Date</mat-label>
+                      <input
+                        matInput
+                        type="date"
+                        formControlName="virtualScheduleDateDraft"
+                        [min]="virtualScheduleDateMin" />
+                    </mat-form-field>
+                    <mat-form-field appearance="outline">
+                      <mat-label>Hour (UTC)</mat-label>
+                      <mat-select formControlName="virtualScheduleDateHour">
+                        <mat-option
+                          *ngFor="let hour of virtualHourOptions"
+                          [value]="hour">
+                          {{ formatTwoDigit(hour) }}
+                        </mat-option>
+                      </mat-select>
+                    </mat-form-field>
+                    <mat-form-field appearance="outline">
+                      <mat-label>Minute</mat-label>
+                      <mat-select formControlName="virtualScheduleDateMinute">
+                        <mat-option
+                          *ngFor="let minute of virtualMinuteOptions"
+                          [value]="minute">
+                          {{ formatTwoDigit(minute) }}
+                        </mat-option>
+                      </mat-select>
+                    </mat-form-field>
+                    <button
+                      mat-stroked-button
+                      type="button"
+                      [disabled]="!canAddVirtualScheduleDate"
+                      (click)="addVirtualScheduleDate()">
+                      Add date
+                    </button>
+                  </div>
+                </div>
+
+                <div
+                  *ngIf="virtualScheduleDates.length; else noScheduleDates"
+                  class="schedule-date-list">
+                  <div *ngFor="let date of virtualScheduleDates">
+                    <span
+                      >{{ date | date: 'MMM d, y, HH:mm' : 'UTC' }} UTC</span
+                    >
+                    <button
+                      *ngIf="isEditingConfig"
+                      mat-icon-button
+                      type="button"
+                      aria-label="Remove scheduled date"
+                      (click)="removeVirtualScheduleDate(date)">
+                      <mat-icon>close</mat-icon>
+                    </button>
+                  </div>
+                </div>
+                <ng-template #noScheduleDates>
+                  <p class="schedule-validation-message">
+                    Add at least one future date to save this schedule.
+                  </p>
+                </ng-template>
+              </ng-container>
             </div>
           </section>
         </ng-container>

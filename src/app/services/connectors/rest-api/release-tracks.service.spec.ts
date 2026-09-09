@@ -181,6 +181,17 @@ describe('ReleaseTracksConnectorService', () => {
     );
   });
 
+  it('should replace a virtual track schedule through the virtual namespace', () => {
+    const schedule = { mode: 'cron' as const, cron: '15 9 * * 1,3' };
+
+    service.updateSchedule('release-track--virtual', schedule).subscribe();
+
+    expect(http.put).toHaveBeenCalledWith(
+      `${environment.integrations.rest_api.url}/release-tracks/release-track--virtual/virtual/schedule`,
+      schedule
+    );
+  });
+
   it('should promote an exact quarantined revision', () => {
     const body = {
       object_ref: 'attack-pattern--one',

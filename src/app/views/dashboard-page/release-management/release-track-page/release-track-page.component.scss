@@ -144,6 +144,77 @@ $released-members-disabled-dark: colors.on-color-deemphasis(dark);
     }
   }
 
+  .schedule-editor-grid,
+  .schedule-date-controls {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 12px;
+    margin-top: 16px;
+  }
+
+  .schedule-wide-field {
+    grid-column: 1 / -1;
+    width: 100%;
+  }
+
+  .schedule-expression-preview,
+  .schedule-existing-warning,
+  .schedule-date-list {
+    margin-top: 12px;
+  }
+
+  .schedule-existing-warning {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 12px;
+    border: 1px solid colors.color(warn);
+    border-radius: 4px;
+  }
+
+  .schedule-date-controls {
+    align-items: start;
+    grid-template-columns: 2fr 1fr 1fr auto;
+
+    button {
+      margin-top: 4px;
+    }
+  }
+
+  .schedule-date-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+
+    > div {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      min-height: 40px;
+      padding-left: 12px;
+      border-radius: 4px;
+
+      .dark & {
+        background: rgba(colors.color(secondary), 0.1);
+      }
+
+      .light & {
+        background: rgba(colors.color(secondary), 0.055);
+      }
+    }
+  }
+
+  .schedule-read-value {
+    display: block;
+    margin-top: 12px;
+  }
+
+  .schedule-validation-message {
+    margin: 12px 0 0;
+    color: colors.color(error);
+  }
+
   .config-component-list {
     display: flex;
     flex-direction: column;
@@ -1820,6 +1891,16 @@ $released-members-disabled-dark: colors.on-color-deemphasis(dark);
       > .mat-mdc-slide-toggle {
         margin-left: 0;
       }
+    }
+
+    .schedule-editor-grid,
+    .schedule-date-controls {
+      grid-template-columns: 1fr;
+    }
+
+    .schedule-existing-warning {
+      align-items: flex-start;
+      flex-direction: column;
     }
 
     .config-component-row {
