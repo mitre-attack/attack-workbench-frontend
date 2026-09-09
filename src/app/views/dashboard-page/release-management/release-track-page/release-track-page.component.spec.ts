@@ -31,7 +31,6 @@ import {
   MemberSyncStrategy,
   ReleaseTrackType,
   SnapshotScheduleMode,
-  SnapshotTier,
 } from 'src/app/classes/release-tracks';
 
 describe('ReleaseTrackPageComponent', () => {
@@ -66,6 +65,9 @@ describe('ReleaseTrackPageComponent', () => {
       getConfig: vi.fn(() => createAsyncObservable(null)),
       updateConfig: vi.fn(() => createAsyncObservable({})),
       updateComposition: vi.fn(() => createAsyncObservable({})),
+      updateSchedule: vi.fn(() =>
+        createAsyncObservable({ snapshot_schedule: { mode: 'manual' } })
+      ),
       reviewCandidates: vi.fn(() => createAsyncObservable({})),
       updateMetadataByLatest: vi.fn(() => createAsyncObservable({})),
       addCandidates: vi.fn(() => createAsyncObservable({})),
@@ -1897,8 +1899,6 @@ describe('ReleaseTrackPageComponent', () => {
           ],
           deduplication: {
             strategy: DeduplicationStrategy.Quarantine,
-            tier_resolution: SnapshotTier.Staged,
-            status_resolution: 'awaiting-review',
           },
         },
         snapshot_schedule: {
@@ -1915,8 +1915,6 @@ describe('ReleaseTrackPageComponent', () => {
     expect(component.configForm.getRawValue()).toEqual(
       expect.objectContaining({
         virtualDeduplicationStrategy: DeduplicationStrategy.Quarantine,
-        virtualDeduplicationTier: SnapshotTier.Staged,
-        virtualDeduplicationStatus: 'awaiting-review',
         virtualSnapshotScheduleMode: SnapshotScheduleMode.Cron,
         virtualSnapshotScheduleCron: '0 0 1 1,7 *',
       })
@@ -1931,6 +1929,9 @@ describe('ReleaseTrackPageComponent', () => {
       .spyOn(component, 'getSnapshotHistory')
       .mockImplementation(() => undefined);
     mockReleaseTrackApiConnector.updateComposition.mockReturnValue(of({}));
+    mockReleaseTrackApiConnector.updateSchedule.mockReturnValue(
+      of({ snapshot_schedule: { mode: SnapshotScheduleMode.Manual } })
+    );
     mockReleaseTrackApiConnector.updateConfig.mockReturnValue(of({}));
     component.id = 'release-track--virtual';
     component.releaseTrack = {
@@ -1949,14 +1950,10 @@ describe('ReleaseTrackPageComponent', () => {
     } as any;
     component.configForm.patchValue({
       virtualDeduplicationStrategy: DeduplicationStrategy.Quarantine,
-      virtualDeduplicationTier: SnapshotTier.Staged,
-      virtualDeduplicationStatus: 'reviewed',
     });
     component.onEditConfig();
     component.configForm.patchValue({
       virtualDeduplicationStrategy: DeduplicationStrategy.Quarantine,
-      virtualDeduplicationTier: SnapshotTier.Staged,
-      virtualDeduplicationStatus: 'reviewed',
     });
 
     component.onSaveConfig();
@@ -1973,10 +1970,12 @@ describe('ReleaseTrackPageComponent', () => {
         ],
         deduplication: {
           strategy: DeduplicationStrategy.Quarantine,
-          tier_resolution: SnapshotTier.Staged,
-          status_resolution: 'reviewed',
         },
       }
+    );
+    expect(mockReleaseTrackApiConnector.updateSchedule).toHaveBeenCalledWith(
+      'release-track--virtual',
+      { mode: SnapshotScheduleMode.Manual }
     );
     // Publication settings apply to virtual tracks too and are saved after
     // the composition.
@@ -1994,6 +1993,146 @@ describe('ReleaseTrackPageComponent', () => {
     expect(component.isEditingConfig).toBe(false);
     expect(refreshSpy).toHaveBeenCalled();
     expect(historySpy).toHaveBeenCalled();
+  });
+
+  it('should suggest hourly from partial text and apply only a selected preset', () => {
+    component.configForm.patchValue({
+      virtualSnapshotScheduleMode: SnapshotScheduleMode.Cron,
+    });
+    const previous = component.virtualCronExpression;
+    component.configForm.patchValue({ virtualScheduleSearch: 'hou' });
+    expect(
+      component.filteredSchedulePresets.map(preset => preset.label)
+    ).toEqual(['Hourly — at minute 0']);
+    expect(component.virtualCronExpression).toBe(previous);
+    expect(component.isVirtualScheduleValid).toBe(false);
+    component.selectSchedulePreset(component.filteredSchedulePresets[0]);
+    expect(component.virtualCronExpression).toBe('0 * * * *');
+    expect(component.isVirtualScheduleValid).toBe(true);
+    expect(component.virtualCronUsesExistingExpression).toBe(false);
+  });
+
+  it('should apply every preset and allow subsequent guided customization', () => {
+    for (const preset of component.schedulePresets) {
+      component.selectSchedulePreset(preset);
+      expect(component.virtualCronExpression).toBe(preset.cron);
+      expect(component.virtualCronUsesExistingExpression).toBe(false);
+    }
+    component.configForm.patchValue({ virtualScheduleSearch: 'EVERY 15' });
+    component.selectSchedulePreset(component.filteredSchedulePresets[0]);
+    expect(component.virtualCronExpression).toBe('*/15 * * * *');
+    component.configForm.patchValue({ virtualCronInterval: 30 });
+    expect(component.virtualCronExpression).toBe('*/30 * * * *');
+    expect(component.configForm.get('virtualScheduleSearch')?.value).toBeNull();
+    component.configForm.patchValue({ virtualScheduleSearch: 'tomorrowish' });
+    expect(component.filteredSchedulePresets).toEqual([]);
+    component.selectSchedulePreset({ label: 'Invalid', cron: 'bad' });
+    expect(component.virtualCronExpression).toBe('*/30 * * * *');
+  });
+
+  it('should generate a controlled weekly UTC cron schedule', () => {
+    component.releaseTrack = {
+      type: ReleaseTrackType.Virtual,
+      snapshot_schedule: { mode: SnapshotScheduleMode.Manual },
+    } as any;
+    component.onEditConfig();
+    component.configForm.patchValue({
+      virtualSnapshotScheduleMode: SnapshotScheduleMode.Cron,
+      virtualCronCadence: 'weekly',
+      virtualCronHour: 9,
+      virtualCronMinute: 15,
+      virtualCronWeekdays: [3, 1],
+    });
+
+    expect(component.virtualCronExpression).toBe('15 9 * * 1,3');
+    expect(component.isVirtualScheduleValid).toBe(true);
+  });
+
+  it('should save every 15 minutes without resubmitting a server-shaped composition', () => {
+    mockReleaseTrackApiConnector.updateSchedule.mockReturnValue(
+      of({
+        snapshot_schedule: {
+          mode: SnapshotScheduleMode.Cron,
+          cron: '*/15 * * * *',
+        },
+      })
+    );
+    mockReleaseTrackApiConnector.updateConfig.mockReturnValue(of({}));
+    component.id = 'release-track--virtual';
+    component.releaseTrack = {
+      id: component.id,
+      type: ReleaseTrackType.Virtual,
+      snapshot_schedule: { mode: SnapshotScheduleMode.Manual },
+      composition: {
+        component_tracks: [
+          {
+            track_id: 'release-track--0ac85c02-e554-41cc-bdf9-8f89a1ce1fd1',
+            resolution_strategy: 'latest_tagged',
+            priority: 10,
+            filters: { domains: ['enterprise-attack'] },
+          },
+        ],
+        deduplication: {
+          strategy: DeduplicationStrategy.PrioritizeLatestObject,
+        },
+      },
+    } as any;
+    component.onEditConfig();
+    component.configForm.patchValue({
+      virtualSnapshotScheduleMode: SnapshotScheduleMode.Cron,
+    });
+    component.selectSchedulePreset(
+      component.schedulePresets.find(preset => preset.cron === '*/15 * * * *')!
+    );
+
+    component.onSaveConfig();
+
+    expect(
+      mockReleaseTrackApiConnector.updateComposition
+    ).not.toHaveBeenCalled();
+    expect(mockReleaseTrackApiConnector.updateSchedule).toHaveBeenCalledWith(
+      component.id,
+      { mode: SnapshotScheduleMode.Cron, cron: '*/15 * * * *' }
+    );
+  });
+
+  it('should preserve an existing cron expression the guided editor cannot represent', () => {
+    component.releaseTrack = {
+      type: ReleaseTrackType.Virtual,
+      snapshot_schedule: {
+        mode: SnapshotScheduleMode.Cron,
+        cron: '*/10 8-17 * * 1-5',
+      },
+    } as any;
+
+    component.onEditConfig();
+
+    expect(component.virtualCronUsesExistingExpression).toBe(true);
+    expect(component.virtualCronExpression).toBe('*/10 8-17 * * 1-5');
+  });
+
+  it('should add unique future UTC schedule dates and require at least one', () => {
+    component.releaseTrack = {
+      type: ReleaseTrackType.Virtual,
+      snapshot_schedule: { mode: SnapshotScheduleMode.Dates, dates: [] },
+    } as any;
+    component.onEditConfig();
+    component.configForm.patchValue({
+      virtualSnapshotScheduleMode: SnapshotScheduleMode.Dates,
+      virtualScheduleDateDraft: '2099-07-15',
+      virtualScheduleDateHour: 9,
+      virtualScheduleDateMinute: 30,
+    });
+
+    expect(component.isVirtualScheduleValid).toBe(false);
+    component.addVirtualScheduleDate();
+    component.configForm.patchValue({ virtualScheduleDateDraft: '2099-07-15' });
+    component.addVirtualScheduleDate();
+
+    expect(component.virtualScheduleDates).toEqual([
+      '2099-07-15T09:30:00.000Z',
+    ]);
+    expect(component.isVirtualScheduleValid).toBe(true);
   });
 
   it('should retain object types when clearing component-track domains', () => {

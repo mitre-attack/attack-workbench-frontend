@@ -22,5 +22,5 @@ export interface ReleaseTrack {
 export interface SnapshotSchedule {
   mode?: SnapshotScheduleModeType;
   cron?: string | null;
-  dates?: Date[] | undefined;
+  dates?: (Date | string)[];
 }

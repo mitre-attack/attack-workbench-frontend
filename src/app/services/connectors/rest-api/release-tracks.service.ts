@@ -23,6 +23,7 @@ import type {
   ReleaseTrackSnapshotOptions,
   ReviewPayload,
   SnapshotHistoryOptions,
+  SnapshotSchedule,
   StixBundlePayload,
   StixObjectRef,
   UpdateMetadataPayload,
@@ -559,6 +560,23 @@ export class ReleaseTracksConnectorService extends ApiConnector {
       catchError(this.handleError_raise()),
       share()
     );
+  }
+
+  /** Replace the active registry-backed schedule for a virtual track. */
+  public updateSchedule(id: string, body: SnapshotSchedule): Observable<any> {
+    const url = `${this.apiUrl}/release-tracks/${id}/virtual/schedule`;
+    return this.http
+      .put<{ snapshot_schedule: SnapshotSchedule }>(url, body)
+      .pipe(
+        tap(result =>
+          logger.log(
+            `updated virtual snapshot schedule for track ${id}`,
+            result
+          )
+        ),
+        catchError(this.handleError_raise()),
+        share()
+      );
   }
 
   /**
