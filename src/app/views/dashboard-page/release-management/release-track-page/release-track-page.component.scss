@@ -633,7 +633,8 @@ $released-members-disabled-dark: colors.on-color-deemphasis(dark);
 
   .snapshot-history-card-header {
     display: flex;
-    justify-content: space-between;
+    flex-direction: column;
+    align-items: stretch;
     gap: 16px;
     padding: 20px 16px 22px;
     border-bottom: 1px solid;
@@ -652,12 +653,18 @@ $released-members-disabled-dark: colors.on-color-deemphasis(dark);
 
   .snapshot-history-title {
     min-width: 0;
+    width: 100%;
 
     .snapshot-history-title-row {
-      display: flex;
-      flex-wrap: wrap;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) max-content;
       align-items: center;
       gap: 8px 12px;
+
+      > app-workbench-chip {
+        align-self: start;
+        margin-top: 2px;
+      }
     }
 
     h3 {
@@ -676,6 +683,8 @@ $released-members-disabled-dark: colors.on-color-deemphasis(dark);
 
     .snapshot-history-chips {
       display: inline-flex;
+      grid-column: 1 / -1;
+      min-width: 0;
       flex-wrap: wrap;
       align-items: center;
       gap: 6px;
@@ -716,9 +725,37 @@ $released-members-disabled-dark: colors.on-color-deemphasis(dark);
       }
     }
 
-    .snapshot-history-meta {
-      margin-top: 2px;
+    .snapshot-history-dates {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 12px;
+    }
+
+    .snapshot-history-date {
+      display: inline-flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 4px 6px;
+      max-width: 100%;
+      padding: 4px 10px;
+      border: 1px solid colors.border-color(light);
+      border-radius: 16px;
+      color: colors.on-color(light);
       font-size: 12px;
+      line-height: 18px;
+
+      .dark & {
+        border-color: colors.border-color(dark);
+        color: colors.on-color(dark);
+      }
+
+      .mat-icon {
+        width: 14px;
+        height: 14px;
+        font-size: 14px;
+        line-height: 14px;
+      }
     }
 
     .snapshot-history-description {
@@ -748,8 +785,9 @@ $released-members-disabled-dark: colors.on-color-deemphasis(dark);
 
   .snapshot-history-actions {
     flex: 0 0 auto;
+    width: 100%;
     justify-content: flex-end;
-    padding-top: 6px;
+    padding-top: 0;
   }
 
   .snapshot-action-spinner {

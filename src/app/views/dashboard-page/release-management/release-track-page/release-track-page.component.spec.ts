@@ -1,4 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { CommonModule } from '@angular/common';
+import { By } from '@angular/platform-browser';
+import { WorkbenchChipComponent } from 'src/app/components/workbench-chip/workbench-chip.component';
 import { Clipboard } from '@angular/cdk/clipboard';
 
 import { ReleaseTrackPageComponent } from './release-track-page.component';
@@ -105,7 +108,12 @@ describe('ReleaseTrackPageComponent', () => {
 
     await TestBed.configureTestingModule({
       declarations: [ReleaseTrackPageComponent],
-      imports: [FormsModule, ReactiveFormsModule],
+      imports: [
+        CommonModule,
+        FormsModule,
+        ReactiveFormsModule,
+        WorkbenchChipComponent,
+      ],
       providers: [
         {
           provide: ReleaseTracksConnectorService,
@@ -158,6 +166,99 @@ describe('ReleaseTrackPageComponent', () => {
 
   it('should create', () => {
     expect(component).toBeTruthy();
+  });
+
+  function withSnapshotHeader(
+    snapshot: any,
+    check: (header: HTMLElement) => void
+  ) {
+    (component as any).snapshotHistory = (
+      component as any
+    ).buildSnapshotHistory([snapshot]);
+    fixture.detectChanges();
+    const tabs = fixture.debugElement.query(By.css('app-stix-page-tabs'));
+    const template = tabs.properties['customTabs'][0].template;
+    const view = template.createEmbeddedView({});
+    try {
+      view.detectChanges();
+      const root = view.rootNodes.find(
+        (node: Node) => node instanceof HTMLElement
+      );
+      check(root.querySelector('.snapshot-history-card-header'));
+    } finally {
+      view.destroy();
+    }
+  }
+
+  it('keeps Latest beside the title, controls below metadata, and only real draft notes', () => {
+    withSnapshotHeader(
+      {
+        modified: '2026-09-09T23:08:38.000Z',
+        version: null,
+        snapshot_description: 'Review these candidates before tagging.',
+      },
+      header => {
+        expect(header.textContent).not.toContain('Draft release snapshot');
+        expect(
+          header.querySelector(
+            '.snapshot-history-title-row > app-workbench-chip'
+          )?.textContent
+        ).toContain('Latest');
+        expect(
+          header.querySelector('.snapshot-history-chips')?.textContent
+        ).toContain('Draft Release');
+        expect(
+          header.querySelector('.snapshot-history-description')?.textContent
+        ).toContain('Review these candidates before tagging.');
+        expect(header.querySelector('.snapshot-history-dates')).toBeNull();
+        expect(
+          header.lastElementChild?.classList.contains(
+            'snapshot-history-actions'
+          )
+        ).toBe(true);
+      }
+    );
+  });
+
+  it('renders snapshot and tagging timestamps as distinct metadata pills', () => {
+    const modified = '2026-09-09T23:08:38.000Z';
+    withSnapshotHeader(
+      {
+        modified,
+        version: '1.1',
+        tagged_at: '2026-09-09T23:09:00.000Z',
+        version_history: [
+          { version: '1.1', modified, tagged_at: '2026-09-09T23:09:00.000Z' },
+        ],
+      },
+      header => {
+        const pills = header.querySelectorAll('.snapshot-history-date');
+        expect(pills).toHaveLength(2);
+        expect(pills[0].textContent).toContain('Snapshot');
+        expect(pills[0].querySelector('time')?.getAttribute('datetime')).toBe(
+          modified
+        );
+        expect(pills[1].textContent).toContain('Tagged');
+        expect(pills[1].querySelector('time')?.getAttribute('datetime')).toBe(
+          '2026-09-09T23:09:00.000Z'
+        );
+        expect(header.querySelector('.snapshot-history-title > p')).toBeNull();
+      }
+    );
+  });
+
+  it('shows only the snapshot date when historical tagging time is unavailable', () => {
+    withSnapshotHeader(
+      { modified: '2026-09-09T23:08:38.000Z', version: '1.0' },
+      header => {
+        expect(header.querySelectorAll('.snapshot-history-date')).toHaveLength(
+          1
+        );
+        expect(header.querySelector('time')?.getAttribute('datetime')).toBe(
+          '2026-09-09T23:08:38.000Z'
+        );
+      }
+    );
   });
 
   it('should only show a diff for the latest pin when an object is both staged and a candidate', () => {

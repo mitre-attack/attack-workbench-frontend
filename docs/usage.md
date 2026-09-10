@@ -28,6 +28,13 @@ You can read more about the technical specifications for a collection, such as t
 
 #### Releasing a Release-Track Snapshot
 
+Snapshot headers keep **Latest** beside the title, with creator and status
+labels on their own row and controls below the metadata. Drafts use the
+timestamp title and **Draft Release** badge without repeating that status as
+description text. Tagged releases show snapshot and, when recorded, tagging
+times in separate metadata pills. Actual snapshot notes remain distinct below
+the labels. Controls wrap onto additional lines on smaller screens.
+
 For a virtual track's recurring schedule, use **Find a schedule** in the Config
 tab: typing `hou` suggests **Hourly — at minute 0**, and typing `every 15`
 suggests **Every 15 minutes**. Select a suggestion to apply it; unmatched text

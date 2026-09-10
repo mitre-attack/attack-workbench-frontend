@@ -590,37 +590,34 @@
                       </ng-container>
                     </ng-template>
                   </h3>
+                  <app-workbench-chip
+                    *ngIf="item.isLatest"
+                    variant="latest"></app-workbench-chip>
                   <div class="snapshot-history-chips">
                     <app-workbench-chip
                       [variant]="
                         item.isTagged ? 'tagged' : 'draft'
                       "></app-workbench-chip>
-                    <app-workbench-chip
-                      *ngIf="item.isLatest"
-                      variant="latest"></app-workbench-chip>
                   </div>
                 </div>
-                <p *ngIf="item.isTagged; else draftSubtitle">
-                  <ng-container *ngIf="item.taggedAt; else taggedSnapshotDate">
-                    Tagged:
-                    {{ item.taggedAt | date: 'MMM d, y, h:mm:ss a' }}
-                  </ng-container>
-                  <ng-template #taggedSnapshotDate>
-                    Snapshot:
-                    <ng-container *ngIf="item.modified; else unknownDate">
+                <div *ngIf="item.isTagged" class="snapshot-history-dates">
+                  <span class="snapshot-history-date">
+                    <mat-icon aria-hidden="true">schedule</mat-icon>
+                    <span>Snapshot</span>
+                    <time
+                      *ngIf="item.modified; else unknownDate"
+                      [attr.datetime]="item.modified">
                       {{ item.modified | date: 'MMM d, y, h:mm:ss a' }}
-                    </ng-container>
-                  </ng-template>
-                </p>
-                <ng-template #draftSubtitle>
-                  <p>Draft release snapshot</p>
-                </ng-template>
-                <p
-                  *ngIf="item.isTagged && item.taggedAt && item.modified"
-                  class="snapshot-history-meta">
-                  Snapshot:
-                  {{ item.modified | date: 'MMM d, y, h:mm:ss a' }}
-                </p>
+                    </time>
+                  </span>
+                  <span *ngIf="item.taggedAt" class="snapshot-history-date">
+                    <mat-icon aria-hidden="true">sell</mat-icon>
+                    <span>Tagged</span>
+                    <time [attr.datetime]="item.taggedAt.toISOString()">
+                      {{ item.taggedAt | date: 'MMM d, y, h:mm:ss a' }}
+                    </time>
+                  </span>
+                </div>
                 <div
                   *ngIf="item.snapshot.snapshot_description"
                   class="snapshot-history-description">
