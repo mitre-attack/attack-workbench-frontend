@@ -594,6 +594,39 @@
                     *ngIf="item.isLatest"
                     variant="latest"></app-workbench-chip>
                   <div class="snapshot-history-chips">
+                    <span
+                      class="snapshot-creator"
+                      [matTooltip]="
+                        item.snapshot.creation_actor?.kind === 'user'
+                          ? 'Created by ' +
+                            getSnapshotCreatorName(item.snapshot.creation_actor)
+                          : getSnapshotCreatorName(item.snapshot.creation_actor)
+                      ">
+                      <app-user-avatar
+                        *ngIf="item.snapshot.creation_actor?.kind === 'user'"
+                        [name]="
+                          getSnapshotCreatorName(item.snapshot.creation_actor)
+                        "
+                        [size]="24">
+                      </app-user-avatar>
+                      <mat-icon
+                        *ngIf="item.snapshot.creation_actor?.kind === 'system'"
+                        aria-hidden="true"
+                        >schedule</mat-icon
+                      >
+                      <span>{{
+                        getSnapshotCreatorName(item.snapshot.creation_actor)
+                      }}</span>
+                    </span>
+                    <app-workbench-chip
+                      variant="standard"
+                      [label]="
+                        getSnapshotCreationCauseLabel(
+                          item.snapshot.creation_cause
+                        )
+                      "
+                      matTooltip="Operation that created this snapshot.">
+                    </app-workbench-chip>
                     <app-workbench-chip
                       [variant]="
                         item.isTagged ? 'tagged' : 'draft'

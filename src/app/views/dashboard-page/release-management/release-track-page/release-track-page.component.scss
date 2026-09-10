@@ -681,6 +681,13 @@ $released-members-disabled-dark: colors.on-color-deemphasis(dark);
       }
     }
 
+    .snapshot-creator {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+    }
+
     .snapshot-history-chips {
       display: inline-flex;
       grid-column: 1 / -1;

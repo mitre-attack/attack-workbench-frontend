@@ -35,9 +35,25 @@ import {
   MemberSyncStrategy,
   ReleaseTrackType,
   SnapshotScheduleMode,
+  SnapshotCreationCause,
 } from 'src/app/classes/release-tracks';
 
 describe('ReleaseTrackPageComponent', () => {
+  it('formats creator names without attributing automated or historical snapshots to a user', () => {
+    const name = ReleaseTrackPageComponent.prototype.getSnapshotCreatorName;
+    expect(
+      name({
+        kind: 'user',
+        user_account_id: 'editor',
+        user: { id: 'editor', displayName: 'First Last', username: 'flast' },
+      })
+    ).toBe('First Last');
+    expect(name({ kind: 'user', user_account_id: 'deleted' })).toBe(
+      'Unknown user'
+    );
+    expect(name({ kind: 'system' })).toBe('Automated');
+    expect(name()).toBe('Creator unavailable');
+  });
   let component: ReleaseTrackPageComponent;
   let fixture: ComponentFixture<ReleaseTrackPageComponent>;
   let mockReleaseTrackApiConnector: any;
@@ -2401,6 +2417,32 @@ describe('ReleaseTrackPageComponent', () => {
     expect(component.filteredSchedulePresets).toEqual([]);
     component.selectSchedulePreset({ label: 'Invalid', cron: 'bad' });
     expect(component.virtualCronExpression).toBe('*/30 * * * *');
+  });
+
+  it('should describe configuration, scheduled, manual, and legacy snapshot causes', () => {
+    expect(
+      component.getSnapshotCreationCauseLabel(
+        SnapshotCreationCause.ConfigurationUpdated
+      )
+    ).toBe('Configuration updated');
+    expect(
+      component.getSnapshotCreationCauseLabel(
+        SnapshotCreationCause.ScheduledSnapshot
+      )
+    ).toBe('Scheduled snapshot');
+    expect(
+      component.getSnapshotCreationCauseLabel(
+        SnapshotCreationCause.ManualSnapshot
+      )
+    ).toBe('Manual snapshot');
+    expect(component.getSnapshotCreationCauseLabel()).toBe(
+      'Creation cause unavailable'
+    );
+    expect(
+      component.getSnapshotCreationCauseLabel(
+        'future_cause' as SnapshotCreationCause
+      )
+    ).toBe('Creation cause unavailable');
   });
 
   it('should generate a controlled weekly UTC cron schedule', () => {

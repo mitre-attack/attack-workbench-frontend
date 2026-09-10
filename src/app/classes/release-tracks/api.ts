@@ -7,6 +7,8 @@ import {
   type ReleasePreviewFormatType,
 } from './enums';
 import type { SnapshotSchedule } from './release-track';
+import type { SnapshotCreationCause } from './snapshot-creation-cause';
+import type { SnapshotCreationActor } from './snapshot-creation-actor';
 
 export type StixObjectRef = string | { id: string; modified?: string };
 
@@ -179,6 +181,8 @@ export interface SnapshotBundleHashes {
 }
 
 export interface ReleaseTrackSnapshotHistoryItem {
+  creation_cause?: SnapshotCreationCause;
+  creation_actor?: SnapshotCreationActor;
   id?: string;
   modified?: string | Date;
   version?: string | null;

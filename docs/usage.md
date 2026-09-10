@@ -35,6 +35,20 @@ description text. Tagged releases show snapshot and, when recorded, tagging
 times in separate metadata pills. Actual snapshot notes remain distinct below
 the labels. Controls wrap onto additional lines on smaller screens.
 
+Each card on the **Releases** tab shows why its snapshot was created, such as
+**Configuration updated**, **Manual snapshot**, **Scheduled snapshot**, or
+**Candidates automatically promoted**. Standard release creation shows
+**Release tagged**; virtual tagging preserves the original cause.
+The invoking user's initials avatar and name appear beside the cause.
+Scheduled jobs show **Automated**, missing attribution shows **Creator
+unavailable**, and deleted accounts show **Unknown user**. The track's original
+creator is not used as a substitute for the snapshot's creator.
+Older snapshots without recorded provenance show **Creation cause unavailable**.
+Saving virtual-track configuration can create a configuration draft after the
+schedule is saved; the schedule's later execution creates a separate scheduled
+snapshot. Standard tracks retain only their most recent rolling draft, so
+these labels describe the surviving snapshots rather than every past action.
+
 For a virtual track's recurring schedule, use **Find a schedule** in the Config
 tab: typing `hou` suggests **Hourly — at minute 0**, and typing `every 15`
 suggests **Every 15 minutes**. Select a suggestion to apply it; unmatched text

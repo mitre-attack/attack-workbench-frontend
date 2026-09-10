@@ -32,6 +32,9 @@ import {
   ReleaseTrackType,
   ResolutionStrategy,
   SnapshotScheduleMode,
+  SnapshotCreationCause,
+  SnapshotCreationActor,
+  SNAPSHOT_CREATION_CAUSE_LABELS,
   SnapshotScheduleModeType,
   SnapshotSchedule,
   StixObjectRef,
@@ -2831,6 +2834,24 @@ export class ReleaseTrackPageComponent implements OnInit {
   public formatConfigOption(value: any): string {
     if (value === null || value === undefined || value === '') return 'not set';
     return String(value).replace(/[_-]+/g, ' ');
+  }
+
+  public getSnapshotCreatorName(actor?: SnapshotCreationActor): string {
+    if (actor?.kind === 'system') return 'Automated';
+    if (actor?.kind !== 'user') return 'Creator unavailable';
+    return (
+      actor.user?.displayName ||
+      actor.user?.name ||
+      actor.user?.username ||
+      'Unknown user'
+    );
+  }
+
+  public getSnapshotCreationCauseLabel(cause?: SnapshotCreationCause): string {
+    return (
+      (cause && SNAPSHOT_CREATION_CAUSE_LABELS[cause]) ||
+      SNAPSHOT_CREATION_CAUSE_LABELS[SnapshotCreationCause.Unknown]
+    );
   }
 
   public getVirtualScheduleModeLabel(mode: SnapshotScheduleMode): string {

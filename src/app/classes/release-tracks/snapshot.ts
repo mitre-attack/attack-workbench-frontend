@@ -2,6 +2,8 @@ import type { SnapshotBundleHashes, SnapshotPublication } from './api';
 import { Composition, CompositionResolution } from './composition';
 import { ReleaseTrackConfig } from './config';
 import { ReleaseTrackType } from './enums';
+import { SnapshotCreationCause } from './snapshot-creation-cause';
+import { SnapshotCreationActor } from './snapshot-creation-actor';
 import { VersionHistoryEntry } from './history';
 import { SnapshotSchedule } from './release-track';
 import {
@@ -22,6 +24,8 @@ export class ReleaseTrackSnapshot {
   public alias?: string | null;
   public description?: string;
   public snapshot_description?: string;
+  public creation_cause: SnapshotCreationCause = SnapshotCreationCause.Unknown;
+  public creation_actor: SnapshotCreationActor = { kind: 'unknown' };
   public created: Date = new Date();
   public created_by_ref?: string;
   public content_manifest_id?: string;
@@ -93,6 +97,8 @@ export class ReleaseTrackSnapshot {
     if (!raw) return;
 
     if ('id' in raw) this.id = raw.id;
+    this.creation_cause = raw.creation_cause || SnapshotCreationCause.Unknown;
+    this.creation_actor = raw.creation_actor || { kind: 'unknown' };
     if ('type' in raw) this.type = raw.type;
     if ('modified' in raw) this.modified = new Date(raw.modified);
     if ('version' in raw) this.version = raw.version;
@@ -204,6 +210,8 @@ export class ReleaseTrackSnapshot {
       name: this.name,
       description: this.description,
       snapshot_description: this.snapshot_description,
+      creation_cause: this.creation_cause,
+      creation_actor: this.creation_actor,
       created: this.created ? this.created.toISOString() : undefined,
       created_by_ref: this.created_by_ref,
       content_manifest_id: this.content_manifest_id,
@@ -319,6 +327,8 @@ export class ReleaseTrackSnapshot {
       version: this.version,
       modified: this.modified,
       snapshot_description: this.snapshot_description,
+      creation_cause: this.creation_cause,
+      creation_actor: this.creation_actor,
       counts: {
         members: this.memberCount,
         staged: this.stagedCount,

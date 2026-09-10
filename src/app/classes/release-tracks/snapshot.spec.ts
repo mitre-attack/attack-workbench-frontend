@@ -1,6 +1,33 @@
 import { ReleaseTrackSnapshot } from './snapshot';
 
 describe('ReleaseTrackSnapshot', () => {
+  it('preserves snapshot actor separately from the original track creator', () => {
+    const actor = {
+      kind: 'user',
+      user_account_id: 'second',
+      user: { id: 'second', displayName: 'Second Editor' },
+    };
+    const snapshot = new ReleaseTrackSnapshot({
+      created_by_ref: 'first',
+      creation_actor: actor,
+    });
+    expect(snapshot.creation_actor).toEqual(actor);
+    expect(snapshot.serialize().creation_actor).toEqual(actor);
+    expect(snapshot.toSummary().creation_actor).toEqual(actor);
+    expect(
+      new ReleaseTrackSnapshot({ created_by_ref: 'first' }).creation_actor
+    ).toEqual({ kind: 'unknown' });
+  });
+
+  it('preserves server creation causes and handles legacy snapshots', () => {
+    const snapshot = new ReleaseTrackSnapshot({
+      creation_cause: 'configuration_updated',
+    });
+    expect(snapshot.creation_cause).toBe('configuration_updated');
+    expect(snapshot.serialize().creation_cause).toBe('configuration_updated');
+    expect(snapshot.toSummary().creation_cause).toBe('configuration_updated');
+    expect(new ReleaseTrackSnapshot({}).creation_cause).toBe('unknown');
+  });
   it('should preserve snapshot-local notes separately from track metadata', () => {
     const snapshot = new ReleaseTrackSnapshot({
       description: 'Long-lived track purpose',
