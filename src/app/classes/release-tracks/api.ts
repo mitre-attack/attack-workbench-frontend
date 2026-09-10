@@ -1,5 +1,5 @@
 import type { WorkflowStatusType } from 'src/app/utils/types';
-import type { Composition } from './composition';
+import type { Composition, CompositionResolution } from './composition';
 import type { ReleaseTrackConfig } from './config';
 import {
   ReleaseTrackType,
@@ -7,6 +7,8 @@ import {
   type ReleasePreviewFormatType,
 } from './enums';
 import type { SnapshotSchedule } from './release-track';
+import type { SnapshotCreationCause } from './snapshot-creation-cause';
+import type { SnapshotCreationActor } from './snapshot-creation-actor';
 
 export type StixObjectRef = string | { id: string; modified?: string };
 
@@ -14,8 +16,6 @@ export interface CreateReleaseTrackPayload {
   name: string;
   description?: string;
   snapshot_description?: string;
-  external_references?: any[];
-  object_marking_refs?: string[];
   type?: ReleaseTrackType;
   config?: ReleaseTrackConfig;
   composition?: Composition;
@@ -31,8 +31,8 @@ export interface StixBundlePayload {
 export interface UpdateMetadataPayload {
   name?: string;
   description?: string;
-  external_references?: any[];
-  object_marking_refs?: string[];
+  /** URL-safe slug accepted wherever the track ID is; null clears it. */
+  alias?: string | null;
 }
 
 export interface UpdateContentsPayload {
@@ -44,6 +44,10 @@ export type ReleasePayload = (
   | { increment?: never; version: string }
   | { increment?: undefined; version?: undefined }
 ) & { description?: string };
+
+export interface RetagReleasePayload {
+  version: string;
+}
 
 export interface ClonePayload {
   name?: string;
@@ -62,10 +66,9 @@ export interface PromoteQuarantinePayload {
 
 export interface ReleaseTrackSnapshotOptions {
   format?: ExportFormatType;
+  /** Workbench responses only; bundles reject it (they replay the sealed manifest). */
   include?: 'members' | 'staged' | 'candidates' | 'quarantine' | 'all';
-  state?: string | string[];
   stixVersion?: '2.0' | '2.1';
-  includeToc?: boolean;
 }
 
 export interface SnapshotHistoryOptions {
@@ -74,13 +77,40 @@ export interface SnapshotHistoryOptions {
   offset?: number;
 }
 
-export interface SnapshotGraphStatistics {
+export interface SnapshotContentStatistics {
   primary_count: number;
   secondary_count: number;
   relationship_count: number;
   supporting_count: number;
   link_target_count: number;
   total_count: number;
+}
+
+export interface SnapshotPublication {
+  collection_id: string;
+  created: string;
+  created_by_ref: string;
+  object_marking_refs: string[];
+  attack_spec_version: string;
+}
+
+export interface PreviewRelationshipChange {
+  object_ref: string;
+  object_modified: string;
+  relationship_type?: string;
+  source_ref?: string;
+  target_ref?: string;
+  stale_endpoints?: ('source' | 'target')[];
+}
+
+export interface PreviewRelationshipChanges {
+  selected_count: number;
+  added_count: number;
+  removed_count: number;
+  unchanged_count: number;
+  added: PreviewRelationshipChange[];
+  removed: PreviewRelationshipChange[];
+  stale_endpoints: PreviewRelationshipChange[];
 }
 
 export type ReleasePreviewOptions = ReleasePayload & {
@@ -91,6 +121,7 @@ export interface ReleasePreviewSummaryBase {
   track_id: string;
   type: ReleaseTrackType;
   source_snapshot_modified: string;
+  release_snapshot_modified?: string;
   version: string;
   version_bounds: {
     lower: { version: string; modified: string } | null;
@@ -115,6 +146,7 @@ export interface StandardReleasePreviewSummary extends ReleasePreviewSummaryBase
   changes: {
     promoted_count: number;
   };
+  relationships?: PreviewRelationshipChanges;
 }
 
 export interface VirtualReleasePreviewSummary extends ReleasePreviewSummaryBase {
@@ -149,12 +181,18 @@ export interface SnapshotBundleHashes {
 }
 
 export interface ReleaseTrackSnapshotHistoryItem {
+  creation_cause?: SnapshotCreationCause;
+  creation_actor?: SnapshotCreationActor;
   id?: string;
   modified?: string | Date;
   version?: string | null;
-  graph_manifest_id?: string;
+  /** Exact draft snapshot retained when a standard release was created. */
+  release_source_modified?: string | Date;
+  content_manifest_id?: string;
+  publication?: SnapshotPublication;
+  bundle_id?: string;
   bundle_hashes?: SnapshotBundleHashes;
-  graph_statistics?: SnapshotGraphStatistics;
+  content_statistics?: SnapshotContentStatistics;
   snapshot_description?: string;
   type?: ReleaseTrackType;
   name?: string;
@@ -192,10 +230,7 @@ export interface ReleaseTrackSnapshotHistoryItem {
     [key: string]: any;
   };
   statistics?: Record<string, any>;
-  composition_resolution?: {
-    total_objects?: number;
-    [key: string]: any;
-  };
+  composition_resolution?: CompositionResolution | null;
   stix?: {
     id?: string;
     modified?: string | Date;

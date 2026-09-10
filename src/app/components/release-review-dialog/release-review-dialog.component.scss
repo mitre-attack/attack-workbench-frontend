@@ -1,0 +1,86 @@
+@use '../../../style/colors';
+
+.release-review-dialog-panel .mat-mdc-dialog-surface {
+  border: 1px solid;
+  border-radius: 10px;
+  overflow: hidden;
+  @include colors.theme-border-color;
+}
+
+.release-review-dialog {
+  display: flex;
+  width: min(94vw, 1160px);
+  max-height: min(90vh, 900px);
+  flex-direction: column;
+
+  .release-review-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 24px;
+    padding: 18px 24px;
+    border-bottom: 1px solid;
+    @include colors.theme-border-color;
+    @include colors.theme-property(
+      background,
+      rgba(colors.on-color(dark), 0.045),
+      rgba(colors.color(mitre-black), 0.025)
+    );
+
+    h2,
+    p {
+      margin: 0;
+    }
+
+    p {
+      margin-top: 4px;
+      @include colors.theme-text-deemphasis;
+
+      span {
+        margin-left: 12px;
+        font-weight: 700;
+      }
+    }
+  }
+
+  .release-review-content {
+    min-height: 0;
+    flex: 1 1 auto;
+    padding: 20px 24px;
+    overflow: auto;
+  }
+
+  .release-review-note {
+    padding: 16px 24px 0;
+    border-top: 1px solid;
+    @include colors.theme-border-color;
+
+    mat-form-field {
+      width: 100%;
+    }
+  }
+
+  .release-review-actions {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 16px 24px;
+    border-top: 1px solid;
+    @include colors.theme-border-color;
+
+    .action-spacer {
+      flex: 1 1 auto;
+    }
+  }
+}
+
+@media (max-width: 700px) {
+  .release-review-dialog .release-review-actions {
+    align-items: stretch;
+    flex-direction: column;
+
+    .action-spacer {
+      display: none;
+    }
+  }
+}

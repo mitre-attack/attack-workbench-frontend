@@ -439,3 +439,20 @@
     }
   }
 }
+
+.release-summary--relationships {
+  margin-top: 0.75rem;
+}
+
+.release-relationship-warning {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  margin: 0.75rem 0 0;
+  font-size: 0.9rem;
+  opacity: 0.85;
+
+  mat-icon {
+    flex-shrink: 0;
+  }
+}

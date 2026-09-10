@@ -129,42 +129,51 @@ describe('ReleaseTracksConnectorService', () => {
     expect(options.params.get('offset')).toBe('50');
   });
 
-  it('should create a deterministic graph for an exact snapshot', async () => {
-    const snapshot = {
-      modified: '2026-07-23T13:37:28.000Z',
-      version: '1.0',
-      graph_manifest_id: 'release-track-graph-manifest--123',
-    };
-    http.post.mockReturnValue(of(snapshot));
+  it('should pass the release confirmation to the separate draft conversion endpoint', () => {
+    http.post.mockReturnValue(of({ version: null }));
 
-    const result = await firstValueFrom(
-      service.createSnapshotGraph(
+    service
+      .convertReleaseToDraft(
         'release-track--standard',
-        '2026-07-23T13:37:28.000Z'
+        '2026-07-23T13:37:28.000Z',
+        '1.1'
       )
-    );
+      .subscribe();
 
-    expect(http.post).toHaveBeenCalledWith(
-      `${environment.integrations.rest_api.url}/release-tracks/release-track--standard/snapshots/2026-07-23T13%3A37%3A28.000Z/graph`,
-      {}
+    const [url, body] = http.post.mock.calls[0];
+    expect(url).toBe(
+      `${environment.integrations.rest_api.url}/release-tracks/release-track--standard/snapshots/2026-07-23T13%3A37%3A28.000Z/draft`
     );
-    expect(result).toEqual(snapshot);
+    expect(body).toEqual({ confirm_version: '1.1' });
   });
 
-  it('should delete a deterministic graph for an exact snapshot', async () => {
-    http.delete.mockReturnValue(of(undefined));
-
-    const result = await firstValueFrom(
-      service.deleteSnapshotGraph(
+  it('should delete a draft by snapshot identity without release confirmation', () => {
+    service
+      .deleteSnapshotByModified(
         'release-track--standard',
         '2026-07-23T13:37:28.000Z'
       )
-    );
+      .subscribe();
 
     expect(http.delete).toHaveBeenCalledWith(
-      `${environment.integrations.rest_api.url}/release-tracks/release-track--standard/snapshots/2026-07-23T13%3A37%3A28.000Z/graph`
+      `${environment.integrations.rest_api.url}/release-tracks/release-track--standard/snapshots/2026-07-23T13%3A37%3A28.000Z`
     );
-    expect(result).toBeUndefined();
+    expect(http.post).not.toHaveBeenCalled();
+  });
+
+  it('should change a release version by snapshot identity', () => {
+    http.put.mockReturnValue(of({ version: '1.2' }));
+
+    service
+      .retagRelease('release-track--standard', '2026-07-23T13:37:28.000Z', {
+        version: '1.2',
+      })
+      .subscribe();
+
+    expect(http.put).toHaveBeenCalledWith(
+      `${environment.integrations.rest_api.url}/release-tracks/release-track--standard/snapshots/2026-07-23T13%3A37%3A28.000Z/release`,
+      { version: '1.2' }
+    );
   });
 
   it('should create virtual snapshots through the virtual namespace', () => {
@@ -198,6 +207,17 @@ describe('ReleaseTracksConnectorService', () => {
     expect(http.put).toHaveBeenCalledWith(
       `${environment.integrations.rest_api.url}/release-tracks/release-track--virtual/virtual/composition`,
       composition
+    );
+  });
+
+  it('should replace a virtual track schedule through the virtual namespace', () => {
+    const schedule = { mode: 'cron' as const, cron: '15 9 * * 1,3' };
+
+    service.updateSchedule('release-track--virtual', schedule).subscribe();
+
+    expect(http.put).toHaveBeenCalledWith(
+      `${environment.integrations.rest_api.url}/release-tracks/release-track--virtual/virtual/schedule`,
+      schedule
     );
   });
 

@@ -17,12 +17,14 @@ import type {
   ExportFormatType,
   PromoteQuarantinePayload,
   ReleasePayload,
+  RetagReleasePayload,
   ReleasePreviewOptions,
   ReleaseTrackConfig,
   ReleaseTrackSnapshotHistoryItem,
   ReleaseTrackSnapshotOptions,
   ReviewPayload,
   SnapshotHistoryOptions,
+  SnapshotSchedule,
   StixBundlePayload,
   StixObjectRef,
   UpdateMetadataPayload,
@@ -35,6 +37,7 @@ export type {
   CreateReleaseTrackPayload,
   PromoteQuarantinePayload,
   ReleasePayload,
+  RetagReleasePayload,
   ReleasePreviewOptions,
   ReleaseTrackSnapshotHistoryItem,
   ReleaseTrackSnapshotOptions,
@@ -474,55 +477,6 @@ export class ReleaseTracksConnectorService extends ApiConnector {
   }
 
   /**
-   * POST /api/release-tracks/:id/snapshots/:modified/graph
-   * Materialize the deterministic member graph for a tagged snapshot.
-   * @param id Release track id
-   * @param modified Snapshot modified timestamp
-   * @returns Observable snapshot containing its opaque graph manifest id
-   */
-  public createSnapshotGraph(
-    id: string,
-    modified: string
-  ): Observable<ReleaseTrackSnapshotHistoryItem> {
-    const url = `${this.apiUrl}/release-tracks/${id}/snapshots/${encodeURIComponent(modified)}/graph`;
-    return this.http.post<ReleaseTrackSnapshotHistoryItem>(url, {}).pipe(
-      tap(result =>
-        logger.log(
-          `created deterministic graph for snapshot ${modified}`,
-          result
-        )
-      ),
-      catchError(
-        this.handleError_raise<ReleaseTrackSnapshotHistoryItem>(false)
-      ),
-      share()
-    );
-  }
-
-  /**
-   * DELETE /api/release-tracks/:id/snapshots/:modified/graph
-   * Remove the deterministic member graph from a tagged snapshot.
-   * @param id Release track id
-   * @param modified Snapshot modified timestamp
-   * @returns Observable<unknown>
-   */
-  public deleteSnapshotGraph(
-    id: string,
-    modified: string
-  ): Observable<unknown> {
-    const url = `${this.apiUrl}/release-tracks/${id}/snapshots/${encodeURIComponent(modified)}/graph`;
-    return this.http.delete(url).pipe(
-      tap(() =>
-        logger.log(
-          `deleted deterministic graph for snapshot ${modified} from track ${id}`
-        )
-      ),
-      catchError(this.handleError_raise()),
-      share()
-    );
-  }
-
-  /**
    * POST /api/release-tracks/:id/snapshots/:modified/clone
    * Clone a new release track from a specific snapshot.
    * @param id Release track id
@@ -557,6 +511,34 @@ export class ReleaseTracksConnectorService extends ApiConnector {
     const url = `${this.apiUrl}/release-tracks/${id}/snapshots/${encodeURIComponent(modified)}`;
     return this.http.delete(url).pipe(
       tap(() => logger.log(`deleted snapshot ${modified} from track ${id}`)),
+      catchError(this.handleError_raise()),
+      share()
+    );
+  }
+
+  /** Convert a release to a draft; the returned draft may have a different timestamp. */
+  public convertReleaseToDraft(
+    id: string,
+    modified: string,
+    confirmVersion: string
+  ): Observable<ReleaseTrackSnapshotHistoryItem> {
+    const url = `${this.apiUrl}/release-tracks/${id}/snapshots/${encodeURIComponent(modified)}/draft`;
+    return this.http
+      .post<ReleaseTrackSnapshotHistoryItem>(url, {
+        confirm_version: confirmVersion,
+      })
+      .pipe(catchError(this.handleError_raise()), share());
+  }
+
+  /** Change a tagged snapshot's semantic version without changing its identity. */
+  public retagRelease(
+    id: string,
+    modified: string,
+    body: RetagReleasePayload
+  ): Observable<ReleaseTrackSnapshotHistoryItem> {
+    const url = `${this.apiUrl}/release-tracks/${id}/snapshots/${encodeURIComponent(modified)}/release`;
+    return this.http.put<ReleaseTrackSnapshotHistoryItem>(url, body).pipe(
+      tap(result => logger.log(`retagged snapshot ${modified}`, result)),
       catchError(this.handleError_raise()),
       share()
     );
@@ -604,6 +586,23 @@ export class ReleaseTracksConnectorService extends ApiConnector {
       catchError(this.handleError_raise()),
       share()
     );
+  }
+
+  /** Replace the active registry-backed schedule for a virtual track. */
+  public updateSchedule(id: string, body: SnapshotSchedule): Observable<any> {
+    const url = `${this.apiUrl}/release-tracks/${id}/virtual/schedule`;
+    return this.http
+      .put<{ snapshot_schedule: SnapshotSchedule }>(url, body)
+      .pipe(
+        tap(result =>
+          logger.log(
+            `updated virtual snapshot schedule for track ${id}`,
+            result
+          )
+        ),
+        catchError(this.handleError_raise()),
+        share()
+      );
   }
 
   /**

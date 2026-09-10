@@ -17,6 +17,8 @@ interface CustomTab {
 export class StixPageTabsComponent {
   @Input() config!: StixViewConfig;
   @Input() detailsTemplate!: TemplateRef<any>;
+  /** Label of the details tab; pages whose first tab is not a plain details view override it. */
+  @Input() detailsLabel = 'Details';
   @Input() customTabs: CustomTab[] = [];
   @Input() showHistory = true;
   @Input() showNotes = true;

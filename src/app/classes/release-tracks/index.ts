@@ -6,4 +6,6 @@ export * from './enums';
 export * from './history';
 export * from './release-track';
 export * from './snapshot';
+export * from './snapshot-creation-cause';
+export * from './snapshot-creation-actor';
 export * from './tiers';

@@ -29,17 +29,22 @@
       </button>
 
       <!-- update workflow status -->
-      <button
-        mat-button
-        type="button"
-        class="workflow-action-button workflow-trigger"
-        [matMenuTriggerFor]="workflowStatusMenu"
-        #workflowTriggerButton
-        #workflowMenuTrigger="matMenuTrigger"
-        aria-label="Submit object for review">
-        <mat-icon>assignment_ind</mat-icon>
-        <span>Submit for Review</span>
-      </button>
+      <span
+        matTooltip="Add this object to a release track to submit it for review"
+        [matTooltipDisabled]="loadingTracks || hasTracks">
+        <button
+          mat-button
+          type="button"
+          class="workflow-action-button workflow-trigger"
+          [disabled]="!loadingTracks && !hasTracks"
+          [matMenuTriggerFor]="workflowStatusMenu"
+          #workflowTriggerButton
+          #workflowMenuTrigger="matMenuTrigger"
+          aria-label="Submit object for review">
+          <mat-icon>assignment_ind</mat-icon>
+          <span>Submit for Review</span>
+        </button>
+      </span>
 
       <mat-menu
         #workflowStatusMenu="matMenu"

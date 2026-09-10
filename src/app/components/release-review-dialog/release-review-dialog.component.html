@@ -1,0 +1,127 @@
+<section
+  class="release-review-dialog"
+  role="dialog"
+  aria-modal="true"
+  aria-labelledby="release-review-title">
+  <header class="release-review-header">
+    <div>
+      <h2 id="release-review-title">Review {{ objectName }}</h2>
+      <p>
+        Awaiting-review revision compared with the current released member.
+        <span *ngIf="data.items.length > 1">{{ progressLabel }}</span>
+      </p>
+    </div>
+    <button
+      mat-icon-button
+      type="button"
+      aria-label="Close review"
+      (click)="cancel()">
+      <mat-icon aria-hidden="true">close</mat-icon>
+    </button>
+  </header>
+
+  <main class="release-review-content">
+    @switch (reviewItem.current.type) {
+      @case ('relationship') {
+        <app-relationship-view [config]="config"></app-relationship-view>
+      }
+      @case ('intrusion-set') {
+        <app-group-view [config]="config"></app-group-view>
+      }
+      @case ('campaign') {
+        <app-campaign-view [config]="config"></app-campaign-view>
+      }
+      @case ('malware') {
+        <app-software-view [config]="config"></app-software-view>
+      }
+      @case ('tool') {
+        <app-software-view [config]="config"></app-software-view>
+      }
+      @case ('x-mitre-matrix') {
+        <app-matrix-view [config]="config"></app-matrix-view>
+      }
+      @case ('course-of-action') {
+        <app-mitigation-view [config]="config"></app-mitigation-view>
+      }
+      @case ('attack-pattern') {
+        <app-technique-view [config]="config"></app-technique-view>
+      }
+      @case ('x-mitre-data-source') {
+        <app-data-source-view [config]="config"></app-data-source-view>
+      }
+      @case ('x-mitre-data-component') {
+        <app-data-component-view [config]="config"></app-data-component-view>
+      }
+      @case ('x-mitre-asset') {
+        <app-asset-view [config]="config"></app-asset-view>
+      }
+      @case ('x-mitre-tactic') {
+        <app-tactic-view [config]="config"></app-tactic-view>
+      }
+      @case ('x-mitre-collection') {
+        <app-collection-view [config]="config"></app-collection-view>
+      }
+      @case ('x-mitre-detection-strategy') {
+        <app-detection-strategy-view
+          [config]="config"></app-detection-strategy-view>
+      }
+      @case ('x-mitre-analytic') {
+        <app-analytic-view [config]="config"></app-analytic-view>
+      }
+    }
+  </main>
+
+  <div class="release-review-note" *ngIf="showNote">
+    <mat-form-field appearance="outline">
+      <mat-label>Updates requested</mat-label>
+      <textarea
+        matInput
+        rows="3"
+        maxlength="4000"
+        [(ngModel)]="note"
+        aria-describedby="release-review-note-help"></textarea>
+      <mat-hint id="release-review-note-help">
+        This note will be attached to the object.
+      </mat-hint>
+    </mat-form-field>
+  </div>
+
+  <footer class="release-review-actions">
+    <button mat-stroked-button type="button" (click)="skip()">
+      Skip
+      <mat-icon aria-hidden="true">arrow_forward</mat-icon>
+    </button>
+    <span class="action-spacer"></span>
+    <button
+      *ngIf="!showNote"
+      mat-stroked-button
+      type="button"
+      (click)="showNote = true">
+      Request updates
+    </button>
+    <button
+      *ngIf="showNote"
+      mat-stroked-button
+      type="button"
+      (click)="showNote = false">
+      Cancel note
+    </button>
+    <button
+      *ngIf="showNote"
+      mat-flat-button
+      color="warn"
+      type="button"
+      [disabled]="!note.trim()"
+      (click)="requestUpdates()">
+      Send request
+    </button>
+    <button
+      *ngIf="!showNote"
+      mat-flat-button
+      color="primary"
+      type="button"
+      (click)="approve()">
+      Approve
+    </button>
+  </footer>
+</section>
