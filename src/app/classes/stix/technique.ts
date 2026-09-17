@@ -729,11 +729,29 @@ export class Technique extends StixObject {
    * @returns {Observable} of the post
    */
   public save(restApiService: RestApiConnectorService): Observable<Technique> {
-    const postObservable = this.updateParentRelationship(restApiService).pipe(
-      concatMap(() => this.syncTacticsWithParentOrSubs(restApiService)),
-      concatMap(() => restApiService.postTechnique(this)),
-      shareReplay(1) // share the result and ensure only the last POST result is emitted
-    );
+    // For a new subtechnique, save the child technique first, then create its subtechnique-of relationship, and sync tactics
+    const isNewSubtechniqueWithParent =
+      this.firstInitialized && this.is_subtechnique && this.parentTechnique;
+    const postObservable = isNewSubtechniqueWithParent
+      ? restApiService.postTechnique(this).pipe(
+          concatMap(savedTechnique => {
+            const serializedTechnique = savedTechnique.serialize(
+              savedTechnique.modified.toISOString()
+            );
+            this.base_deserialize(serializedTechnique);
+            this.deserialize(serializedTechnique);
+            return this.updateParentRelationship(restApiService).pipe(
+              concatMap(() => this.syncTacticsWithParentOrSubs(restApiService)),
+              map(() => savedTechnique)
+            );
+          }),
+          shareReplay(1)
+        )
+      : this.updateParentRelationship(restApiService).pipe(
+          concatMap(() => this.syncTacticsWithParentOrSubs(restApiService)),
+          concatMap(() => restApiService.postTechnique(this)),
+          shareReplay(1)
+        );
 
     const subscription = postObservable.subscribe({
       next: result => {
