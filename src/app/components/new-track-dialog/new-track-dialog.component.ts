@@ -50,6 +50,7 @@ export class NewTrackDialogComponent implements OnInit {
   public MemberSyncStrategy = MemberSyncStrategy;
   public MemberSyncBehavior = MemberSyncBehavior;
   public ReleaseTrack = ReleaseTrackType;
+  public ResolutionStrategy = ResolutionStrategy;
 
   public candidacyOptions = Object.values(WorkflowStatus);
   public memberSyncOptions = Object.values(MemberSyncStrategy);
@@ -276,7 +277,7 @@ export class NewTrackDialogComponent implements OnInit {
       component_tracks: this.selectedComponentTracks.map((track, priority) => {
         const componentTrack: any = {
           track_id: track.trackId,
-          resolution_strategy: ResolutionStrategy.LatestTagged,
+          resolution_strategy: track.resolutionStrategy,
           priority,
         };
 
@@ -326,6 +327,7 @@ export class NewTrackDialogComponent implements OnInit {
       latestTaggedVersion,
       taggedReleaseCount,
       selected: false,
+      resolutionStrategy: ResolutionStrategy.LatestTagged,
       objectTypes: [],
       domains: [],
     };
@@ -386,6 +388,7 @@ interface VirtualComponentTrackOption {
   latestTaggedVersion: string | null;
   taggedReleaseCount: number;
   selected: boolean;
+  resolutionStrategy: ResolutionStrategy;
   objectTypes: StixType[];
   domains: string[];
 }

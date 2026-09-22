@@ -140,13 +140,17 @@ describe('NewTrackDialogComponent', () => {
     expect(component.componentTrackOptions[0].objectTypes).toEqual([]);
   });
 
-  it('should create a virtual track with latest tagged components and priorities', () => {
+  it('should create a mixed tagged and draft composition with independent filters', () => {
     component.form.patchValue({
       name: 'Combined Enterprise',
       description: 'Aggregates released Enterprise content',
     });
     component.toggleComponentTrack(component.componentTrackOptions[0], true);
     component.componentTrackOptions[0].objectTypes = ['attack-pattern'];
+    component.toggleComponentTrack(component.componentTrackOptions[1], true);
+    component.componentTrackOptions[1].resolutionStrategy =
+      ResolutionStrategy.LatestDraft;
+    component.componentTrackOptions[1].domains = ['mobile'];
 
     component.handleCreate();
 
@@ -162,6 +166,14 @@ describe('NewTrackDialogComponent', () => {
             priority: 0,
             filters: {
               object_types: ['attack-pattern'],
+            },
+          },
+          {
+            track_id: 'release-track--standard-draft',
+            resolution_strategy: ResolutionStrategy.LatestDraft,
+            priority: 1,
+            filters: {
+              domains: ['mobile'],
             },
           },
         ],

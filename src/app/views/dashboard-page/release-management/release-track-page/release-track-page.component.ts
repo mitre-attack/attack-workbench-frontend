@@ -8,6 +8,7 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { forkJoin, Observable, of } from 'rxjs';
 import { finalize, map, switchMap, take } from 'rxjs/operators';
 import {
+  ComponentTrack,
   ConflictPolicy,
   ConflictPolicyType,
   DeduplicationStrategy,
@@ -307,6 +308,7 @@ export class ReleaseTrackPageComponent implements OnInit {
   ).filter(policy => policy !== ConflictPolicy.Abort);
   public stagedToMembersConflictOptions = Object.values(ConflictPolicy);
   public virtualDeduplicationOptions = Object.values(DeduplicationStrategy);
+  public ResolutionStrategy = ResolutionStrategy;
   public virtualSnapshotScheduleModeOptions =
     Object.values(SnapshotScheduleMode);
   public virtualObjectTypeOptions = VIRTUAL_OBJECT_TYPE_OPTIONS.map(type => ({
@@ -534,10 +536,12 @@ export class ReleaseTrackPageComponent implements OnInit {
             configuredTrack?.resolution_strategy ||
             '',
           resolvedVersion:
-            component.resolved_version ||
-            component.version ||
-            component.version_label ||
-            null,
+            component.resolved_version !== undefined
+              ? component.resolved_version
+              : component.version || component.version_label || null,
+          resolvedSnapshotId: component.resolved_snapshot_id
+            ? this.toIsoString(component.resolved_snapshot_id)
+            : null,
           ...this.getVirtualComponentCounts(component.track_id),
         };
       });
@@ -1557,6 +1561,9 @@ export class ReleaseTrackPageComponent implements OnInit {
   }
 
   public getResolvedComponentLabel(component: any): string {
+    if (component.strategy_used === ResolutionStrategy.LatestDraft) {
+      return 'Resolved Draft';
+    }
     const version =
       component.resolved_version ||
       component.version ||
@@ -1571,6 +1578,9 @@ export class ReleaseTrackPageComponent implements OnInit {
   }
 
   public getVirtualResolvedVersion(row: VirtualResolutionRow): string {
+    if (row.resolvedVersion === null && row.resolvedSnapshotId) {
+      return 'Draft';
+    }
     if (!row.resolvedVersion) return '-';
     return row.resolvedVersion.startsWith('v')
       ? row.resolvedVersion
@@ -1618,6 +1628,16 @@ export class ReleaseTrackPageComponent implements OnInit {
   public removeVirtualComponentTrack(track: any): void {
     this.virtualConfigComponentTracks =
       this.virtualConfigComponentTracks.filter(item => item !== track);
+  }
+
+  public setVirtualComponentTrackResolution(
+    track: ComponentTrack,
+    strategy: ResolutionStrategy
+  ): void {
+    if (track.resolution_strategy === strategy) return;
+    track.resolution_strategy = strategy;
+    delete track.version;
+    delete track.snapshot;
   }
 
   public getVirtualComponentTrackObjectTypes(track: any): string[] {
@@ -3512,10 +3532,16 @@ export class ReleaseTrackPageComponent implements OnInit {
 
     return {
       component_tracks: this.virtualConfigComponentTracks.map(
-        (track, index) => ({
-          ...track,
-          priority: index,
-        })
+        (track, index) => {
+          const component = { ...track, priority: index };
+          if (
+            component.resolution_strategy === ResolutionStrategy.LatestDraft
+          ) {
+            delete component.version;
+            delete component.snapshot;
+          }
+          return component;
+        }
       ),
       deduplication: {
         strategy:
