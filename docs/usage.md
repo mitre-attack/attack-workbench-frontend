@@ -46,8 +46,9 @@ creator is not used as a substitute for the snapshot's creator.
 Older snapshots without recorded provenance show **Creation cause unavailable**.
 Saving virtual-track configuration can create a configuration draft after the
 schedule is saved; the schedule's later execution creates a separate scheduled
-snapshot. Standard tracks retain only their most recent rolling draft, so
-these labels describe the surviving snapshots rather than every past action.
+snapshot. Standard tracks retain their most recent rolling draft plus preserved
+release sources and drafts referenced by virtual provenance, so these labels
+describe surviving snapshots rather than every past action.
 
 For a virtual track's recurring schedule, use **Find a schedule** in the Config
 tab: typing `hou` suggests **Hourly — at minute 0**, and typing `every 15`
@@ -60,6 +61,16 @@ intervals align to the clock rather than the time you click Save.
 Saving only a schedule leaves the virtual track's composition and draft
 unchanged. Deduplication configuration supports the strategy selector;
 preferred tier and preferred status are not supported by the API.
+
+When creating a virtual track or editing its **Config**, each component's
+**Resolve from** selector offers **Latest tagged** (the default) and
+**Latest draft**. A draft source needs no tagged releases, but its newest
+snapshot must be an active draft; there is no fallback to a tagged release or
+older retained draft. Both options compose **members only**, excluding staged
+objects and candidates. Use **Create Draft** after saving composition to
+materialize it. The Releases tab labels draft component provenance **Draft**
+and shows the exact source snapshot timestamp; its content stays frozen even
+when the component advances or is later tagged.
 
 The release preview offers minor and major relative tags as well as an exact `MAJOR.MINOR` version. Relative tags are calculated from the tagged snapshot immediately before the selected draft. When releasing an older draft, the exact version must also remain below the next tagged snapshot; the dialog shows these exclusive bounds. Optional release notes are stored on that snapshot and become the `x-mitre-collection` description in exported STIX bundles.
 

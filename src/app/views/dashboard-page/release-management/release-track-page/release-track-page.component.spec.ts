@@ -1147,8 +1147,8 @@ describe('ReleaseTrackPageComponent', () => {
                   track_name: 'Component',
                   track_type: 'standard',
                   resolved_snapshot_id: '2024-04-20T10:00:00.000Z',
-                  resolved_version: '2.7',
-                  strategy_used: 'specific_version',
+                  resolved_version: null,
+                  strategy_used: 'latest_draft',
                   total_objects_in_source: 40,
                   objects_after_filter: 40,
                   objects_contributed: 38,
@@ -1188,11 +1188,37 @@ describe('ReleaseTrackPageComponent', () => {
     expect(component.snapshotHistory[0].compositionResolutionRows).toEqual([]);
     expect(
       component.snapshotHistory[1].compositionResolutionRows[0].resolvedVersion
-    ).toBe('2.7');
+    ).toBeNull();
     expect(
       component.snapshotHistory[1].compositionResolutionRows[0]
         .resolvedSnapshotId
     ).toBe('2024-04-20T10:00:00.000Z');
+    fixture.detectChanges();
+    const tabs = fixture.debugElement.query(By.css('app-stix-page-tabs'));
+    const view = tabs.properties['customTabs'][0].template.createEmbeddedView(
+      {}
+    );
+    try {
+      view.detectChanges();
+      const root: HTMLElement = view.rootNodes.find(
+        (node: Node) => node instanceof HTMLElement
+      );
+      const provenance = root.querySelector('.snapshot-component-provenance');
+      expect(
+        provenance?.querySelector('.snapshot-component-version')?.textContent
+      ).toContain('Draft');
+      expect(provenance?.textContent).toContain('2024-04-20T10:00:00.000Z');
+      expect(provenance?.textContent).not.toContain('vnull');
+      provenance
+        ?.querySelector<HTMLButtonElement>('.snapshot-component-track')
+        ?.click();
+      expect(mockRouter.navigate).toHaveBeenCalledWith([
+        '/dashboard/release-management',
+        'release-track--component',
+      ]);
+    } finally {
+      view.destroy();
+    }
     expect(
       component.snapshotHistory[2].compositionResolutionRows[0].resolvedVersion
     ).toBe('1.3');
@@ -2310,7 +2336,7 @@ describe('ReleaseTrackPageComponent', () => {
     );
   });
 
-  it('should save virtual release track composition config', () => {
+  it('should save a changed draft strategy while preserving loaded strategies and selectors', () => {
     const refreshSpy = vi
       .spyOn(component, 'getReleaseTrack')
       .mockImplementation(() => undefined);
@@ -2329,7 +2355,17 @@ describe('ReleaseTrackPageComponent', () => {
         component_tracks: [
           {
             track_id: 'release-track--component-one',
-            resolution_strategy: 'latest_tagged',
+            resolution_strategy: 'specific_version',
+            version: '1.2',
+          },
+          {
+            track_id: 'release-track--draft',
+            resolution_strategy: 'latest_draft',
+          },
+          {
+            track_id: 'release-track--pinned',
+            resolution_strategy: 'specific_snapshot',
+            snapshot: '2024-04-20T10:00:00.000Z',
           },
         ],
         deduplication: {
@@ -2341,6 +2377,10 @@ describe('ReleaseTrackPageComponent', () => {
       virtualDeduplicationStrategy: DeduplicationStrategy.Quarantine,
     });
     component.onEditConfig();
+    component.setVirtualComponentTrackResolution(
+      component.virtualConfigComponentTracks[0],
+      component.ResolutionStrategy.LatestDraft
+    );
     component.configForm.patchValue({
       virtualDeduplicationStrategy: DeduplicationStrategy.Quarantine,
     });
@@ -2353,8 +2393,19 @@ describe('ReleaseTrackPageComponent', () => {
         component_tracks: [
           {
             track_id: 'release-track--component-one',
-            resolution_strategy: 'latest_tagged',
+            resolution_strategy: 'latest_draft',
             priority: 0,
+          },
+          {
+            track_id: 'release-track--draft',
+            resolution_strategy: 'latest_draft',
+            priority: 1,
+          },
+          {
+            track_id: 'release-track--pinned',
+            resolution_strategy: 'specific_snapshot',
+            snapshot: '2024-04-20T10:00:00.000Z',
+            priority: 2,
           },
         ],
         deduplication: {

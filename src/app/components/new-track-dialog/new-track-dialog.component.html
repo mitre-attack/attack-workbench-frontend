@@ -104,7 +104,11 @@
       <div class="section-block stack">
         <div class="section-title">Component Tracks</div>
         <div class="section-sub">
-          Standard tracks to include in this virtual release track.
+          Choose the latest tagged release or active draft for each standard
+          track. Only members are included, never candidates or staged objects.
+          Member revisions are frozen when the virtual snapshot is created.
+          Latest draft requires an active draft; it does not fall back to a
+          tagged release.
         </div>
       </div>
 
@@ -186,6 +190,18 @@
             <p *ngIf="track.description" class="component-track-description">
               {{ track.description }}
             </p>
+
+            <mat-form-field appearance="outline" class="object-type-filter">
+              <mat-label>Resolve from</mat-label>
+              <mat-select [(value)]="track.resolutionStrategy">
+                <mat-option [value]="ResolutionStrategy.LatestTagged">
+                  Latest tagged
+                </mat-option>
+                <mat-option [value]="ResolutionStrategy.LatestDraft">
+                  Latest draft
+                </mat-option>
+              </mat-select>
+            </mat-form-field>
 
             <mat-form-field
               *ngIf="track.selected"

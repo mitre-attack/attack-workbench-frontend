@@ -104,6 +104,7 @@ export const CANDIDACY_THRESHOLD_OPTIONS: WorkflowStatusType[] = Object.values(
 
 export enum ResolutionStrategy {
   LatestTagged = 'latest_tagged',
+  LatestDraft = 'latest_draft',
   SpecificVersion = 'specific_version',
   SpecificSnapshot = 'specific_snapshot',
 }

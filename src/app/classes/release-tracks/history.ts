@@ -9,5 +9,5 @@ export interface VersionHistoryEntry {
     staged_count?: number;
     candidate_count?: number;
   };
-  component_versions?: any; // virtual tracks only
+  component_versions?: Record<string, string | null>; // virtual tracks only
 }

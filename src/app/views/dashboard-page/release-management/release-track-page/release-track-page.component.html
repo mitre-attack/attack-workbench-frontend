@@ -1067,7 +1067,11 @@
                 <div class="config-copy">
                   <div class="config-label">Component Tracks</div>
                   <p>
-                    Standard release tracks resolved into this virtual track.
+                    Choose the latest tagged release or active draft for each
+                    standard track. Only members are included, never candidates
+                    or staged objects. Member revisions are frozen when the
+                    virtual snapshot is created. Latest draft requires an active
+                    draft; it does not fall back to a tagged release.
                   </p>
                 </div>
                 <span class="config-value">
@@ -1180,6 +1184,41 @@
                       {{ getComponentTrackFilters(track).join(', ') }}
                     </span>
                   </div>
+
+                  <mat-form-field
+                    *ngIf="isEditingConfig"
+                    appearance="outline"
+                    class="config-component-filter">
+                    <mat-label>Resolve from</mat-label>
+                    <mat-select
+                      [value]="track.resolution_strategy"
+                      (selectionChange)="
+                        setVirtualComponentTrackResolution(track, $event.value)
+                      ">
+                      <mat-option [value]="ResolutionStrategy.LatestTagged">
+                        Latest tagged
+                      </mat-option>
+                      <mat-option [value]="ResolutionStrategy.LatestDraft">
+                        Latest draft
+                      </mat-option>
+                      <mat-option
+                        *ngIf="
+                          track.resolution_strategy ===
+                          ResolutionStrategy.SpecificVersion
+                        "
+                        [value]="ResolutionStrategy.SpecificVersion">
+                        Specific version: {{ track.version }}
+                      </mat-option>
+                      <mat-option
+                        *ngIf="
+                          track.resolution_strategy ===
+                          ResolutionStrategy.SpecificSnapshot
+                        "
+                        [value]="ResolutionStrategy.SpecificSnapshot">
+                        Specific snapshot: {{ track.snapshot }}
+                      </mat-option>
+                    </mat-select>
+                  </mat-form-field>
 
                   <mat-form-field
                     *ngIf="isEditingConfig"
