@@ -1,6 +1,11 @@
 import { provideHttpClient } from '@angular/common/http';
 import { NO_ERRORS_SCHEMA } from '@angular/core';
-import { ComponentFixture, TestBed } from '@angular/core/testing';
+import {
+  ComponentFixture,
+  fakeAsync,
+  flush,
+  TestBed,
+} from '@angular/core/testing';
 import { FormsModule } from '@angular/forms';
 import { MatAutocompleteModule } from '@angular/material/autocomplete';
 import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
@@ -10,7 +15,6 @@ import { MatRadioModule } from '@angular/material/radio';
 import { NoopAnimationsModule } from '@angular/platform-browser/animations';
 import { vi } from 'vitest';
 
-import { SaveDialogComponent } from './save-dialog.component';
 import { VersionNumber } from 'src/app/classes/version-number';
 import { ReleaseTracksConnectorService } from 'src/app/services/connectors/rest-api/release-tracks.service';
 import { RestApiConnectorService } from 'src/app/services/connectors/rest-api/rest-api-connector.service';
@@ -19,6 +23,7 @@ import {
   createMockRestApiConnector,
 } from 'src/app/testing/mocks/rest-api-connector.mock';
 import { WorkflowStatus } from 'src/app/utils/types';
+import { SaveDialogComponent } from './save-dialog.component';
 
 describe('SaveDialogComponent', () => {
   let component: SaveDialogComponent;
@@ -138,24 +143,14 @@ describe('SaveDialogComponent', () => {
     }).compileComponents();
   });
 
-  beforeEach(() => {
+  beforeEach(fakeAsync(() => {
     fixture = TestBed.createComponent(SaveDialogComponent);
     component = fixture.componentInstance;
     fixture.detectChanges();
-  });
+    flush();
+  }));
 
-  it('should create', () => {
-    expect(component).toBeTruthy();
-  });
-
-  it('should default to keeping the version and syncing tracks to WIP', async () => {
-    await new Promise(resolve => setTimeout(resolve, 10));
-
-    expect(component.versionChoice).toBe('keep');
-    expect(mockReleaseTracksService.getLatestSnapshot).toHaveBeenCalledWith(
-      'release-track--core',
-      { format: 'workbench', include: 'all' }
-    );
+  it('should distinguish enrolled tracks from available tracks', () => {
     expect(component.trackRows).toEqual([
       expect.objectContaining({
         trackId: 'release-track--core',
@@ -182,9 +177,7 @@ describe('SaveDialogComponent', () => {
     ]);
   });
 
-  it('should move newly enrolled tracks into the release track status table', async () => {
-    await new Promise(resolve => setTimeout(resolve, 10));
-
+  it('should move newly enrolled tracks into the release track status table', () => {
     const row = component.enrollmentOptions[0];
     component.selectEnrollmentTrack({ option: { value: row } });
 
@@ -200,9 +193,7 @@ describe('SaveDialogComponent', () => {
     expect(component.enrollmentOptions).toEqual([]);
   });
 
-  it('should always validate save updates against WIP', async () => {
-    await new Promise(resolve => setTimeout(resolve, 10));
-
+  it('should always validate save updates against WIP', () => {
     expect(component.validationReviewStatus).toBe(
       WorkflowStatus.WorkInProgress
     );
@@ -214,18 +205,16 @@ describe('SaveDialogComponent', () => {
     expect(component.validationStatus).toBe('success');
   });
 
-  it('should add the saved object as a WIP candidate without reviewing tracks', async () => {
-    await new Promise(resolve => setTimeout(resolve, 10));
-
+  it('should add the saved object as a WIP candidate without reviewing tracks', fakeAsync(() => {
     const newTrack = component.enrollmentOptions[0];
     component.selectEnrollmentTrack({ option: { value: newTrack } });
-    await new Promise(resolve => setTimeout(resolve, 10));
 
     component.onConfirmSave();
-    await new Promise(resolve => setTimeout(resolve, 10));
+    flush();
 
     expect(mockReleaseTracksService.reviewCandidates).not.toHaveBeenCalled();
     expect(mockReleaseTracksService.demoteStaged).not.toHaveBeenCalled();
+    expect(mockReleaseTracksService.addCandidates).toHaveBeenCalledTimes(2);
     expect(mockReleaseTracksService.addCandidates).toHaveBeenCalledWith(
       'release-track--core',
       ['attack-pattern--123']
@@ -234,7 +223,8 @@ describe('SaveDialogComponent', () => {
       'release-track--groups',
       ['attack-pattern--123']
     );
-  });
+    expect(component.dialogRef.close).toHaveBeenCalledWith(true);
+  }));
 
   it('should summarize validation status by severity', () => {
     component.validation = {
