@@ -17,10 +17,35 @@ export interface ReleaseTrack {
 
   // virtual tracks only
   snapshot_schedule?: SnapshotSchedule;
+  draft_retention?: DraftRetention;
 }
 
 export interface SnapshotSchedule {
   mode?: SnapshotScheduleModeType;
   cron?: string | null;
   dates?: (Date | string)[];
+}
+
+export interface DraftRetention {
+  max_drafts: number | null;
+}
+
+export interface DraftCleanupResult {
+  operation_id: string;
+  status: 'pending' | 'completed' | 'failed';
+  kind: 'retention' | 'squash';
+  eligible_count: number;
+  deleted_count: number;
+  protected_count: number;
+  target_modified?: string;
+  release_committed?: boolean;
+  error?: string;
+}
+
+export interface DraftSquashPreview {
+  lower_bound: string | null;
+  upper_bound: string;
+  eligible_count: number;
+  protected_count: number;
+  fingerprint: string;
 }

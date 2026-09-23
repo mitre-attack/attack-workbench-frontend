@@ -14,6 +14,8 @@ import type {
   ClonePayload,
   Composition,
   CreateReleaseTrackPayload,
+  DraftCleanupResult,
+  DraftRetention,
   ExportFormatType,
   PromoteQuarantinePayload,
   ReleasePayload,
@@ -471,7 +473,7 @@ export class ReleaseTracksConnectorService extends ApiConnector {
     const url = `${this.apiUrl}/release-tracks/${id}/snapshots/${encodeURIComponent(modified)}/release`;
     return this.http.post(url, body).pipe(
       tap(result => logger.log(`released snapshot ${modified}`, result)),
-      catchError(this.handleError_raise()),
+      catchError(this.handleError_raise(false)),
       share()
     );
   }
@@ -843,6 +845,50 @@ export class ReleaseTracksConnectorService extends ApiConnector {
       catchError(this.handleError_raise()),
       share()
     );
+  }
+
+  public updateDraftRetention(
+    id: string,
+    maxDrafts: number | null
+  ): Observable<{ draft_retention: DraftRetention }> {
+    const url = `${this.apiUrl}/release-tracks/${id}/virtual/draft-retention`;
+    return this.http
+      .put<{ draft_retention: DraftRetention }>(url, {
+        max_drafts: maxDrafts,
+      })
+      .pipe(
+        catchError(
+          this.handleError_raise<{ draft_retention: DraftRetention }>(false)
+        ),
+        share()
+      );
+  }
+
+  public listDraftCleanup(
+    id: string
+  ): Observable<{ data: DraftCleanupResult[] }> {
+    const url = `${this.apiUrl}/release-tracks/${id}/virtual/draft-cleanup`;
+    return this.http
+      .get<{ data: DraftCleanupResult[] }>(url)
+      .pipe(
+        catchError(
+          this.handleError_raise<{ data: DraftCleanupResult[] }>(false)
+        ),
+        share()
+      );
+  }
+
+  public retryDraftCleanup(
+    id: string,
+    operationId: string
+  ): Observable<DraftCleanupResult> {
+    const url = `${this.apiUrl}/release-tracks/${id}/virtual/draft-cleanup/${encodeURIComponent(operationId)}/retry`;
+    return this.http
+      .post<DraftCleanupResult>(url, {})
+      .pipe(
+        catchError(this.handleError_raise<DraftCleanupResult>(false)),
+        share()
+      );
   }
 
   // -----------------------------------------------------------------------------

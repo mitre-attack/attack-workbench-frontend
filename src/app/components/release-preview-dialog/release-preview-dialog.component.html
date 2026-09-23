@@ -123,6 +123,27 @@
           {{ snapshotDescription.length }}/{{ snapshotDescriptionMaxLength }}
         </mat-hint>
       </mat-form-field>
+
+      <section *ngIf="draftSquash as squash" class="release-draft-squash">
+        <mat-checkbox [(ngModel)]="squashDrafts">
+          Delete earlier drafts after tagging
+        </mat-checkbox>
+        <p>
+          {{ squash.eligible_count }} eligible drafts;
+          {{ squash.protected_count }}
+          protected drafts will be preserved. Only drafts strictly
+          <ng-container *ngIf="squash.lower_bound; else sinceCreation">
+            after <code>{{ squash.lower_bound }}</code> and
+          </ng-container>
+          before <code>{{ squash.upper_bound }}</code> will be deleted.
+          <ng-template #sinceCreation>since track creation and </ng-template>
+        </p>
+        <p>
+          This permanently deletes earlier draft history, including notes and
+          quarantine choices. It does not merge content. The selected snapshot,
+          all releases, and newer snapshots are preserved.
+        </p>
+      </section>
     </mat-tab>
 
     <mat-tab>

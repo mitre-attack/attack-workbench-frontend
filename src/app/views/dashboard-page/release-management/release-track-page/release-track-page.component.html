@@ -33,6 +33,48 @@
       {{ message }} Stay on this page until it finishes.
     </p>
   </div>
+  <section
+    *ngIf="isVirtualReleaseTrack"
+    class="draft-cleanup-status"
+    aria-label="Draft cleanup operations">
+    <p *ngIf="cleanupMessage" role="status">{{ cleanupMessage }}</p>
+    <article
+      *ngFor="let operation of draftCleanupResults"
+      class="draft-cleanup-operation">
+      <div>
+        <strong
+          >{{
+            operation.kind === 'squash' ? 'Release-time' : 'Retention'
+          }}
+          cleanup: {{ operation.status }}</strong
+        >
+        <p>
+          {{ operation.deleted_count }} deleted of
+          {{ operation.eligible_count }} eligible drafts;
+          {{ operation.protected_count }} protected drafts preserved. Releases
+          are preserved.
+        </p>
+        <p *ngIf="operation.release_committed">
+          Release committed. Do not tag again to repair cleanup.
+        </p>
+        <p *ngIf="operation.error">{{ operation.error }}</p>
+        <small
+          >Operation: <code>{{ operation.operation_id }}</code></small
+        >
+      </div>
+      <button
+        *ngIf="canManageDraftLifecycle && operation.status !== 'completed'"
+        mat-stroked-button
+        [disabled]="retryingCleanup.has(operation.operation_id)"
+        (click)="retryDraftCleanup(operation)">
+        {{
+          retryingCleanup.has(operation.operation_id)
+            ? 'Repairing cleanup'
+            : 'Retry cleanup'
+        }}
+      </button>
+    </article>
+  </section>
 
   <app-stix-page-tabs
     [detailsTemplate]="detailsTpl"
@@ -544,6 +586,30 @@
 
   <ng-template #historyTpl>
     <div class="history-tpl">
+      <div *ngIf="isVirtualReleaseTrack" class="draft-lifecycle-controls">
+        <mat-form-field appearance="outline">
+          <mat-label>History view</mat-label>
+          <mat-select
+            [value]="historyFilter"
+            (selectionChange)="onHistoryFilterChange($event.value)">
+            <mat-option value="releases">Releases + current draft</mat-option>
+            <mat-option value="drafts">Drafts</mat-option>
+            <mat-option value="all">All snapshots</mat-option>
+          </mat-select>
+        </mat-form-field>
+        <button
+          mat-stroked-button
+          (click)="refreshHistory()"
+          [disabled]="isLoadingSnapshotHistory">
+          <mat-icon>refresh</mat-icon> Refresh history
+        </button>
+        <span *ngIf="releaseTrack?.snapshot_count != null">
+          Total snapshots: {{ releaseTrack?.snapshot_count }}
+        </span>
+      </div>
+      <p *ngIf="historyMessage" class="draft-lifecycle-message" role="alert">
+        {{ historyMessage }}
+      </p>
       <div
         *ngIf="isLoadingSnapshotHistory && !snapshotHistory.length"
         class="empty-state">
@@ -553,7 +619,11 @@
       <div
         *ngIf="!isLoadingSnapshotHistory && !snapshotHistory.length"
         class="empty-state">
-        No tagged releases or current draft snapshot
+        {{
+          isVirtualReleaseTrack
+            ? 'No snapshots in this history view'
+            : 'No tagged releases or current draft snapshot'
+        }}
       </div>
 
       <div *ngIf="snapshotHistory.length" class="snapshot-history-summary">
@@ -593,6 +663,14 @@
                   <app-workbench-chip
                     *ngIf="item.isLatest"
                     variant="latest"></app-workbench-chip>
+                  <span
+                    *ngIf="
+                      isVirtualReleaseTrack &&
+                      historyFilter === 'releases' &&
+                      item.isCurrentDraft
+                    ">
+                    Current draft (pinned)
+                  </span>
                   <div class="snapshot-history-chips">
                     <span
                       class="snapshot-creator"
@@ -980,6 +1058,16 @@
         </article>
       </div>
     </div>
+    <mat-paginator
+      *ngIf="isVirtualReleaseTrack"
+      aria-label="Snapshot history pages"
+      [length]="historyTotal"
+      [pageIndex]="historyPageIndex"
+      [pageSize]="historyPageSize"
+      [hidePageSize]="true"
+      [showFirstLastButtons]="true"
+      (page)="onHistoryPageChange($event)">
+    </mat-paginator>
   </ng-template>
 
   <ng-template #unknownDate> Unknown </ng-template>
@@ -1014,6 +1102,69 @@
           </button>
         </div>
       </div>
+
+      <section
+        *ngIf="isVirtualReleaseTrack"
+        class="labelled-box config-card draft-retention-card">
+        <div class="content no-label">
+          <h3>Draft retention</h3>
+          <p>
+            Current policy:
+            {{
+              releaseTrack?.draft_retention?.max_drafts == null
+                ? 'Disabled (unlimited drafts)'
+                : 'Keep newest ' +
+                  releaseTrack?.draft_retention?.max_drafts +
+                  ' drafts'
+            }}.
+          </p>
+          <p>
+            All draft history counts, including manual notes and quarantine
+            choices. Older eligible drafts and their notes are permanently
+            deleted after new drafts are created. Tagged releases are preserved.
+            Protected drafts may exceed the limit. Saving this policy creates no
+            draft and deletes nothing.
+          </p>
+          <form
+            *ngIf="canManageDraftLifecycle"
+            [formGroup]="retentionForm"
+            (ngSubmit)="saveDraftRetention()"
+            class="draft-lifecycle-controls">
+            <mat-slide-toggle formControlName="enabled"
+              >Limit retained drafts</mat-slide-toggle
+            >
+            <mat-form-field
+              *ngIf="retentionForm.get('enabled')?.value"
+              appearance="outline">
+              <mat-label>Maximum retained drafts</mat-label>
+              <input
+                matInput
+                type="number"
+                min="1"
+                step="1"
+                formControlName="maxDrafts" />
+              <mat-hint>Positive whole number; suggested: 10.</mat-hint>
+            </mat-form-field>
+            <button
+              mat-stroked-button
+              type="submit"
+              [disabled]="
+                isSavingRetention || !isRetentionValid || !retentionForm.dirty
+              ">
+              {{
+                isSavingRetention ? 'Saving retention' : 'Save retention policy'
+              }}
+            </button>
+          </form>
+          <p *ngIf="canManageDraftLifecycle && !isRetentionValid" role="alert">
+            Enter a positive safe whole number.
+          </p>
+          <p *ngIf="!canManageDraftLifecycle">
+            Only application administrators can change draft retention.
+          </p>
+          <p *ngIf="retentionMessage" role="status">{{ retentionMessage }}</p>
+        </div>
+      </section>
 
       <form [formGroup]="configForm" class="config-card-list">
         <section class="labelled-box config-card">

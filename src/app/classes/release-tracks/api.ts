@@ -6,7 +6,11 @@ import {
   type ExportFormatType,
   type ReleasePreviewFormatType,
 } from './enums';
-import type { SnapshotSchedule } from './release-track';
+import type {
+  DraftRetention,
+  DraftSquashPreview,
+  SnapshotSchedule,
+} from './release-track';
 import type { SnapshotCreationCause } from './snapshot-creation-cause';
 import type { SnapshotCreationActor } from './snapshot-creation-actor';
 
@@ -20,6 +24,7 @@ export interface CreateReleaseTrackPayload {
   config?: ReleaseTrackConfig;
   composition?: Composition;
   snapshot_schedule?: SnapshotSchedule;
+  draft_retention?: DraftRetention;
 }
 
 export interface StixBundlePayload {
@@ -43,7 +48,11 @@ export type ReleasePayload = (
   | { increment: 'major' | 'minor'; version?: never }
   | { increment?: never; version: string }
   | { increment?: undefined; version?: undefined }
-) & { description?: string };
+) & {
+  description?: string;
+  squash_drafts?: boolean;
+  squash_fingerprint?: string;
+};
 
 export interface RetagReleasePayload {
   version: string;
@@ -151,6 +160,7 @@ export interface StandardReleasePreviewSummary extends ReleasePreviewSummaryBase
 
 export interface VirtualReleasePreviewSummary extends ReleasePreviewSummaryBase {
   type: ReleaseTrackType.Virtual;
+  draft_squash?: DraftSquashPreview;
   previous_release: {
     version: string;
     modified: string;

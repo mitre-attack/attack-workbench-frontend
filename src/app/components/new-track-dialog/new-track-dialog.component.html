@@ -254,6 +254,37 @@
 
       <mat-divider style="margin: 12px 0"></mat-divider>
 
+      <section *ngIf="canConfigureRetention" class="section-block stack">
+        <div class="section-title">Draft retention</div>
+        <mat-slide-toggle formControlName="retentionEnabled">
+          Limit retained drafts
+        </mat-slide-toggle>
+        <p class="section-sub">
+          Disabled by default (unlimited). When enabled, all draft history
+          counts, including manual notes and quarantine choices. Older eligible
+          drafts and their notes are permanently deleted after new drafts are
+          created. Tagged releases are always preserved; protected drafts may
+          exceed the limit.
+        </p>
+        <mat-form-field
+          *ngIf="form.get('retentionEnabled')?.value"
+          appearance="outline">
+          <mat-label>Maximum retained drafts</mat-label>
+          <input
+            matInput
+            type="number"
+            min="1"
+            step="1"
+            formControlName="maxDrafts" />
+          <mat-hint
+            >Positive whole number; suggested starting limit: 10.</mat-hint
+          >
+        </mat-form-field>
+        <p *ngIf="!isRetentionValid" role="alert">
+          Enter a positive safe whole number.
+        </p>
+      </section>
+
       <div class="section-block stack">
         <div class="section-title">Snapshot Schedule</div>
         <div class="section-sub">

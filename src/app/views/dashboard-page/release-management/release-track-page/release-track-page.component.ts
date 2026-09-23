@@ -1,12 +1,14 @@
 import { Clipboard } from '@angular/cdk/clipboard';
+import { HttpErrorResponse } from '@angular/common/http';
 import { SelectionModel } from '@angular/cdk/collections';
 import { Component, OnInit } from '@angular/core';
 import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { MatDialog } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
+import { PageEvent } from '@angular/material/paginator';
 import { ActivatedRoute, Router } from '@angular/router';
 import { forkJoin, Observable, of } from 'rxjs';
-import { finalize, map, switchMap, take } from 'rxjs/operators';
+import { finalize, map, switchMap, take, tap } from 'rxjs/operators';
 import {
   ComponentTrack,
   ConflictPolicy,
@@ -14,6 +16,7 @@ import {
   DeduplicationStrategy,
   DeduplicationStrategyType,
   ExportFormat,
+  DraftCleanupResult,
   ExportFormatType,
   MemberSyncBehavior,
   MemberSyncBehaviorType,
@@ -283,6 +286,18 @@ export class ReleaseTrackPageComponent implements OnInit {
   public isSavingConfig = false;
   public releaseTrackConfig: ReleaseTrackConfig = {};
   public snapshotHistory: SnapshotHistoryViewModel[] = [];
+  public historyFilter: 'releases' | 'drafts' | 'all' = 'releases';
+  public historyPageIndex = 0;
+  public readonly historyPageSize = 25;
+  public historyTotal = 0;
+  public historyMessage = '';
+  public retentionForm: FormGroup;
+  public isSavingRetention = false;
+  public retentionMessage = '';
+  public draftCleanupResults: DraftCleanupResult[] = [];
+  public cleanupMessage = '';
+  public retryingCleanup = new Set<string>();
+  private historyRequest = 0;
   public configForm: FormGroup;
   private virtualComponentTrackSummaries = new Map<
     string,
@@ -290,7 +305,6 @@ export class ReleaseTrackPageComponent implements OnInit {
   >();
   public virtualComponentTrackOptions: VirtualComponentTrackOption[] = [];
   public virtualConfigComponentTracks: any[] = [];
-  private createdDraftSnapshot: ReleaseTrackSnapshotHistoryItem | null = null;
   private updatingSnapshotDescriptionModified = new Set<string>();
   private convertingReleaseModified = new Set<string>();
   private deletingDraftModified = new Set<string>();
@@ -378,6 +392,10 @@ export class ReleaseTrackPageComponent implements OnInit {
     private clipboard: Clipboard,
     private fb: FormBuilder
   ) {
+    this.retentionForm = this.fb.group({
+      enabled: [false],
+      maxDrafts: [10],
+    });
     this.configForm = this.fb.group({
       alias: [
         '',
@@ -438,11 +456,19 @@ export class ReleaseTrackPageComponent implements OnInit {
 
   ngOnInit(): void {
     this.route.params.subscribe(params => {
-      if (this.id !== params.id) this.showReleasedMembers = false;
+      if (this.id !== params.id) {
+        this.showReleasedMembers = false;
+        this.historyFilter = 'releases';
+        this.historyPageIndex = 0;
+        this.snapshotHistory = [];
+        this.draftCleanupResults = [];
+        this.historyMessage = '';
+        this.cleanupMessage = '';
+        this.retentionForm.markAsPristine();
+      }
       this.id = params.id;
       if (this.id) {
         this.getReleaseTrack();
-        this.getSnapshotHistory();
         this.getConfig();
       }
     });
@@ -496,12 +522,21 @@ export class ReleaseTrackPageComponent implements OnInit {
   }
 
   public get hasCurrentDraftSnapshot(): boolean {
+    if (this.isVirtualReleaseTrack)
+      return !!this.releaseTrack?.modified && !this.releaseTrack.version;
     return this.snapshotHistory.some((item, index) =>
       this.isCurrentDraftHistoryItem(item, index)
     );
   }
 
   public get taggedSnapshotCount(): number {
+    if (this.isVirtualReleaseTrack) {
+      return (
+        this.releaseTrack?.tagged_release_count ??
+        this.releaseTrack?.version_history?.length ??
+        0
+      );
+    }
     return this.snapshotHistory.filter(item => item.isTagged).length;
   }
 
@@ -709,6 +744,148 @@ export class ReleaseTrackPageComponent implements OnInit {
     return this.authenticationService.canDelete();
   }
 
+  public get canManageDraftLifecycle(): boolean {
+    return this.authenticationService.isAuthorized([Role.ADMIN]);
+  }
+
+  public get isRetentionValid(): boolean {
+    const value = this.retentionForm.getRawValue();
+    return (
+      !value.enabled ||
+      (Number.isSafeInteger(value.maxDrafts) && value.maxDrafts > 0)
+    );
+  }
+
+  public saveDraftRetention(): void {
+    if (
+      !this.isVirtualReleaseTrack ||
+      !this.canManageDraftLifecycle ||
+      !this.isRetentionValid ||
+      this.isSavingRetention
+    )
+      return;
+    const value = this.retentionForm.getRawValue();
+    this.isSavingRetention = true;
+    this.retentionMessage = '';
+    this.connector
+      .updateDraftRetention(this.id, value.enabled ? value.maxDrafts : null)
+      .pipe(
+        take(1),
+        finalize(() => {
+          this.isSavingRetention = false;
+        })
+      )
+      .subscribe({
+        next: result => {
+          if (this.releaseTrack)
+            this.releaseTrack.draft_retention = result.draft_retention;
+          this.retentionForm.markAsPristine();
+          this.retentionMessage =
+            'Policy saved. No draft was created or deleted. Applies after the next successful draft creation.';
+        },
+        error: err => {
+          this.retentionMessage =
+            err?.error?.message ||
+            'Unable to save draft retention. Please try again.';
+        },
+      });
+  }
+
+  public loadDraftCleanup(): void {
+    if (!this.isVirtualReleaseTrack) return;
+    this.connector
+      .listDraftCleanup(this.id)
+      .pipe(take(1))
+      .subscribe({
+        next: result => {
+          const recent = result.data;
+          this.draftCleanupResults = [
+            ...recent,
+            ...this.draftCleanupResults.filter(
+              item =>
+                item.status === 'completed' &&
+                !recent.some(other => other.operation_id === item.operation_id)
+            ),
+          ];
+        },
+        error: () => {
+          this.cleanupMessage =
+            'Unable to load recent cleanup operations. Refresh to check for pending cleanup before trying to release again.';
+        },
+      });
+  }
+
+  public retryDraftCleanup(operation: DraftCleanupResult): void {
+    if (
+      !this.canManageDraftLifecycle ||
+      this.retryingCleanup.has(operation.operation_id)
+    )
+      return;
+    this.retryingCleanup.add(operation.operation_id);
+    this.connector
+      .retryDraftCleanup(this.id, operation.operation_id)
+      .pipe(
+        take(1),
+        finalize(() => {
+          this.retryingCleanup.delete(operation.operation_id);
+        })
+      )
+      .subscribe({
+        next: result => {
+          this.captureDraftCleanup(result);
+          this.refreshReleaseTrackState();
+        },
+        error: err => {
+          this.cleanupMessage =
+            err?.error?.message ||
+            'Cleanup repair failed. The release is not re-tagged. Refresh to check the existing operation.';
+          this.refreshReleaseTrackState();
+        },
+      });
+  }
+
+  private captureDraftCleanup(result?: DraftCleanupResult): void {
+    if (!result) return;
+    this.draftCleanupResults = [
+      result,
+      ...this.draftCleanupResults.filter(
+        item => item.operation_id !== result.operation_id
+      ),
+    ];
+    if (result.status !== 'completed') {
+      this.cleanupMessage = result.release_committed
+        ? 'Release committed, but draft cleanup is incomplete. Use Retry cleanup; do not tag the release again.'
+        : 'The snapshot operation has deferred draft cleanup. Use Retry cleanup to repair the existing operation.';
+    } else {
+      this.cleanupMessage =
+        'Draft cleanup completed. Tagged releases were preserved.';
+    }
+  }
+
+  public refreshHistory(): void {
+    this.historyMessage = '';
+    this.refreshReleaseTrackState();
+  }
+
+  public onHistoryFilterChange(filter: 'releases' | 'drafts' | 'all'): void {
+    this.historyFilter = filter;
+    this.historyPageIndex = 0;
+    this.getSnapshotHistory();
+  }
+
+  public onHistoryPageChange(event: PageEvent): void {
+    this.historyPageIndex = event.pageIndex;
+    this.getSnapshotHistory();
+  }
+
+  private showSnapshotError(err: HttpErrorResponse, fallback: string): void {
+    this.historyMessage =
+      err?.status === 404
+        ? 'This draft may have been removed by retention or release-time cleanup. Refresh history to see the surviving snapshots.'
+        : err?.error?.message || fallback;
+    this.snackbar.open(this.historyMessage, 'Dismiss', { duration: 10000 });
+  }
+
   public getReleaseTrack(): void {
     this.connector
       .getLatestSnapshot(this.id, {
@@ -767,6 +944,14 @@ export class ReleaseTrackPageComponent implements OnInit {
 
     if (this.isVirtualReleaseTrack) {
       this.loadVirtualComponentTrackSummaries();
+      if (!this.retentionForm.dirty) {
+        const maxDrafts = this.releaseTrack.draft_retention?.max_drafts;
+        this.retentionForm.reset({
+          enabled: maxDrafts != null,
+          maxDrafts: maxDrafts ?? 10,
+        });
+      }
+      this.loadDraftCleanup();
     } else {
       this.virtualComponentTrackSummaries.clear();
     }
@@ -778,11 +963,12 @@ export class ReleaseTrackPageComponent implements OnInit {
         this.setConfig(this.releaseTrack.config);
       }
     }
+    this.getSnapshotHistory();
   }
 
   private refreshReleaseTrackState(): void {
+    this.historyPageIndex = 0;
     this.getReleaseTrack();
-    this.getSnapshotHistory();
   }
 
   private hydrateDynamicEntryDates(): void {
@@ -1045,6 +1231,10 @@ export class ReleaseTrackPageComponent implements OnInit {
   }
 
   private showSnapshotOperationError(err: any, operation: string): void {
+    if (err?.status === 404) {
+      this.showSnapshotError(err, `Unable to ${operation}.`);
+      return;
+    }
     const dependents = err?.error?.dependent_snapshots;
     this.snackbar.open(
       Array.isArray(dependents) && dependents.length
@@ -1057,25 +1247,71 @@ export class ReleaseTrackPageComponent implements OnInit {
 
   public getSnapshotHistory(): void {
     if (!this.id) return;
-
+    const request = ++this.historyRequest;
+    const virtual = this.isVirtualReleaseTrack;
+    const options = virtual
+      ? {
+          tagged:
+            this.historyFilter === 'all'
+              ? undefined
+              : this.historyFilter === 'releases',
+          limit: this.historyPageSize,
+          offset: this.historyPageIndex * this.historyPageSize,
+        }
+      : {};
     this.isLoadingSnapshotHistory = true;
-    this.connector
-      .listSnapshots(this.id)
+    const history = virtual
+      ? this.connector.listSnapshots(this.id, options)
+      : this.connector.listSnapshots(this.id);
+    history
       .pipe(
         take(1),
         finalize(() => {
-          this.isLoadingSnapshotHistory = false;
+          if (request === this.historyRequest)
+            this.isLoadingSnapshotHistory = false;
         })
       )
       .subscribe({
         next: result => {
-          const snapshots = Array.isArray(result) ? result : result?.data || [];
-          this.snapshotHistory = this.buildSnapshotHistory(
-            this.withCreatedDraftSnapshot(snapshots)
-          );
+          if (request !== this.historyRequest) return;
+          let snapshots = Array.isArray(result) ? result : result?.data || [];
+          if (virtual) {
+            this.historyTotal = result?.pagination?.total ?? 0;
+            const lastPage = Math.max(
+              0,
+              Math.ceil(this.historyTotal / this.historyPageSize) - 1
+            );
+            if (this.historyPageIndex > lastPage) {
+              this.historyPageIndex = lastPage;
+              this.getSnapshotHistory();
+              return;
+            }
+            if (
+              this.historyFilter === 'releases' &&
+              this.hasCurrentDraftSnapshot &&
+              this.releaseTrack
+            ) {
+              const currentDraft: ReleaseTrackSnapshotHistoryItem = {
+                ...this.releaseTrack,
+                members_count:
+                  this.releaseTrack.summary?.members_count ??
+                  this.releaseTrack.members?.length ??
+                  0,
+                quarantine_count:
+                  this.releaseTrack.summary?.quarantine_count ??
+                  this.releaseTrack.quarantine?.length ??
+                  0,
+              };
+              snapshots = [currentDraft, ...snapshots];
+            }
+          }
+          this.snapshotHistory = this.buildSnapshotHistory(snapshots);
         },
         error: err => {
-          console.error('Failed to load release track snapshot history', err);
+          this.showSnapshotError(
+            err,
+            'Unable to load snapshot history. Refresh to try again.'
+          );
         },
       });
   }
@@ -1487,10 +1723,11 @@ export class ReleaseTrackPageComponent implements OnInit {
       .updateMetadataByLatest(this.id, { description })
       .pipe(take(1))
       .subscribe({
-        next: () => {
+        next: result => {
+          this.captureDraftCleanup(result?.draft_cleanup);
           this.isEditingDescription = false;
           this.descriptionDraft = '';
-          this.getReleaseTrack();
+          this.refreshReleaseTrackState();
         },
         error: err => {
           this.isSavingDescription = false;
@@ -2003,81 +2240,13 @@ export class ReleaseTrackPageComponent implements OnInit {
       )
       .subscribe({
         next: snapshot => {
-          this.addCreatedDraftSnapshotToHistory(snapshot);
+          this.captureDraftCleanup(snapshot?.draft_cleanup);
           this.refreshReleaseTrackState();
         },
         error: err => {
           console.error('Failed to create draft snapshot', err);
         },
       });
-  }
-
-  private addCreatedDraftSnapshotToHistory(snapshot: any): void {
-    const draftSnapshot = this.getCreatedDraftSnapshot(snapshot);
-    if (!draftSnapshot) return;
-
-    this.createdDraftSnapshot = draftSnapshot;
-    this.snapshotHistory = this.buildSnapshotHistory(
-      this.withCreatedDraftSnapshot(
-        this.snapshotHistory.map(item => item.snapshot)
-      )
-    );
-  }
-
-  private getCreatedDraftSnapshot(
-    snapshot: any
-  ): ReleaseTrackSnapshotHistoryItem | null {
-    const draftSnapshot = snapshot?.data || snapshot?.snapshot || snapshot;
-    if (!draftSnapshot || this.isTaggedSnapshot(draftSnapshot)) return null;
-
-    const modified = this.getSnapshotModified(draftSnapshot);
-    if (!modified) return null;
-    const resolvedTotalObjects =
-      typeof draftSnapshot.composition_resolution?.total_objects === 'number'
-        ? draftSnapshot.composition_resolution.total_objects
-        : null;
-    const membersCount =
-      this.getSnapshotCount(draftSnapshot, 'members_count') ??
-      this.getSnapshotMembers(draftSnapshot).length;
-    const quarantineCount =
-      this.getSnapshotCount(
-        draftSnapshot,
-        'quarantine_count',
-        'quarantined_count'
-      ) ?? this.getSnapshotQuarantineCount(draftSnapshot);
-    const shouldUseResolvedTotal =
-      !membersCount && !quarantineCount && resolvedTotalObjects !== null;
-
-    return {
-      ...draftSnapshot,
-      modified,
-      version: null,
-      type: ReleaseTrackType.Virtual,
-      members_count: shouldUseResolvedTotal
-        ? resolvedTotalObjects
-        : membersCount,
-      quarantine_count: quarantineCount,
-    };
-  }
-
-  private withCreatedDraftSnapshot(
-    snapshots: ReleaseTrackSnapshotHistoryItem[]
-  ): ReleaseTrackSnapshotHistoryItem[] {
-    if (!this.createdDraftSnapshot) return snapshots;
-
-    const createdDraftModified = this.getSnapshotModified(
-      this.createdDraftSnapshot
-    );
-    const draftAlreadyLoaded = snapshots.some(
-      snapshot => this.getSnapshotModified(snapshot) === createdDraftModified
-    );
-
-    if (draftAlreadyLoaded) {
-      this.createdDraftSnapshot = null;
-      return snapshots;
-    }
-
-    return [...snapshots, this.createdDraftSnapshot];
   }
 
   public onEditConfig(): void {
@@ -2154,9 +2323,10 @@ export class ReleaseTrackPageComponent implements OnInit {
   private withAliasUpdate<T>(next: () => Observable<T>): Observable<T> {
     const update = this.getAliasUpdate();
     if (!update) return next();
-    return this.connector
-      .updateMetadataByLatest(this.id, update)
-      .pipe(switchMap(() => next()));
+    return this.connector.updateMetadataByLatest(this.id, update).pipe(
+      tap(result => this.captureDraftCleanup(result?.draft_cleanup)),
+      switchMap(() => next())
+    );
   }
 
   public onSaveConfig(): void {
@@ -2240,7 +2410,7 @@ export class ReleaseTrackPageComponent implements OnInit {
         next: result => {
           if (!result.preview || !result.track) {
             this.snackbar.open(
-              'Unable to load the release preview. Please try again.',
+              'This snapshot may no longer exist. Refresh history before opening another preview.',
               null,
               {
                 duration: 5000,
@@ -2257,7 +2427,10 @@ export class ReleaseTrackPageComponent implements OnInit {
           );
         },
         error: err => {
-          console.error('Failed to load objects for release preview', err);
+          this.showSnapshotError(
+            err,
+            'Unable to load the release preview. Refresh history and try again.'
+          );
         },
       });
   }
@@ -2394,12 +2567,6 @@ export class ReleaseTrackPageComponent implements OnInit {
               ) {
                 Object.assign(this.releaseTrack, snapshot);
               }
-              if (
-                this.createdDraftSnapshot &&
-                this.getSnapshotModified(this.createdDraftSnapshot) === modified
-              ) {
-                Object.assign(this.createdDraftSnapshot, snapshot);
-              }
 
               this.snackbar.open(
                 updatedDescription
@@ -2410,11 +2577,9 @@ export class ReleaseTrackPageComponent implements OnInit {
               );
             },
             error: err => {
-              console.error('Failed to update snapshot notes', err);
-              this.snackbar.open(
-                'Unable to save snapshot notes. Please try again.',
-                null,
-                { duration: 5000, panelClass: 'error' }
+              this.showSnapshotError(
+                err,
+                'Unable to save snapshot notes. Please try again.'
               );
             },
           });
@@ -2442,7 +2607,10 @@ export class ReleaseTrackPageComponent implements OnInit {
           );
         },
         error: err => {
-          console.error('Failed to export release track snapshot', err);
+          this.showSnapshotError(
+            err,
+            'Unable to export this snapshot. Refresh history and try again.'
+          );
         },
       });
   }
@@ -3211,6 +3379,8 @@ export class ReleaseTrackPageComponent implements OnInit {
       )
       .subscribe({
         next: ({ result, scheduleResult, configResult }) => {
+          this.captureDraftCleanup(result?.draft_cleanup);
+          this.captureDraftCleanup(configResult?.draft_cleanup);
           this.isEditingConfig = false;
           if (this.releaseTrack) {
             this.releaseTrack.composition = this.getCompositionFromResponse(
@@ -3568,6 +3738,8 @@ export class ReleaseTrackPageComponent implements OnInit {
         conflicts: this.getReleaseConflicts(preview),
         proposedMinorVersion: preview?.version,
         previewSummary: preview,
+        canSquashDrafts:
+          this.isVirtualReleaseTrack && this.canManageDraftLifecycle,
       },
     });
 
@@ -3619,14 +3791,31 @@ export class ReleaseTrackPageComponent implements OnInit {
         })
       )
       .subscribe({
-        next: () => {
-          if (item.modified === this.createdDraftSnapshot?.modified) {
-            this.createdDraftSnapshot = null;
-          }
+        next: result => {
+          this.captureDraftCleanup(result?.draft_cleanup);
           this.refreshReleaseTrackState();
         },
         error: err => {
-          console.error('Failed to tag release track snapshot', err);
+          const details = { ...err?.error?.details, ...err?.error };
+          this.captureDraftCleanup(details.draft_cleanup);
+          if (details.release_committed || details.operation_id) {
+            this.cleanupMessage = details.release_committed
+              ? `Release committed, but completion requires repair. Do not tag again. Cleanup operation: ${details.operation_id || 'see recent operations'}.`
+              : `Release did not complete. Refresh history and review cleanup operation ${details.operation_id} before trying again.`;
+            this.refreshReleaseTrackState();
+          } else if (err?.status === 409) {
+            this.historyMessage =
+              'The release preview is stale or the track changed. Refresh history and open a new preview before tagging.';
+            this.snackbar.open(this.historyMessage, 'Dismiss', {
+              duration: 10000,
+            });
+          } else {
+            this.showSnapshotError(
+              err,
+              'Unable to tag this snapshot. Refresh history to check its state before trying again.'
+            );
+            this.loadDraftCleanup();
+          }
         },
       });
   }
@@ -3657,9 +3846,18 @@ export class ReleaseTrackPageComponent implements OnInit {
     );
     const latestSnapshot =
       sorted.find(snapshot => this.isLatestHistorySnapshot(snapshot)) ??
-      sorted[0];
-    const latestRelease = sorted.find(snapshot =>
-      this.isTaggedSnapshot(snapshot)
+      (this.isVirtualReleaseTrack ? undefined : sorted[0]);
+    const latestReleaseModified = this.isVirtualReleaseTrack
+      ? (this.releaseTrack?.version_history ?? []).reduce((latest, entry) => {
+          const modified = this.toIsoString(entry.snapshot_id) ?? '';
+          return modified > latest ? modified : latest;
+        }, '')
+      : '';
+    const latestRelease = sorted.find(
+      snapshot =>
+        this.isTaggedSnapshot(snapshot) &&
+        (!this.isVirtualReleaseTrack ||
+          this.getSnapshotModified(snapshot) === latestReleaseModified)
     );
 
     return sorted.map((snapshot, index) => {
@@ -4082,7 +4280,7 @@ export class ReleaseTrackPageComponent implements OnInit {
   private isLatestHistorySnapshot(
     snapshot: ReleaseTrackSnapshotHistoryItem
   ): boolean {
-    if (snapshot.is_latest) return true;
+    if (!this.isVirtualReleaseTrack && snapshot.is_latest) return true;
     if (!this.releaseTrack?.modified) return false;
     return (
       this.getSnapshotModified(snapshot) ===

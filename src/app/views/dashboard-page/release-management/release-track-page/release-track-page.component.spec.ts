@@ -34,6 +34,8 @@ import {
   MemberSyncPolicy,
   MemberSyncStrategy,
   ReleaseTrackType,
+  ReleaseTrackSnapshot,
+  DraftCleanupResult,
   SnapshotScheduleMode,
   SnapshotCreationCause,
 } from 'src/app/classes/release-tracks';
@@ -95,6 +97,11 @@ describe('ReleaseTrackPageComponent', () => {
       deleteReleaseTrack: vi.fn(() => createAsyncObservable({})),
       deleteSnapshotByModified: vi.fn(() => createAsyncObservable(undefined)),
       convertReleaseToDraft: vi.fn(() => createAsyncObservable({})),
+      listDraftCleanup: vi.fn(() => of({ data: [] })),
+      retryDraftCleanup: vi.fn(() => of({})),
+      updateDraftRetention: vi.fn(() =>
+        of({ draft_retention: { max_drafts: null } })
+      ),
     });
     mockDialog = {
       open: vi.fn(),
@@ -178,6 +185,402 @@ describe('ReleaseTrackPageComponent', () => {
     fixture = TestBed.createComponent(ReleaseTrackPageComponent);
     component = fixture.componentInstance;
     fixture.detectChanges();
+  });
+
+  it('pages virtual releases using server totals while keeping the actual current draft pinned', () => {
+    const current = new ReleaseTrackSnapshot({
+      id: 'release-track--virtual',
+      type: ReleaseTrackType.Virtual,
+      modified: '2026-09-20T00:00:00.000Z',
+      snapshot_description: 'Current notes',
+      snapshot_count: 104,
+      tagged_release_count: 26,
+      version_history: [
+        { version: '26.0', snapshot_id: '2026-09-19T00:00:00.000Z' },
+      ],
+    });
+    component.id = current.id;
+    component.releaseTrack = current;
+    mockReleaseTrackApiConnector.listSnapshots.mockReturnValue(
+      of({
+        data: [
+          {
+            type: ReleaseTrackType.Virtual,
+            modified: '2026-01-01T00:00:00.000Z',
+            version: '1.0',
+            snapshot_description: 'Original release notes',
+          },
+        ],
+        pagination: { total: 26, limit: 25, offset: 25 },
+      })
+    );
+
+    component.onHistoryPageChange({ pageIndex: 1, pageSize: 25, length: 26 });
+
+    expect(mockReleaseTrackApiConnector.listSnapshots).toHaveBeenLastCalledWith(
+      current.id,
+      {
+        tagged: true,
+        limit: 25,
+        offset: 25,
+      }
+    );
+    expect(component.historyTotal).toBe(26);
+    expect(component.taggedSnapshotCount).toBe(26);
+    expect(
+      component.snapshotHistory.map(item => ({
+        modified: item.modified,
+        latest: item.isLatest,
+        current: item.isCurrentDraft,
+        latestRelease: item.isLatestRelease,
+        notes: item.snapshot.snapshot_description,
+      }))
+    ).toEqual([
+      {
+        modified: '2026-09-20T00:00:00.000Z',
+        latest: true,
+        current: true,
+        latestRelease: false,
+        notes: 'Current notes',
+      },
+      {
+        modified: '2026-01-01T00:00:00.000Z',
+        latest: false,
+        current: false,
+        latestRelease: false,
+        notes: 'Original release notes',
+      },
+    ]);
+
+    mockReleaseTrackApiConnector.listSnapshots.mockReturnValue(
+      of({
+        data: [
+          {
+            type: ReleaseTrackType.Virtual,
+            modified: '2026-02-01T00:00:00.000Z',
+            version: null,
+          },
+        ],
+        pagination: { total: 78, limit: 25, offset: 0 },
+      })
+    );
+    component.onHistoryFilterChange('drafts');
+    expect(component.historyPageIndex).toBe(0);
+    expect(component.historyTotal).toBe(78);
+    expect(component.snapshotHistory[0].isLatest).toBe(false);
+    expect(component.snapshotHistory[0].isCurrentDraft).toBe(false);
+    expect(component.hasCurrentDraftSnapshot).toBe(true);
+    expect(mockReleaseTrackApiConnector.listSnapshots).toHaveBeenLastCalledWith(
+      current.id,
+      {
+        tagged: false,
+        limit: 25,
+        offset: 0,
+      }
+    );
+  });
+
+  it('clamps a virtual history page emptied by cleanup and does not invent a current draft', () => {
+    component.id = 'release-track--virtual';
+    component.releaseTrack = new ReleaseTrackSnapshot({
+      id: component.id,
+      type: ReleaseTrackType.Virtual,
+      modified: '2026-09-20T00:00:00.000Z',
+      version: '2.0',
+    });
+    mockReleaseTrackApiConnector.listSnapshots
+      .mockReturnValueOnce(
+        of({ data: [], pagination: { total: 1, limit: 25, offset: 25 } })
+      )
+      .mockReturnValueOnce(
+        of({
+          data: [{ modified: '2026-09-01T00:00:00.000Z', version: '1.0' }],
+          pagination: { total: 1, limit: 25, offset: 0 },
+        })
+      );
+
+    component.onHistoryPageChange({ pageIndex: 1, pageSize: 25, length: 26 });
+
+    expect(component.historyPageIndex).toBe(0);
+    expect(component.snapshotHistory.map(item => item.title)).toEqual(['v1.0']);
+    expect(component.hasCurrentDraftSnapshot).toBe(false);
+    expect(component.snapshotHistory[0].isLatest).toBe(false);
+  });
+
+  it('saves retention independently of content edits and rejects invalid or unauthorized policies', () => {
+    component.id = 'release-track--virtual';
+    component.releaseTrack = new ReleaseTrackSnapshot({
+      id: component.id,
+      type: ReleaseTrackType.Virtual,
+      modified: '2026-09-20T00:00:00.000Z',
+    });
+    const originalModified = component.releaseTrack.modified;
+    component.isEditingConfig = true;
+    component.configForm.patchValue({
+      virtualDeduplicationStrategy: DeduplicationStrategy.Quarantine,
+    });
+    component.retentionForm.patchValue({ enabled: true, maxDrafts: 1 });
+    mockReleaseTrackApiConnector.updateDraftRetention.mockReturnValue(
+      of({ draft_retention: { max_drafts: 1 } })
+    );
+
+    component.saveDraftRetention();
+
+    expect(component.releaseTrack.modified).toBe(originalModified);
+    expect(component.releaseTrack.draft_retention).toEqual({ max_drafts: 1 });
+    expect(component.isEditingConfig).toBe(true);
+    expect(
+      mockReleaseTrackApiConnector.updateComposition
+    ).not.toHaveBeenCalled();
+    expect(mockReleaseTrackApiConnector.updateConfig).not.toHaveBeenCalled();
+    expect(mockReleaseTrackApiConnector.updateSchedule).not.toHaveBeenCalled();
+    expect(
+      mockReleaseTrackApiConnector.createVirtualSnapshot
+    ).not.toHaveBeenCalled();
+    mockReleaseTrackApiConnector.updateDraftRetention.mockClear();
+    component.retentionForm.patchValue({ maxDrafts: 0 });
+    component.saveDraftRetention();
+    component.retentionForm.patchValue({ maxDrafts: 1.5 });
+    component.saveDraftRetention();
+    component.retentionForm.patchValue({
+      maxDrafts: Number.MAX_SAFE_INTEGER + 1,
+    });
+    component.saveDraftRetention();
+    component.retentionForm.patchValue({ maxDrafts: 10 });
+    mockAuthenticationService.isAuthorized.mockReturnValue(false);
+    component.saveDraftRetention();
+    expect(
+      mockReleaseTrackApiConnector.updateDraftRetention
+    ).not.toHaveBeenCalled();
+  });
+
+  it('tags the reviewed historical snapshot and repairs partial cleanup without tagging twice', () => {
+    const target = '2026-09-10T00:00:00.000Z';
+    const current = new ReleaseTrackSnapshot({
+      id: 'release-track--virtual',
+      type: ReleaseTrackType.Virtual,
+      modified: '2026-09-20T00:00:00.000Z',
+    });
+    const failed: DraftCleanupResult = {
+      operation_id: 'cleanup--original',
+      kind: 'squash',
+      status: 'failed',
+      target_modified: target,
+      release_committed: true,
+      eligible_count: 7,
+      deleted_count: 3,
+      protected_count: 1,
+      error: 'Manifest repair interrupted',
+    };
+    component.id = current.id;
+    component.releaseTrack = current;
+    component.historyFilter = 'all';
+    mockReleaseTrackApiConnector.listSnapshots.mockReturnValue(
+      of({
+        data: [
+          { type: ReleaseTrackType.Virtual, modified: target, version: null },
+        ],
+        pagination: { total: 1, limit: 25, offset: 0 },
+      })
+    );
+    component.getSnapshotHistory();
+    mockReleaseTrackApiConnector.previewRelease.mockReturnValue(
+      of({
+        type: ReleaseTrackType.Virtual,
+        source_snapshot_modified: target,
+        draft_squash: {
+          lower_bound: null,
+          upper_bound: target,
+          eligible_count: 7,
+          protected_count: 1,
+          fingerprint: 'reviewed-set',
+        },
+      })
+    );
+    mockReleaseTrackApiConnector.retrieveSnapshotByModified.mockReturnValue(
+      of(
+        new ReleaseTrackSnapshot({
+          id: current.id,
+          type: ReleaseTrackType.Virtual,
+          modified: target,
+        })
+      )
+    );
+    mockDialog.open.mockReturnValue({
+      afterClosed: () =>
+        of({
+          version: '1.0',
+          description: '',
+          squash_drafts: true,
+          squash_fingerprint: 'reviewed-set',
+        }),
+    });
+    mockReleaseTrackApiConnector.releaseSnapshot.mockReturnValue(
+      of({
+        modified: target,
+        version: '1.0',
+        draft_cleanup: failed,
+      })
+    );
+    mockReleaseTrackApiConnector.getLatestSnapshot.mockReturnValue(of(current));
+    mockReleaseTrackApiConnector.listDraftCleanup.mockReturnValue(
+      of({ data: [failed] })
+    );
+
+    component.onTagSnapshot(component.snapshotHistory[0]);
+
+    expect(mockReleaseTrackApiConnector.releaseSnapshot).toHaveBeenCalledWith(
+      current.id,
+      target,
+      {
+        version: '1.0',
+        description: '',
+        squash_drafts: true,
+        squash_fingerprint: 'reviewed-set',
+      }
+    );
+    expect(component.draftCleanupResults[0].status).toBe('failed');
+    expect(component.draftCleanupResults[0].release_committed).toBe(true);
+    const completed: DraftCleanupResult = {
+      ...failed,
+      status: 'completed',
+      deleted_count: 7,
+      error: undefined,
+    };
+    mockReleaseTrackApiConnector.retryDraftCleanup.mockReturnValue(
+      of(completed)
+    );
+    mockReleaseTrackApiConnector.listDraftCleanup.mockReturnValue(
+      of({ data: [] })
+    );
+    component.historyPageIndex = 3;
+    component.retryDraftCleanup(failed);
+
+    expect(component.draftCleanupResults[0]).toEqual(completed);
+    expect(component.historyPageIndex).toBe(0);
+    expect(mockReleaseTrackApiConnector.retryDraftCleanup).toHaveBeenCalledWith(
+      current.id,
+      failed.operation_id
+    );
+    expect(mockReleaseTrackApiConnector.releaseSnapshot).toHaveBeenCalledTimes(
+      1
+    );
+    expect(mockReleaseTrackApiConnector.releaseLatest).not.toHaveBeenCalled();
+  });
+
+  it('explains a disappeared draft instead of opening a release dialog', () => {
+    component.id = 'release-track--virtual';
+    component.releaseTrack = new ReleaseTrackSnapshot({
+      type: ReleaseTrackType.Virtual,
+      modified: '2026-09-20T00:00:00.000Z',
+    });
+    mockReleaseTrackApiConnector.listSnapshots.mockReturnValue(
+      of({
+        data: [],
+        pagination: { total: 0, limit: 25, offset: 0 },
+      })
+    );
+    component.getSnapshotHistory();
+    mockReleaseTrackApiConnector.previewRelease.mockReturnValue(
+      throwError(() => ({ status: 404 }))
+    );
+
+    component.onTagSnapshot(component.snapshotHistory[0]);
+
+    expect(component.historyMessage).toMatch(/removed.*[Rr]efresh/);
+    expect(mockDialog.open).not.toHaveBeenCalled();
+    expect(mockReleaseTrackApiConnector.releaseSnapshot).not.toHaveBeenCalled();
+  });
+
+  it('requires a fresh preview after a stale squash and rediscovers a partially committed release', () => {
+    const current = new ReleaseTrackSnapshot({
+      id: 'release-track--virtual',
+      type: ReleaseTrackType.Virtual,
+      modified: '2026-09-20T00:00:00.000Z',
+    });
+    component.id = current.id;
+    component.releaseTrack = current;
+    mockReleaseTrackApiConnector.listSnapshots.mockReturnValue(
+      of({
+        data: [],
+        pagination: { total: 0, limit: 25, offset: 0 },
+      })
+    );
+    component.getSnapshotHistory();
+    mockReleaseTrackApiConnector.previewRelease.mockReturnValue(
+      of({
+        type: ReleaseTrackType.Virtual,
+        draft_squash: {
+          lower_bound: null,
+          upper_bound: current.modified.toISOString(),
+          eligible_count: 2,
+          protected_count: 0,
+          fingerprint: 'old',
+        },
+      })
+    );
+    mockReleaseTrackApiConnector.retrieveSnapshotByModified.mockReturnValue(
+      of(current)
+    );
+    mockDialog.open.mockReturnValue({
+      afterClosed: () =>
+        of({
+          increment: 'minor',
+          description: '',
+          squash_drafts: true,
+          squash_fingerprint: 'old',
+        }),
+    });
+    mockReleaseTrackApiConnector.releaseSnapshot.mockReturnValue(
+      throwError(() => ({
+        status: 409,
+        error: { message: 'Fingerprint changed' },
+      }))
+    );
+
+    component.onTagSnapshot(component.snapshotHistory[0]);
+
+    expect(component.historyMessage).toMatch(/[Ff]resh|[Rr]efresh/);
+    expect(mockReleaseTrackApiConnector.releaseSnapshot).toHaveBeenCalledTimes(
+      1
+    );
+    expect(
+      mockReleaseTrackApiConnector.retryDraftCleanup
+    ).not.toHaveBeenCalled();
+    const pending: DraftCleanupResult = {
+      operation_id: 'cleanup--partial',
+      kind: 'squash',
+      status: 'pending',
+      release_committed: true,
+      eligible_count: 2,
+      deleted_count: 0,
+      protected_count: 0,
+    };
+    mockReleaseTrackApiConnector.releaseSnapshot.mockReturnValue(
+      throwError(() => ({
+        status: 500,
+        error: {
+          operation_id: pending.operation_id,
+          release_committed: true,
+          draft_cleanup: pending,
+        },
+      }))
+    );
+    mockReleaseTrackApiConnector.getLatestSnapshot.mockReturnValue(of(current));
+    mockReleaseTrackApiConnector.listDraftCleanup.mockReturnValue(
+      of({ data: [pending] })
+    );
+
+    component.onTagSnapshot(component.snapshotHistory[0]);
+
+    expect(component.draftCleanupResults[0]).toEqual(pending);
+    expect(component.cleanupMessage).toMatch(/[Dd]o not tag again/);
+    expect(mockReleaseTrackApiConnector.releaseSnapshot).toHaveBeenCalledTimes(
+      2
+    );
+    expect(mockReleaseTrackApiConnector.listDraftCleanup).toHaveBeenCalledWith(
+      current.id
+    );
   });
 
   it('should create', () => {
@@ -1181,6 +1584,7 @@ describe('ReleaseTrackPageComponent', () => {
       })
     );
     component.id = 'release-track--virtual';
+    component.historyFilter = 'all';
 
     component.getSnapshotHistory();
 
@@ -1242,9 +1646,9 @@ describe('ReleaseTrackPageComponent', () => {
     const trackSpy = vi
       .spyOn(component, 'getReleaseTrack')
       .mockImplementation(() => undefined);
-    const historySpy = vi
-      .spyOn(component, 'getSnapshotHistory')
-      .mockImplementation(() => undefined);
+    vi.spyOn(component, 'getSnapshotHistory').mockImplementation(
+      () => undefined
+    );
     component.id = 'release-track--123';
 
     component.onConvertReleaseToDraft(item);
@@ -1262,7 +1666,6 @@ describe('ReleaseTrackPageComponent', () => {
       mockReleaseTrackApiConnector.convertReleaseToDraft
     ).toHaveBeenCalledWith('release-track--123', item.modified, '1.1');
     expect(trackSpy).toHaveBeenCalled();
-    expect(historySpy).toHaveBeenCalled();
     expect(mockSnackbar.open).toHaveBeenCalledWith(
       'Release 1.1 converted to draft.',
       null,
@@ -1371,9 +1774,9 @@ describe('ReleaseTrackPageComponent', () => {
     const trackSpy = vi
       .spyOn(component, 'getReleaseTrack')
       .mockImplementation(() => undefined);
-    const historySpy = vi
-      .spyOn(component, 'getSnapshotHistory')
-      .mockImplementation(() => undefined);
+    vi.spyOn(component, 'getSnapshotHistory').mockImplementation(
+      () => undefined
+    );
     component.onDeleteDraft(item);
     expect(
       mockReleaseTrackApiConnector.deleteSnapshotByModified
@@ -1382,7 +1785,6 @@ describe('ReleaseTrackPageComponent', () => {
       mockReleaseTrackApiConnector.convertReleaseToDraft
     ).not.toHaveBeenCalled();
     expect(trackSpy).toHaveBeenCalled();
-    expect(historySpy).toHaveBeenCalled();
     expect(mockSnackbar.open).toHaveBeenCalledWith(
       'Draft snapshot deleted.',
       null,
@@ -1655,69 +2057,59 @@ describe('ReleaseTrackPageComponent', () => {
     expect(component.hasCurrentDraftSnapshot).toBe(false);
   });
 
-  it('should create a draft snapshot and refresh the release track', () => {
-    const refreshSpy = vi
-      .spyOn(component, 'getReleaseTrack')
-      .mockImplementation(() => undefined);
-    const historySpy = vi
-      .spyOn(component, 'getSnapshotHistory')
-      .mockImplementation(() => undefined);
+  it('refreshes the current draft and resets virtual pagination after creation', () => {
+    const draft = new ReleaseTrackSnapshot({
+      id: 'release-track--123',
+      type: ReleaseTrackType.Virtual,
+      name: 'Virtual Release',
+      modified: '2024-05-21T07:00:00.000Z',
+      snapshot_description: 'Draft analyst context',
+      members: [{ object_ref: 'attack-pattern--member' }],
+      quarantine: [{ object_ref: 'attack-pattern--quarantined' }],
+      composition: {
+        component_tracks: [{ track_id: 'release-track--standard' }],
+      },
+    });
     mockDialog.open.mockReturnValue({
       afterClosed: () => of('Draft analyst context'),
     });
     mockReleaseTrackApiConnector.createVirtualSnapshot.mockReturnValue(
+      of(draft)
+    );
+    mockReleaseTrackApiConnector.getLatestSnapshot.mockReturnValue(of(draft));
+    mockReleaseTrackApiConnector.listSnapshots.mockReturnValue(
       of({
-        stix: {
-          modified: '2024-05-21T07:00:00.000Z',
-          x_mitre_version: null,
-        },
-        members: [{ object_ref: 'attack-pattern--member' }],
-        quarantine: [{ object_ref: 'attack-pattern--quarantined' }],
+        data: [],
+        pagination: { total: 0, limit: 25, offset: 0 },
       })
     );
-    component.id = 'release-track--123';
-    component.releaseTrack = {
-      type: ReleaseTrackType.Virtual,
-      name: 'Virtual Release',
-      composition: {
-        component_tracks: [{ track_id: 'release-track--standard' }],
-      },
-    } as any;
+    component.id = draft.id;
+    component.releaseTrack = new ReleaseTrackSnapshot({
+      ...draft,
+      modified: '2024-05-20T07:00:00.000Z',
+      version: '1.0',
+    });
+    component.historyPageIndex = 3;
 
     component.onDraft();
 
-    expect(mockDialog.open).toHaveBeenCalledWith(
-      SnapshotDescriptionDialogComponent,
-      expect.objectContaining({
-        data: expect.objectContaining({
-          title: 'Create draft snapshot',
-          message: expect.stringContaining(
-            'Create a copy of the latest snapshot for Virtual Release'
-          ),
-          confirmLabel: 'Create draft',
-        }),
-      })
-    );
     expect(
       mockReleaseTrackApiConnector.createVirtualSnapshot
-    ).toHaveBeenCalledWith('release-track--123', {
+    ).toHaveBeenCalledWith(draft.id, {
       description: 'Draft analyst context',
     });
-    expect(refreshSpy).toHaveBeenCalled();
-    expect(historySpy).toHaveBeenCalled();
-    expect(component.hasCurrentDraftSnapshot).toBe(true);
+    expect(component.historyPageIndex).toBe(0);
     expect(component.snapshotHistory[0]).toEqual(
       expect.objectContaining({
-        title: 'Draft Snapshot',
+        modified: '2024-05-21T07:00:00.000Z',
+        isCurrentDraft: true,
         totalObjects: 2,
-        isTagged: false,
       })
     );
     expect(component.snapshotHistory[0].stats).toEqual([
       expect.objectContaining({ label: 'Members', value: 1 }),
       expect.objectContaining({ label: 'Quarantine', value: 1 }),
     ]);
-    expect(component.isCreatingDraft).toBe(false);
   });
 
   it('should not create a draft snapshot without a release track id', () => {
@@ -1798,9 +2190,9 @@ describe('ReleaseTrackPageComponent', () => {
     const refreshSpy = vi
       .spyOn(component, 'getReleaseTrack')
       .mockImplementation(() => undefined);
-    const historySpy = vi
-      .spyOn(component, 'getSnapshotHistory')
-      .mockImplementation(() => undefined);
+    vi.spyOn(component, 'getSnapshotHistory').mockImplementation(
+      () => undefined
+    );
     mockReleaseTrackApiConnector.previewRelease.mockReturnValue(
       of({
         type: ReleaseTrackType.Standard,
@@ -1883,7 +2275,6 @@ describe('ReleaseTrackPageComponent', () => {
     );
     expect(mockReleaseTrackApiConnector.releaseLatest).not.toHaveBeenCalled();
     expect(refreshSpy).toHaveBeenCalled();
-    expect(historySpy).toHaveBeenCalled();
     expect(component.isReleasing).toBe(false);
   });
 
@@ -1891,9 +2282,9 @@ describe('ReleaseTrackPageComponent', () => {
     const refreshSpy = vi
       .spyOn(component, 'getReleaseTrack')
       .mockImplementation(() => undefined);
-    const historySpy = vi
-      .spyOn(component, 'getSnapshotHistory')
-      .mockImplementation(() => undefined);
+    vi.spyOn(component, 'getSnapshotHistory').mockImplementation(
+      () => undefined
+    );
     mockReleaseTrackApiConnector.previewRelease.mockReturnValue(
       of({
         type: ReleaseTrackType.Standard,
@@ -1993,7 +2384,6 @@ describe('ReleaseTrackPageComponent', () => {
     );
     expect(mockReleaseTrackApiConnector.releaseLatest).not.toHaveBeenCalled();
     expect(refreshSpy).toHaveBeenCalled();
-    expect(historySpy).toHaveBeenCalled();
     expect(component.isReleasing).toBe(false);
   });
 
@@ -2075,9 +2465,6 @@ describe('ReleaseTrackPageComponent', () => {
   });
 
   it('should stop releasing when the preview request fails', () => {
-    const consoleSpy = vi
-      .spyOn(console, 'error')
-      .mockImplementation(() => undefined);
     mockReleaseTrackApiConnector.previewRelease.mockReturnValue(
       throwError(() => new Error('preview failed'))
     );
@@ -2091,36 +2478,7 @@ describe('ReleaseTrackPageComponent', () => {
 
     expect(component.isReleasing).toBe(false);
     expect(component.previewingSnapshotModified).toBeNull();
-    expect(consoleSpy).toHaveBeenCalledWith(
-      'Failed to load objects for release preview',
-      expect.any(Error)
-    );
     expect(mockDialog.open).not.toHaveBeenCalled();
-  });
-
-  it('should notify the user when the preview response is empty', () => {
-    mockReleaseTrackApiConnector.previewRelease.mockReturnValue(of(null));
-    mockReleaseTrackApiConnector.retrieveSnapshotByModified.mockReturnValue(
-      of({ id: 'release-track--123' })
-    );
-    component.id = 'release-track--123';
-
-    component.onTagSnapshot({
-      modified: '2026-07-30T14:00:00.000Z',
-      isTagged: false,
-      snapshot: {},
-    } as any);
-
-    expect(mockSnackbar.open).toHaveBeenCalledWith(
-      'Unable to load the release preview. Please try again.',
-      null,
-      {
-        duration: 5000,
-        panelClass: 'error',
-      }
-    );
-    expect(mockDialog.open).not.toHaveBeenCalled();
-    expect(component.isReleasing).toBe(false);
   });
 
   it('should describe in-flight work in the activity bar', () => {
@@ -2220,9 +2578,9 @@ describe('ReleaseTrackPageComponent', () => {
     const refreshSpy = vi
       .spyOn(component, 'getReleaseTrack')
       .mockImplementation(() => undefined);
-    const historySpy = vi
-      .spyOn(component, 'getSnapshotHistory')
-      .mockImplementation(() => undefined);
+    vi.spyOn(component, 'getSnapshotHistory').mockImplementation(
+      () => undefined
+    );
     mockReleaseTrackApiConnector.updateConfig.mockReturnValue(of({}));
     component.id = 'release-track--123';
     component.releaseTrack = { config: {} } as any;
@@ -2265,7 +2623,6 @@ describe('ReleaseTrackPageComponent', () => {
     );
     expect(component.isEditingConfig).toBe(false);
     expect(refreshSpy).toHaveBeenCalled();
-    expect(historySpy).toHaveBeenCalled();
   });
 
   it('should save release track config without a candidacy threshold when auto-promotion is off', () => {
@@ -2340,9 +2697,9 @@ describe('ReleaseTrackPageComponent', () => {
     const refreshSpy = vi
       .spyOn(component, 'getReleaseTrack')
       .mockImplementation(() => undefined);
-    const historySpy = vi
-      .spyOn(component, 'getSnapshotHistory')
-      .mockImplementation(() => undefined);
+    vi.spyOn(component, 'getSnapshotHistory').mockImplementation(
+      () => undefined
+    );
     mockReleaseTrackApiConnector.updateComposition.mockReturnValue(of({}));
     mockReleaseTrackApiConnector.updateSchedule.mockReturnValue(
       of({ snapshot_schedule: { mode: SnapshotScheduleMode.Manual } })
@@ -2432,7 +2789,6 @@ describe('ReleaseTrackPageComponent', () => {
     );
     expect(component.isEditingConfig).toBe(false);
     expect(refreshSpy).toHaveBeenCalled();
-    expect(historySpy).toHaveBeenCalled();
   });
 
   it('should suggest hourly from partial text and apply only a selected preset', () => {

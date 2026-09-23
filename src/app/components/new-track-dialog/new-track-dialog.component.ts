@@ -17,6 +17,8 @@ import {
   StixTypeToAttackType,
 } from 'src/app/utils/type-mappings';
 import { finalize, take } from 'rxjs/operators';
+import { AuthenticationService } from 'src/app/services/connectors/authentication/authentication.service';
+import { Role } from 'src/app/classes/authn/role';
 
 const OBJECT_FILTER_OPTIONS: StixType[] = [
   'attack-pattern',
@@ -72,16 +74,31 @@ export class NewTrackDialogComponent implements OnInit {
     return this.mode === ReleaseTrackType.Virtual;
   }
 
+  public get canConfigureRetention(): boolean {
+    return this.authenticationService.isAuthorized([Role.ADMIN]);
+  }
+
+  public get isRetentionValid(): boolean {
+    const count = this.form.get('maxDrafts')?.value;
+    return (
+      !this.form.get('retentionEnabled')?.value ||
+      (Number.isSafeInteger(count) && count > 0)
+    );
+  }
+
   constructor(
     public dialogRef: MatDialogRef<NewTrackDialogComponent>,
     @Inject(MAT_DIALOG_DATA) public data: any,
     private fb: FormBuilder,
-    private connector: ReleaseTracksConnectorService
+    private connector: ReleaseTracksConnectorService,
+    private authenticationService: AuthenticationService
   ) {
     this.form = this.fb.group({
       name: ['', [Validators.required]],
       description: [''],
       snapshotDescription: ['', [Validators.maxLength(4000)]],
+      retentionEnabled: [false],
+      maxDrafts: [10],
       autoPromote: [false],
       candidacyThreshold: [{ value: WorkflowStatus.Reviewed, disabled: true }],
       memberSync: [MemberSyncStrategy.TrackLatest],
@@ -129,7 +146,11 @@ export class NewTrackDialogComponent implements OnInit {
   public isFormValid(): boolean {
     const nameValid = !!this.form.get('name')?.value?.trim();
     if (this.isVirtual) {
-      return nameValid && this.selectedComponentTracks.length > 0;
+      return (
+        nameValid &&
+        this.selectedComponentTracks.length > 0 &&
+        this.isRetentionValid
+      );
     }
     return this.form.valid && nameValid;
   }
@@ -203,6 +224,14 @@ export class NewTrackDialogComponent implements OnInit {
       };
       const snapshotSchedule = this.buildVirtualSnapshotSchedule();
       if (snapshotSchedule) payload.snapshot_schedule = snapshotSchedule;
+      if (
+        this.canConfigureRetention &&
+        this.form.get('retentionEnabled')?.value
+      ) {
+        payload.draft_retention = {
+          max_drafts: this.form.get('maxDrafts')?.value,
+        };
+      }
     } else {
       payload = {
         name: this.form.get('name')?.value,

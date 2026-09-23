@@ -2,18 +2,24 @@ import { Component, Inject, ViewEncapsulation } from '@angular/core';
 import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 
 import { VersionNumber } from 'src/app/classes/version-number';
+import { DraftSquashPreview } from 'src/app/classes/release-tracks';
 
 export interface ReleasePreviewDialogData {
   track: any;
   conflicts?: any[];
   proposedMinorVersion?: string;
   previewSummary?: any;
+  canSquashDrafts?: boolean;
 }
 
 export type ReleasePreviewSelection = (
   | { increment: 'minor' | 'major'; version?: never }
   | { increment?: never; version: string }
-) & { description: string };
+) & {
+  description: string;
+  squash_drafts?: boolean;
+  squash_fingerprint?: string;
+};
 
 interface ReleaseTrackObject {
   object_ref?: string;
@@ -46,6 +52,25 @@ export class ReleasePreviewDialogComponent {
   public readonly snapshotDescriptionMaxLength = 4000;
   public snapshotDescription: string;
   public exactVersion = '';
+  public squashDrafts = false;
+
+  public get draftSquash(): DraftSquashPreview | null {
+    return this.isVirtualTrack && this.data.canSquashDrafts
+      ? (this.data.previewSummary?.draft_squash ?? null)
+      : null;
+  }
+
+  private get squashSelection(): {
+    squash_drafts?: boolean;
+    squash_fingerprint?: string;
+  } {
+    return this.squashDrafts && this.draftSquash
+      ? {
+          squash_drafts: true,
+          squash_fingerprint: this.draftSquash.fingerprint,
+        }
+      : {};
+  }
 
   constructor(
     public dialogRef: MatDialogRef<ReleasePreviewDialogComponent>,
@@ -227,6 +252,7 @@ export class ReleasePreviewDialogComponent {
     this.dialogRef.close({
       increment: type,
       description: this.snapshotDescription.trim(),
+      ...this.squashSelection,
     } satisfies ReleasePreviewSelection);
   }
 
@@ -266,6 +292,7 @@ export class ReleasePreviewDialogComponent {
     this.dialogRef.close({
       version: this.normalizedExactVersion,
       description: this.snapshotDescription.trim(),
+      ...this.squashSelection,
     } satisfies ReleasePreviewSelection);
   }
 

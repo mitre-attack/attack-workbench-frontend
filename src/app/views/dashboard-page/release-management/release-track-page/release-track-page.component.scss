@@ -2146,3 +2146,35 @@ $released-members-disabled-dark: colors.on-color-deemphasis(dark);
   opacity: 0.8;
   word-break: break-all;
 }
+
+.draft-lifecycle-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1rem;
+  margin: 1rem 0;
+}
+
+.draft-retention-card {
+  margin-bottom: 1rem;
+}
+
+.draft-lifecycle-message,
+.draft-cleanup-operation {
+  padding: 1rem;
+  border: 1px solid currentColor;
+  border-radius: 4px;
+  margin-bottom: 1rem;
+}
+
+.draft-cleanup-operation {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+
+  code {
+    overflow-wrap: anywhere;
+  }
+}

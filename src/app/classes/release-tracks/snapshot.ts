@@ -5,7 +5,11 @@ import { ReleaseTrackType } from './enums';
 import { SnapshotCreationCause } from './snapshot-creation-cause';
 import { SnapshotCreationActor } from './snapshot-creation-actor';
 import { VersionHistoryEntry } from './history';
-import { SnapshotSchedule } from './release-track';
+import {
+  DraftCleanupResult,
+  DraftRetention,
+  SnapshotSchedule,
+} from './release-track';
 import {
   CandidateEntry,
   MemberEntry,
@@ -49,6 +53,10 @@ export class ReleaseTrackSnapshot {
   public composition?: Composition;
   public composition_resolution?: CompositionResolution;
   public snapshot_schedule?: SnapshotSchedule;
+  public draft_retention?: DraftRetention;
+  public draft_cleanup?: DraftCleanupResult;
+  public snapshot_count?: number;
+  public tagged_release_count?: number;
 
   constructor(raw?: any) {
     if (raw) this.deserialize(raw);
@@ -181,6 +189,11 @@ export class ReleaseTrackSnapshot {
 
     if ('snapshot_schedule' in raw)
       this.snapshot_schedule = raw.snapshot_schedule;
+    if ('draft_retention' in raw) this.draft_retention = raw.draft_retention;
+    if ('draft_cleanup' in raw) this.draft_cleanup = raw.draft_cleanup;
+    if ('snapshot_count' in raw) this.snapshot_count = raw.snapshot_count;
+    if ('tagged_release_count' in raw)
+      this.tagged_release_count = raw.tagged_release_count;
 
     if ('composition_resolution' in raw && raw.composition_resolution) {
       const cr = raw.composition_resolution;
