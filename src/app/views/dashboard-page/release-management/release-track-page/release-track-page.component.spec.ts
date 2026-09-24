@@ -33,6 +33,7 @@ import {
   MemberSyncBehavior,
   MemberSyncPolicy,
   MemberSyncStrategy,
+  ReleaseTrackSnapshot,
   ReleaseTrackType,
   SnapshotScheduleMode,
   SnapshotCreationCause,
@@ -1193,6 +1194,9 @@ describe('ReleaseTrackPageComponent', () => {
       component.snapshotHistory[1].compositionResolutionRows[0]
         .resolvedSnapshotId
     ).toBe('2024-04-20T10:00:00.000Z');
+    expect(
+      component.snapshotHistory[1].compositionResolutionRows[0].strategy
+    ).toBe('latest_draft');
     fixture.detectChanges();
     const tabs = fixture.debugElement.query(By.css('app-stix-page-tabs'));
     const view = tabs.properties['customTabs'][0].template.createEmbeddedView(
@@ -1223,6 +1227,73 @@ describe('ReleaseTrackPageComponent', () => {
       component.snapshotHistory[2].compositionResolutionRows[0].resolvedVersion
     ).toBe('1.3');
   });
+
+  it.each([
+    { resolvedVersion: null, label: /draft preview/i },
+    { resolvedVersion: '2.4', label: /v2\.4/ },
+  ])(
+    'shows preview provenance for source version $resolvedVersion without changing its source link or timestamp',
+    ({ resolvedVersion, label }) => {
+      component.id = 'release-track--virtual';
+      component.releaseTrack = new ReleaseTrackSnapshot({
+        type: ReleaseTrackType.Virtual,
+      });
+      mockReleaseTrackApiConnector.listSnapshots.mockReturnValue(
+        of({
+          data: [
+            {
+              modified: '2024-06-01T00:00:00.000Z',
+              version: null,
+              type: ReleaseTrackType.Virtual,
+              composition_resolution: {
+                component_snapshots: [
+                  {
+                    track_id: 'release-track--preview-source',
+                    track_name: 'Preview source',
+                    track_type: 'standard',
+                    resolved_snapshot_id: '2024-05-20T10:00:00.000Z',
+                    resolved_version: resolvedVersion,
+                    strategy_used: 'latest_preview',
+                    total_objects_in_source: 42,
+                    objects_after_filter: 42,
+                    objects_contributed: 42,
+                  },
+                ],
+              },
+            },
+          ],
+        })
+      );
+      component.getSnapshotHistory();
+      fixture.detectChanges();
+      const tabs = fixture.debugElement.query(By.css('app-stix-page-tabs'));
+      const view = tabs.properties['customTabs'][0].template.createEmbeddedView(
+        {}
+      );
+      try {
+        view.detectChanges();
+        const root: HTMLElement = view.rootNodes.find(
+          (node: Node) => node instanceof HTMLElement
+        );
+        const provenance = root.querySelector('.snapshot-component-provenance');
+        const versionLabel = provenance?.querySelector(
+          '.snapshot-component-version'
+        )?.textContent;
+        expect(versionLabel).toMatch(label);
+        if (resolvedVersion) expect(versionLabel).not.toMatch(/draft/i);
+        expect(provenance?.textContent).toContain('2024-05-20T10:00:00.000Z');
+        provenance
+          ?.querySelector<HTMLButtonElement>('.snapshot-component-track')
+          ?.click();
+        expect(mockRouter.navigate).toHaveBeenCalledWith([
+          '/dashboard/release-management',
+          'release-track--preview-source',
+        ]);
+      } finally {
+        view.destroy();
+      }
+    }
+  );
 
   it('should convert the most recent release to draft after typed confirmation', () => {
     const item = {
@@ -2336,7 +2407,7 @@ describe('ReleaseTrackPageComponent', () => {
     );
   });
 
-  it('should save a changed draft strategy while preserving loaded strategies and selectors', () => {
+  it('should save a changed preview strategy while preserving loaded pinned strategies and selectors', () => {
     const refreshSpy = vi
       .spyOn(component, 'getReleaseTrack')
       .mockImplementation(() => undefined);
@@ -2357,15 +2428,26 @@ describe('ReleaseTrackPageComponent', () => {
             track_id: 'release-track--component-one',
             resolution_strategy: 'specific_version',
             version: '1.2',
+            priority: 40,
           },
           {
             track_id: 'release-track--draft',
-            resolution_strategy: 'latest_draft',
+            resolution_strategy: 'latest_preview',
+            version: 'stale-selector',
+            snapshot: '2024-01-01T00:00:00.000Z',
+            priority: 7,
           },
           {
             track_id: 'release-track--pinned',
             resolution_strategy: 'specific_snapshot',
             snapshot: '2024-04-20T10:00:00.000Z',
+            priority: 12,
+          },
+          {
+            track_id: 'release-track--version-pinned',
+            resolution_strategy: 'specific_version',
+            version: '3.2',
+            priority: 25,
           },
         ],
         deduplication: {
@@ -2379,7 +2461,7 @@ describe('ReleaseTrackPageComponent', () => {
     component.onEditConfig();
     component.setVirtualComponentTrackResolution(
       component.virtualConfigComponentTracks[0],
-      component.ResolutionStrategy.LatestDraft
+      component.ResolutionStrategy.LatestPreview
     );
     component.configForm.patchValue({
       virtualDeduplicationStrategy: DeduplicationStrategy.Quarantine,
@@ -2393,19 +2475,25 @@ describe('ReleaseTrackPageComponent', () => {
         component_tracks: [
           {
             track_id: 'release-track--component-one',
-            resolution_strategy: 'latest_draft',
-            priority: 0,
+            resolution_strategy: 'latest_preview',
+            priority: 40,
           },
           {
             track_id: 'release-track--draft',
-            resolution_strategy: 'latest_draft',
-            priority: 1,
+            resolution_strategy: 'latest_preview',
+            priority: 7,
           },
           {
             track_id: 'release-track--pinned',
             resolution_strategy: 'specific_snapshot',
             snapshot: '2024-04-20T10:00:00.000Z',
-            priority: 2,
+            priority: 12,
+          },
+          {
+            track_id: 'release-track--version-pinned',
+            resolution_strategy: 'specific_version',
+            version: '3.2',
+            priority: 25,
           },
         ],
         deduplication: {
@@ -2434,6 +2522,152 @@ describe('ReleaseTrackPageComponent', () => {
     expect(refreshSpy).toHaveBeenCalled();
     expect(historySpy).toHaveBeenCalled();
   });
+
+  it('saves a priority-only edit without reordering, and restores priorities on cancel', () => {
+    vi.spyOn(component, 'getReleaseTrack').mockImplementation(() => undefined);
+    vi.spyOn(component, 'getSnapshotHistory').mockImplementation(
+      () => undefined
+    );
+    mockReleaseTrackApiConnector.updateComposition.mockReturnValue(of({}));
+    mockReleaseTrackApiConnector.updateSchedule.mockReturnValue(
+      of({ snapshot_schedule: { mode: SnapshotScheduleMode.Manual } })
+    );
+    mockReleaseTrackApiConnector.updateConfig.mockReturnValue(of({}));
+    component.id = 'release-track--virtual';
+    component.releaseTrack = new ReleaseTrackSnapshot({
+      type: ReleaseTrackType.Virtual,
+      composition: {
+        component_tracks: [
+          {
+            track_id: 'release-track--one',
+            resolution_strategy: 'specific_version',
+            version: '1.2',
+            priority: 40,
+            filters: { domains: ['enterprise'] },
+          },
+          {
+            track_id: 'release-track--two',
+            resolution_strategy: 'latest_preview',
+            priority: 7,
+          },
+        ],
+      },
+    });
+    component.onEditConfig();
+    component.virtualConfigComponentTracks[0].priority = 7;
+    expect(component.isVirtualCompositionValid).toBe(false);
+    component.onSaveConfig();
+    expect(
+      mockReleaseTrackApiConnector.updateComposition
+    ).not.toHaveBeenCalled();
+    component.virtualConfigComponentTracks[0].priority = -1;
+    expect(component.isVirtualCompositionValid).toBe(false);
+    component.onSaveConfig();
+    expect(mockReleaseTrackApiConnector.updateConfig).not.toHaveBeenCalled();
+
+    component.onCancelConfigEdit();
+    component.onEditConfig();
+    expect(
+      component.virtualConfigComponentTracks.map(track => track.priority)
+    ).toEqual([40, 7]);
+    component.virtualConfigComponentTracks[0].priority = 0;
+    expect(component.isVirtualCompositionValid).toBe(true);
+    expect(
+      component.releaseTrack.composition.component_tracks[0].priority
+    ).toBe(40);
+    component.onSaveConfig();
+    expect(mockReleaseTrackApiConnector.updateComposition).toHaveBeenCalledWith(
+      component.id,
+      expect.objectContaining({
+        component_tracks: [
+          {
+            track_id: 'release-track--one',
+            resolution_strategy: 'specific_version',
+            version: '1.2',
+            priority: 0,
+            filters: { domains: ['enterprise'] },
+          },
+          {
+            track_id: 'release-track--two',
+            resolution_strategy: 'latest_preview',
+            priority: 7,
+          },
+        ],
+      })
+    );
+  });
+
+  it.each([
+    ['latest_preview', 'LatestPreview'],
+    ['latest_tagged', 'LatestTagged'],
+  ] as const)(
+    'requires explicit replacement of a retired rule with %s before saving',
+    (strategy, enumKey) => {
+      vi.spyOn(component, 'getReleaseTrack').mockImplementation(
+        () => undefined
+      );
+      vi.spyOn(component, 'getSnapshotHistory').mockImplementation(
+        () => undefined
+      );
+      mockReleaseTrackApiConnector.updateComposition.mockReturnValue(of({}));
+      mockReleaseTrackApiConnector.updateSchedule.mockReturnValue(
+        of({ snapshot_schedule: { mode: SnapshotScheduleMode.Manual } })
+      );
+      mockReleaseTrackApiConnector.updateConfig.mockReturnValue(of({}));
+      component.id = 'release-track--virtual';
+      component.releaseTrack = new ReleaseTrackSnapshot({
+        type: ReleaseTrackType.Virtual,
+        composition: {
+          component_tracks: [
+            {
+              track_id: 'release-track--legacy-source',
+              resolution_strategy: 'latest_draft',
+              priority: 0,
+            },
+          ],
+        },
+      });
+
+      component.onEditConfig();
+      expect(
+        component.virtualConfigComponentTracks[0].resolution_strategy
+      ).toBe('latest_draft');
+      expect(component.isVirtualCompositionValid).toBe(false);
+      expect(component.canCreateDraft).toBe(false);
+      component.onSaveConfig();
+      component.onDraft();
+      expect(
+        mockReleaseTrackApiConnector.updateComposition
+      ).not.toHaveBeenCalled();
+      expect(mockReleaseTrackApiConnector.updateConfig).not.toHaveBeenCalled();
+      expect(mockDialog.open).not.toHaveBeenCalled();
+
+      component.setVirtualComponentTrackResolution(
+        component.virtualConfigComponentTracks[0],
+        component.ResolutionStrategy[enumKey]
+      );
+      expect(component.isVirtualCompositionValid).toBe(true);
+      expect(component.virtualComponentTracks[0].resolution_strategy).toBe(
+        'latest_draft'
+      );
+      expect(component.canCreateDraft).toBe(false);
+      component.onSaveConfig();
+      expect(
+        mockReleaseTrackApiConnector.updateComposition
+      ).toHaveBeenCalledWith(
+        'release-track--virtual',
+        expect.objectContaining({
+          component_tracks: [
+            {
+              track_id: 'release-track--legacy-source',
+              resolution_strategy: strategy,
+              priority: 0,
+            },
+          ],
+        })
+      );
+    }
+  );
 
   it('should suggest hourly from partial text and apply only a selected preset', () => {
     component.configForm.patchValue({
@@ -2616,7 +2850,7 @@ describe('ReleaseTrackPageComponent', () => {
     });
   });
 
-  it('should edit virtual release track component tracks', () => {
+  it('preserves component priorities when removing and adding tracks', () => {
     mockReleaseTrackApiConnector.updateComposition.mockReturnValue(of({}));
     component.id = 'release-track--virtual';
     component.releaseTrack = {
@@ -2667,6 +2901,9 @@ describe('ReleaseTrackPageComponent', () => {
     component.removeVirtualComponentTrack(
       component.virtualConfigComponentTracks[0]
     );
+    component.selectVirtualComponentTrack({
+      option: { value: component.virtualComponentTrackOptions[0] },
+    });
 
     component.onSaveConfig();
 
@@ -2677,10 +2914,15 @@ describe('ReleaseTrackPageComponent', () => {
           {
             track_id: 'release-track--component-two',
             resolution_strategy: 'latest_tagged',
-            priority: 0,
+            priority: 1,
             filters: {
               object_types: ['attack-pattern'],
             },
+          },
+          {
+            track_id: 'release-track--component-one',
+            resolution_strategy: 'latest_tagged',
+            priority: 2,
           },
         ],
       })

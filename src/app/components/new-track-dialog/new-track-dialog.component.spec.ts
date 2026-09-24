@@ -1,6 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { NO_ERRORS_SCHEMA } from '@angular/core';
-import { ReactiveFormsModule } from '@angular/forms';
+import { FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { MatDialogRef, MAT_DIALOG_DATA } from '@angular/material/dialog';
 import { of } from 'rxjs';
 
@@ -58,7 +58,7 @@ describe('NewTrackDialogComponent', () => {
 
     await TestBed.configureTestingModule({
       declarations: [NewTrackDialogComponent],
-      imports: [ReactiveFormsModule],
+      imports: [FormsModule, ReactiveFormsModule],
       providers: [
         { provide: MatDialogRef, useValue: mockDialogRef },
         {
@@ -117,19 +117,6 @@ describe('NewTrackDialogComponent', () => {
     );
   });
 
-  it('should format component track snapshot labels', () => {
-    expect(
-      component.getComponentTrackSnapshotLabel(
-        component.componentTrackOptions[0]
-      )
-    ).toBe('v1.0');
-    expect(
-      component.getComponentTrackSnapshotLabel(
-        component.componentTrackOptions[1]
-      )
-    ).toBe('no tagged snapshots');
-  });
-
   it('should remove selected component tracks and clear their filters', () => {
     component.toggleComponentTrack(component.componentTrackOptions[0], true);
     component.componentTrackOptions[0].objectTypes = ['attack-pattern'];
@@ -140,7 +127,7 @@ describe('NewTrackDialogComponent', () => {
     expect(component.componentTrackOptions[0].objectTypes).toEqual([]);
   });
 
-  it('should create a mixed tagged and draft composition with independent filters', () => {
+  it('should create a mixed composition with explicit priorities and independent filters', () => {
     component.form.patchValue({
       name: 'Combined Enterprise',
       description: 'Aggregates released Enterprise content',
@@ -149,8 +136,10 @@ describe('NewTrackDialogComponent', () => {
     component.componentTrackOptions[0].objectTypes = ['attack-pattern'];
     component.toggleComponentTrack(component.componentTrackOptions[1], true);
     component.componentTrackOptions[1].resolutionStrategy =
-      ResolutionStrategy.LatestDraft;
+      ResolutionStrategy.LatestPreview;
     component.componentTrackOptions[1].domains = ['mobile'];
+    component.componentTrackOptions[0].priority = 20;
+    component.componentTrackOptions[1].priority = 3;
 
     component.handleCreate();
 
@@ -163,15 +152,15 @@ describe('NewTrackDialogComponent', () => {
           {
             track_id: 'release-track--standard-tagged',
             resolution_strategy: ResolutionStrategy.LatestTagged,
-            priority: 0,
+            priority: 20,
             filters: {
               object_types: ['attack-pattern'],
             },
           },
           {
             track_id: 'release-track--standard-draft',
-            resolution_strategy: ResolutionStrategy.LatestDraft,
-            priority: 1,
+            resolution_strategy: ResolutionStrategy.LatestPreview,
+            priority: 3,
             filters: {
               domains: ['mobile'],
             },
@@ -188,6 +177,44 @@ describe('NewTrackDialogComponent', () => {
     expect(mockDialogRef.close).toHaveBeenCalledWith({
       track_id: 'release-track--new-virtual',
     });
+  });
+
+  it('blocks duplicate, empty and invalid priorities until they are corrected', () => {
+    component.form.patchValue({ name: 'Priority validation' });
+    const [first, second] = component.componentTrackOptions;
+    component.toggleComponentTrack(first, true);
+    component.toggleComponentTrack(second, true);
+
+    for (const priority of [first.priority, null, -1, 0.5]) {
+      second.priority = priority;
+      expect(component.isFormValid()).toBe(false);
+      component.handleCreate();
+    }
+    expect(mockConnector.createReleaseTrack).not.toHaveBeenCalled();
+    second.priority = 7;
+    expect(component.isFormValid()).toBe(true);
+    component.handleCreate();
+    expect(mockConnector.createReleaseTrack).toHaveBeenCalledWith(
+      expect.objectContaining({
+        composition: expect.objectContaining({
+          component_tracks: [
+            expect.objectContaining({ track_id: first.trackId, priority: 0 }),
+            expect.objectContaining({ track_id: second.trackId, priority: 7 }),
+          ],
+        }),
+      })
+    );
+  });
+
+  it('does not renumber remaining priorities when a component is removed and re-added', () => {
+    const [first, second] = component.componentTrackOptions;
+    component.toggleComponentTrack(first, true);
+    component.toggleComponentTrack(second, true);
+    second.priority = 12;
+    component.removeComponentTrack(first);
+    component.selectComponentTrack({ option: { value: first } });
+    expect(second.priority).toBe(12);
+    expect(first.priority).toBe(13);
   });
 
   it('should create a virtual track with public domain filters', () => {

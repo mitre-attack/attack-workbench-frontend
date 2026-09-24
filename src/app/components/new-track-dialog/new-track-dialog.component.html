@@ -104,11 +104,12 @@
       <div class="section-block stack">
         <div class="section-title">Component Tracks</div>
         <div class="section-sub">
-          Choose the latest tagged release or active draft for each standard
-          track. Only members are included, never candidates or staged objects.
-          Member revisions are frozen when the virtual snapshot is created.
-          Latest draft requires an active draft; it does not fall back to a
-          tagged release.
+          Latest tagged uses the newest published release. Latest preview uses
+          the newest snapshot, draft or released. Draft previews include members
+          plus staged objects under the source track's release conflict rules;
+          released snapshots use their published members. Candidates are
+          excluded. Revisions are frozen when the virtual snapshot is
+          materialized, without tagging or changing the source track.
         </div>
       </div>
 
@@ -192,13 +193,34 @@
             </p>
 
             <mat-form-field appearance="outline" class="object-type-filter">
+              <mat-label>Priority</mat-label>
+              <input
+                matInput
+                type="number"
+                min="0"
+                step="1"
+                required
+                [attr.aria-label]="'Priority for ' + track.name"
+                [(ngModel)]="track.priority"
+                [ngModelOptions]="{ standalone: true }"
+                [errorStateMatcher]="componentPriorityErrorMatcher" />
+              <mat-hint
+                >Lower numbers have higher priority. Each value must be
+                unique.</mat-hint
+              >
+              <mat-error>{{
+                componentPriorityError(track.priority)
+              }}</mat-error>
+            </mat-form-field>
+
+            <mat-form-field appearance="outline" class="object-type-filter">
               <mat-label>Resolve from</mat-label>
               <mat-select [(value)]="track.resolutionStrategy">
                 <mat-option [value]="ResolutionStrategy.LatestTagged">
                   Latest tagged
                 </mat-option>
-                <mat-option [value]="ResolutionStrategy.LatestDraft">
-                  Latest draft
+                <mat-option [value]="ResolutionStrategy.LatestPreview">
+                  Latest preview
                 </mat-option>
               </mat-select>
             </mat-form-field>

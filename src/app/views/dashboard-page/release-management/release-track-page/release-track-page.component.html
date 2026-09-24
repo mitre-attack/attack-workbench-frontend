@@ -186,6 +186,12 @@
                 <div *ngIf="!virtualComponentTracks.length" class="empty-state">
                   No component tracks configured.
                 </div>
+                <p *ngIf="hasRetiredComponentTracks" role="alert">
+                  This configuration uses the retired members-only latest draft
+                  rule. Edit Config and explicitly choose Latest preview or
+                  Latest tagged for each retired rule before materializing
+                  again. Existing snapshots are unchanged.
+                </p>
 
                 <article
                   *ngFor="
@@ -870,7 +876,13 @@
 
                     <dl class="snapshot-component-metrics">
                       <div>
-                        <dt>Source members</dt>
+                        <dt>
+                          {{
+                            row.strategy === ResolutionStrategy.LatestPreview
+                              ? 'Preview members'
+                              : 'Source members'
+                          }}
+                        </dt>
                         <dd>
                           {{ getVirtualTierCount(row.totalObjectsInSource) }}
                         </dd>
@@ -1007,7 +1019,8 @@
             color="primary"
             [disabled]="
               isSavingConfig ||
-              (isVirtualReleaseTrack && !isVirtualScheduleValid)
+              (isVirtualReleaseTrack &&
+                (!isVirtualScheduleValid || !isVirtualCompositionValid))
             "
             (click)="onSaveConfig()">
             Save Config
@@ -1067,11 +1080,13 @@
                 <div class="config-copy">
                   <div class="config-label">Component Tracks</div>
                   <p>
-                    Choose the latest tagged release or active draft for each
-                    standard track. Only members are included, never candidates
-                    or staged objects. Member revisions are frozen when the
-                    virtual snapshot is created. Latest draft requires an active
-                    draft; it does not fall back to a tagged release.
+                    Latest tagged uses the newest published release. Latest
+                    preview uses the newest snapshot, draft or released. Draft
+                    previews include members plus staged objects under the
+                    source track's release conflict rules; released snapshots
+                    use their published members. Candidates are excluded.
+                    Revisions are frozen at materialization without tagging or
+                    changing the source track.
                   </p>
                 </div>
                 <span class="config-value">
@@ -1132,7 +1147,6 @@
                 <article
                   *ngFor="
                     let track of displayedVirtualConfigComponentTracks;
-                    let componentIndex = index;
                     trackBy: trackByComponentTrack
                   "
                   class="config-component-row"
@@ -1176,7 +1190,7 @@
                     </span>
                     <span class="config-value">
                       priority
-                      {{ getVirtualTrackPriority(track, componentIndex) }}
+                      {{ track.priority ?? 'not set' }}
                     </span>
                     <span
                       *ngIf="getComponentTrackFilters(track).length"
@@ -1184,6 +1198,37 @@
                       {{ getComponentTrackFilters(track).join(', ') }}
                     </span>
                   </div>
+                  <p *ngIf="isRetiredComponentTrack(track)" role="alert">
+                    Latest draft is retired and included members only.
+                    Explicitly choose Latest preview or Latest tagged before
+                    saving. Historical snapshots keep their original content.
+                  </p>
+
+                  <mat-form-field
+                    *ngIf="isEditingConfig"
+                    appearance="outline"
+                    class="config-component-filter">
+                    <mat-label>Priority</mat-label>
+                    <input
+                      matInput
+                      type="number"
+                      min="0"
+                      step="1"
+                      required
+                      [attr.aria-label]="
+                        'Priority for ' + getComponentTrackLabel(track)
+                      "
+                      [(ngModel)]="track.priority"
+                      [ngModelOptions]="{ standalone: true }"
+                      [errorStateMatcher]="componentPriorityErrorMatcher" />
+                    <mat-hint
+                      >Lower numbers have higher priority. Each value must be
+                      unique.</mat-hint
+                    >
+                    <mat-error>{{
+                      componentPriorityError(track.priority)
+                    }}</mat-error>
+                  </mat-form-field>
 
                   <mat-form-field
                     *ngIf="isEditingConfig"
@@ -1198,8 +1243,14 @@
                       <mat-option [value]="ResolutionStrategy.LatestTagged">
                         Latest tagged
                       </mat-option>
-                      <mat-option [value]="ResolutionStrategy.LatestDraft">
-                        Latest draft
+                      <mat-option [value]="ResolutionStrategy.LatestPreview">
+                        Latest preview
+                      </mat-option>
+                      <mat-option
+                        *ngIf="isRetiredComponentTrack(track)"
+                        value="latest_draft"
+                        disabled>
+                        Latest draft — retired, members only
                       </mat-option>
                       <mat-option
                         *ngIf="

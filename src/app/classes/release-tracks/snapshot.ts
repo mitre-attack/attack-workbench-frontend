@@ -1,5 +1,5 @@
 import type { SnapshotBundleHashes, SnapshotPublication } from './api';
-import { Composition, CompositionResolution } from './composition';
+import { LoadedComposition, CompositionResolution } from './composition';
 import { ReleaseTrackConfig } from './config';
 import { ReleaseTrackType } from './enums';
 import { SnapshotCreationCause } from './snapshot-creation-cause';
@@ -46,7 +46,7 @@ export class ReleaseTrackSnapshot {
   public quarantine?: QuarantineEntry[];
 
   // virtual track composition
-  public composition?: Composition;
+  public composition?: LoadedComposition;
   public composition_resolution?: CompositionResolution;
   public snapshot_schedule?: SnapshotSchedule;
 
