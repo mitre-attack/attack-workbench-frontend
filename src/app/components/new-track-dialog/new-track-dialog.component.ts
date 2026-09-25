@@ -98,6 +98,9 @@ export class NewTrackDialogComponent implements OnInit {
   public get isRetentionValid(): boolean {
     const count = this.form.get('maxDrafts')?.value;
     return (
+      !this.canConfigureRetention ||
+      this.form.get('snapshotSchedule.mode')?.value !==
+        SnapshotScheduleMode.Cron ||
       !this.form.get('retentionEnabled')?.value ||
       (Number.isSafeInteger(count) && count > 0)
     );
@@ -246,14 +249,6 @@ export class NewTrackDialogComponent implements OnInit {
       };
       const snapshotSchedule = this.buildVirtualSnapshotSchedule();
       if (snapshotSchedule) payload.snapshot_schedule = snapshotSchedule;
-      if (
-        this.canConfigureRetention &&
-        this.form.get('retentionEnabled')?.value
-      ) {
-        payload.draft_retention = {
-          max_drafts: this.form.get('maxDrafts')?.value,
-        };
-      }
     } else {
       payload = {
         name: this.form.get('name')?.value,
@@ -354,6 +349,15 @@ export class NewTrackDialogComponent implements OnInit {
 
     const payload: any = { mode };
     if (mode === SnapshotScheduleMode.Cron && cron) payload.cron = cron;
+    if (
+      mode === SnapshotScheduleMode.Cron &&
+      this.canConfigureRetention &&
+      this.form.get('retentionEnabled')?.value
+    ) {
+      payload.draft_retention = {
+        max_drafts: this.form.get('maxDrafts')?.value,
+      };
+    }
     return payload;
   }
 

@@ -97,18 +97,46 @@ requires explicitly choosing **Latest preview** or **Latest tagged** before
 saving or creating another snapshot; it never silently includes staged content.
 Historical draft-only provenance retains its original meaning.
 
-Virtual-track history defaults to **Releases + current draft**, so scheduled
-drafts do not crowd out releases. Use **Drafts** or **All snapshots** to inspect
-older work; the paginator loads 25 history entries per page. Counts come from
-the server, and the current draft is pinned separately in the default view.
+Virtual-track history offers **Drafts only**, **Releases only**, and **All
+releases** (the default). All releases includes both drafts and tagged releases;
+Releases only never inserts a current draft into the results. The paginator loads
+25 entries per page, newest first.
 
-Administrators can configure **Draft retention** in the virtual track's Config
-tab. **Limit retained drafts** accepts a positive whole number (suggested: 10);
-disabled means unlimited. **Save retention policy** is separate from **Save
-Config**: it creates no draft and deletes nothing immediately. The next
-successful draft creation applies the limit to all draft causes, including
-notes and quarantine history. Tagged releases are preserved, and protected
-drafts can leave the count above the limit.
+The smaller summary below the selector shows **Tagged releases**, **Drafts**, and
+**Total** for the selected view across all matching pages, not just the visible
+page. For example, a track with two tags and three drafts reports `2 / 3 / 5` in
+All releases, `2 / 0 / 2` in Releases only, and `0 / 3 / 3` in Drafts only.
+Zero-result views still show all three counters.
+
+History refreshes automatically every 30 seconds while the Releases tab is
+visible, and immediately when entering that tab or returning browser focus or
+visibility. This picks up cron-created snapshots and other users' changes
+without a Refresh history button. Refresh pauses while editing, while a dialog
+is open, or while an operation/request is in flight. It preserves the selected
+filter, page and scroll position; if cleanup removes the last page, it moves to
+the last remaining page. Local changes still refresh immediately.
+
+Automatic refresh reads lightweight history and cleanup status rather than
+reloading full snapshot contents or configuration. The **LATEST** pill and
+latest-only actions use unfiltered server identities, so an older filtered page
+is not mistaken for the current snapshot.
+
+**Create Draft** offers administrators **Delete older drafts after creating this
+draft**, off by default every time the dialog opens. A positive whole-number
+limit applies to that request only; it is never saved or inherited from a
+schedule.
+
+To configure persistent retention, click **Edit Config** and select **Recurring**
+schedule mode. **Recurring draft retention** is read-only outside edit mode;
+administrators can change its limit while editing. **Cancel** restores the saved
+policy. **Save Config** sends schedule-only changes without creating a content
+draft or deleting anything immediately. Actual cron runs apply this policy;
+manual creation and dated schedules do not. The former global policy has been
+removed, so configure the recurring policy explicitly.
+
+Both policies count all untagged snapshots across the track, regardless of how
+they were created. Tagged releases and protected sources survive. Configuration,
+metadata, composition and quarantine edits never trigger retention.
 
 The virtual release preview offers administrators an unchecked **Delete earlier
 drafts after tagging** option. It shows eligible/protected counts and the strict
@@ -118,10 +146,11 @@ If the reviewed deletion set changes, fetch a fresh preview.
 
 If a release commits but cleanup fails, the page says so and exposes **Retry
 cleanup**. This repairs the existing operation without tagging again. Pending
-operations are rediscovered when reopening the track; completed recovery clears
-the stale failure message. Large cleanups can need more than one retry. If a draft
-is removed while you are viewing it, refresh history to select a surviving
-snapshot.
+operations are rediscovered when reopening the track. Completed cleanup appears
+as a floating notification with an **X** dismiss button; dismissal survives
+ordinary history refreshes. Pending/failed operations retain their repair
+controls. Large cleanups can need more than one retry. If a draft is removed
+while you are viewing it, the automatic history refresh lets you select a surviving snapshot.
 
 The release preview offers minor and major relative tags as well as an exact `MAJOR.MINOR` version. Relative tags are calculated from the tagged snapshot immediately before the selected draft. When releasing an older draft, the exact version must also remain below the next tagged snapshot; the dialog shows these exclusive bounds. Optional release notes are stored on that snapshot and become the `x-mitre-collection` description in exported STIX bundles.
 

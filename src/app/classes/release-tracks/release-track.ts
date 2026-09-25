@@ -1,4 +1,4 @@
-import { ReleaseTrackType, SnapshotScheduleModeType } from './enums';
+import { ReleaseTrackType } from './enums';
 
 export interface ReleaseTrack {
   track_id: string;
@@ -17,14 +17,22 @@ export interface ReleaseTrack {
 
   // virtual tracks only
   snapshot_schedule?: SnapshotSchedule;
-  draft_retention?: DraftRetention;
 }
 
-export interface SnapshotSchedule {
-  mode?: SnapshotScheduleModeType;
-  cron?: string | null;
-  dates?: (Date | string)[];
-}
+export type SnapshotSchedule =
+  | { mode: 'manual'; cron?: never; dates?: never; draft_retention?: never }
+  | {
+      mode: 'dates';
+      dates: (Date | string)[];
+      cron?: never;
+      draft_retention?: never;
+    }
+  | {
+      mode: 'cron';
+      cron: string;
+      dates?: never;
+      draft_retention?: DraftRetention;
+    };
 
 export interface DraftRetention {
   max_drafts: number | null;

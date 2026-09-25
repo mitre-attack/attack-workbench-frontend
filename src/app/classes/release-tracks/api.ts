@@ -24,7 +24,11 @@ export interface CreateReleaseTrackPayload {
   config?: ReleaseTrackConfig;
   composition?: Composition;
   snapshot_schedule?: SnapshotSchedule;
-  draft_retention?: DraftRetention;
+}
+
+export interface CreateVirtualSnapshotPayload {
+  description?: string;
+  draft_retention?: DraftRetention | null;
 }
 
 export interface StixBundlePayload {
@@ -84,6 +88,22 @@ export interface SnapshotHistoryOptions {
   tagged?: boolean;
   limit?: number;
   offset?: number;
+}
+
+/** Counts cover the selected tagged filter before pagination. */
+export interface SnapshotHistoryCounts {
+  tagged: number;
+  drafts: number;
+  total: number;
+}
+
+export interface SnapshotHistoryResponse {
+  data: ReleaseTrackSnapshotHistoryItem[];
+  pagination: { total: number; limit: number; offset: number };
+  counts: SnapshotHistoryCounts;
+  /** Unfiltered live identities, even when neither snapshot is on this page. */
+  latest_snapshot_modified: string | null;
+  latest_tagged_snapshot_modified: string | null;
 }
 
 export interface SnapshotContentStatistics {

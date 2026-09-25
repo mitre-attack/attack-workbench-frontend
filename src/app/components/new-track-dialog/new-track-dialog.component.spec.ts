@@ -84,6 +84,7 @@ describe('NewTrackDialogComponent', () => {
     component.form.patchValue({
       name: 'Retained virtual track',
       retentionEnabled: true,
+      snapshotSchedule: { mode: SnapshotScheduleMode.Cron, cron: '0 * * * *' },
     });
     component.toggleComponentTrack(component.componentTrackOptions[0], true);
     for (const maxDrafts of [0, -1, 1.5, Number.MAX_SAFE_INTEGER + 1]) {
@@ -95,7 +96,8 @@ describe('NewTrackDialogComponent', () => {
     component.form.patchValue({ maxDrafts: 1 });
     component.handleCreate();
     expect(
-      mockConnector.createReleaseTrack.mock.calls[0][0].draft_retention
+      mockConnector.createReleaseTrack.mock.calls[0][0].snapshot_schedule
+        .draft_retention
     ).toEqual({ max_drafts: 1 });
   });
 
@@ -104,6 +106,7 @@ describe('NewTrackDialogComponent', () => {
       name: 'Unretained virtual track',
       retentionEnabled: true,
       maxDrafts: 10,
+      snapshotSchedule: { mode: SnapshotScheduleMode.Cron, cron: '0 * * * *' },
     });
     component.toggleComponentTrack(component.componentTrackOptions[0], true);
     vi.mocked(
@@ -111,8 +114,23 @@ describe('NewTrackDialogComponent', () => {
     ).mockReturnValue(false);
     component.handleCreate();
     expect(
-      mockConnector.createReleaseTrack.mock.calls[0][0].draft_retention
+      mockConnector.createReleaseTrack.mock.calls[0][0].snapshot_schedule
+        .draft_retention
     ).toBeUndefined();
+  });
+
+  it('drops recurring retention when creating a manual track', () => {
+    component.form.patchValue({
+      name: 'Manual virtual track',
+      retentionEnabled: true,
+      maxDrafts: 0,
+      snapshotSchedule: { mode: SnapshotScheduleMode.Manual },
+    });
+    component.toggleComponentTrack(component.componentTrackOptions[0], true);
+    component.handleCreate();
+    const payload = mockConnector.createReleaseTrack.mock.calls[0][0];
+    expect(payload.snapshot_schedule).toEqual({ mode: 'manual' });
+    expect(payload.draft_retention).toBeUndefined();
   });
 
   it('should list standard tracks even when they have no tagged snapshots', () => {

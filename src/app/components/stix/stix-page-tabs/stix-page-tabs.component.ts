@@ -1,5 +1,11 @@
 import { ViewEncapsulation } from '@angular/core';
-import { Component, Input, TemplateRef } from '@angular/core';
+import {
+  Component,
+  EventEmitter,
+  Input,
+  Output,
+  TemplateRef,
+} from '@angular/core';
 import { StixViewConfig } from 'src/app/views/stix/stix-view-page';
 
 interface CustomTab {
@@ -23,4 +29,5 @@ export class StixPageTabsComponent {
   @Input() showHistory = true;
   @Input() showNotes = true;
   @Input() showMembership = true;
+  @Output() selectedIndexChange = new EventEmitter<number>();
 }

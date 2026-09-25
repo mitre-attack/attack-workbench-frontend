@@ -1,3 +1,19 @@
+<ng-template #cleanupNotification let-operation>
+  <div class="cleanup-notification" role="status">
+    <span>
+      Draft cleanup completed: {{ operation.deleted_count }} drafts deleted;
+      {{ operation.protected_count }} protected drafts and all tagged releases
+      preserved.
+    </span>
+    <button
+      mat-icon-button
+      type="button"
+      aria-label="Dismiss draft cleanup notification"
+      (click)="dismissCleanupNotification()">
+      <mat-icon>close</mat-icon>
+    </button>
+  </div>
+</ng-template>
 <div class="release-track-page">
   <div class="release-track-header">
     <h1>
@@ -34,7 +50,9 @@
     </p>
   </div>
   <section
-    *ngIf="isVirtualReleaseTrack"
+    *ngIf="
+      isVirtualReleaseTrack && (cleanupMessage || draftCleanupResults.length)
+    "
     class="draft-cleanup-status"
     aria-label="Draft cleanup operations">
     <p *ngIf="cleanupMessage" role="status">{{ cleanupMessage }}</p>
@@ -82,6 +100,7 @@
     [showHistory]="false"
     [showNotes]="false"
     [showMembership]="false"
+    (selectedIndexChange)="onSelectedTabChange($event)"
     [customTabs]="[
       { label: 'Releases', template: historyTpl },
       { label: 'Config', template: configTpl },
@@ -592,26 +611,19 @@
 
   <ng-template #historyTpl>
     <div class="history-tpl">
-      <div *ngIf="isVirtualReleaseTrack" class="draft-lifecycle-controls">
-        <mat-form-field appearance="outline">
+      <div
+        *ngIf="isVirtualReleaseTrack"
+        class="draft-lifecycle-controls history-controls">
+        <mat-form-field appearance="outline" subscriptSizing="dynamic">
           <mat-label>History view</mat-label>
           <mat-select
             [value]="historyFilter"
             (selectionChange)="onHistoryFilterChange($event.value)">
-            <mat-option value="releases">Releases + current draft</mat-option>
-            <mat-option value="drafts">Drafts</mat-option>
-            <mat-option value="all">All snapshots</mat-option>
+            <mat-option value="drafts">Drafts only</mat-option>
+            <mat-option value="releases">Releases only</mat-option>
+            <mat-option value="all">All releases</mat-option>
           </mat-select>
         </mat-form-field>
-        <button
-          mat-stroked-button
-          (click)="refreshHistory()"
-          [disabled]="isLoadingSnapshotHistory">
-          <mat-icon>refresh</mat-icon> Refresh history
-        </button>
-        <span *ngIf="releaseTrack?.snapshot_count != null">
-          Total snapshots: {{ releaseTrack?.snapshot_count }}
-        </span>
       </div>
       <p *ngIf="historyMessage" class="draft-lifecycle-message" role="alert">
         {{ historyMessage }}
@@ -632,17 +644,15 @@
         }}
       </div>
 
-      <div *ngIf="snapshotHistory.length" class="snapshot-history-summary">
-        <span>Tagged releases: {{ taggedSnapshotCount }}</span>
-        <span
-          >Current draft:
-          {{ hasCurrentDraftSnapshot ? 'available' : 'none' }}</span
-        >
+      <div class="snapshot-history-summary">
+        <span>Tagged releases: {{ historyCounts.tagged }}</span>
+        <span>Drafts: {{ historyCounts.drafts }}</span>
+        <span>Total: {{ historyCounts.total }}</span>
       </div>
 
       <div *ngIf="snapshotHistory.length" class="snapshot-history-list">
         <article
-          *ngFor="let item of snapshotHistory"
+          *ngFor="let item of snapshotHistory; trackBy: trackSnapshotHistory"
           class="snapshot-history-entry">
           <div
             class="snapshot-history-marker"
@@ -669,14 +679,6 @@
                   <app-workbench-chip
                     *ngIf="item.isLatest"
                     variant="latest"></app-workbench-chip>
-                  <span
-                    *ngIf="
-                      isVirtualReleaseTrack &&
-                      historyFilter === 'releases' &&
-                      item.isCurrentDraft
-                    ">
-                    Current draft (pinned)
-                  </span>
                   <div class="snapshot-history-chips">
                     <span
                       class="snapshot-creator"
@@ -1115,69 +1117,6 @@
           </button>
         </div>
       </div>
-
-      <section
-        *ngIf="isVirtualReleaseTrack"
-        class="labelled-box config-card draft-retention-card">
-        <div class="content no-label">
-          <h3>Draft retention</h3>
-          <p>
-            Current policy:
-            {{
-              releaseTrack?.draft_retention?.max_drafts == null
-                ? 'Disabled (unlimited drafts)'
-                : 'Keep newest ' +
-                  releaseTrack?.draft_retention?.max_drafts +
-                  ' drafts'
-            }}.
-          </p>
-          <p>
-            All draft history counts, including manual notes and quarantine
-            choices. Older eligible drafts and their notes are permanently
-            deleted after new drafts are created. Tagged releases are preserved.
-            Protected drafts may exceed the limit. Saving this policy creates no
-            draft and deletes nothing.
-          </p>
-          <form
-            *ngIf="canManageDraftLifecycle"
-            [formGroup]="retentionForm"
-            (ngSubmit)="saveDraftRetention()"
-            class="draft-lifecycle-controls">
-            <mat-slide-toggle formControlName="enabled"
-              >Limit retained drafts</mat-slide-toggle
-            >
-            <mat-form-field
-              *ngIf="retentionForm.get('enabled')?.value"
-              appearance="outline">
-              <mat-label>Maximum retained drafts</mat-label>
-              <input
-                matInput
-                type="number"
-                min="1"
-                step="1"
-                formControlName="maxDrafts" />
-              <mat-hint>Positive whole number; suggested: 10.</mat-hint>
-            </mat-form-field>
-            <button
-              mat-stroked-button
-              type="submit"
-              [disabled]="
-                isSavingRetention || !isRetentionValid || !retentionForm.dirty
-              ">
-              {{
-                isSavingRetention ? 'Saving retention' : 'Save retention policy'
-              }}
-            </button>
-          </form>
-          <p *ngIf="canManageDraftLifecycle && !isRetentionValid" role="alert">
-            Enter a positive safe whole number.
-          </p>
-          <p *ngIf="!canManageDraftLifecycle">
-            Only application administrators can change draft retention.
-          </p>
-          <p *ngIf="retentionMessage" role="status">{{ retentionMessage }}</p>
-        </div>
-      </section>
 
       <form [formGroup]="configForm" class="config-card-list">
         <section class="labelled-box config-card">
@@ -1725,6 +1664,60 @@
                     getVirtualScheduleValue('cron')
                   }}</code>
                 </ng-template>
+                <div class="recurring-retention">
+                  <h4>Recurring draft retention</h4>
+                  <p>
+                    Applies only after scheduled recurring snapshots. Counts all
+                    drafts across this track, regardless of how they were
+                    created. Older eligible drafts and their notes are
+                    permanently deleted; tagged releases and protected drafts
+                    are preserved. Protected drafts may exceed the limit. Saving
+                    the policy creates no snapshot and deletes nothing
+                    immediately.
+                  </p>
+                  <div
+                    *ngIf="
+                      isEditingConfig && canManageDraftLifecycle;
+                      else retentionValue
+                    "
+                    [formGroup]="retentionForm"
+                    class="draft-lifecycle-controls">
+                    <mat-slide-toggle formControlName="enabled">
+                      Limit retained drafts
+                    </mat-slide-toggle>
+                    <mat-form-field
+                      *ngIf="retentionForm.get('enabled')?.value"
+                      appearance="outline">
+                      <mat-label>Maximum retained drafts</mat-label>
+                      <input
+                        matInput
+                        type="number"
+                        min="1"
+                        step="1"
+                        formControlName="maxDrafts" />
+                      <mat-hint>Positive whole number; suggested: 10.</mat-hint>
+                    </mat-form-field>
+                    <p *ngIf="!isRetentionValid" role="alert">
+                      Enter a positive safe whole number.
+                    </p>
+                  </div>
+                  <ng-template #retentionValue>
+                    <p>
+                      {{
+                        (virtualSnapshotSchedule.draft_retention?.max_drafts ??
+                          null) === null
+                          ? 'Disabled (unlimited drafts)'
+                          : 'Keep newest ' +
+                            virtualSnapshotSchedule.draft_retention.max_drafts +
+                            ' drafts'
+                      }}
+                    </p>
+                    <p *ngIf="isEditingConfig && !canManageDraftLifecycle">
+                      Only application administrators can change draft
+                      retention.
+                    </p>
+                  </ng-template>
+                </div>
               </ng-container>
 
               <ng-container

@@ -95,6 +95,9 @@ describe('ReleaseTracksConnectorService', () => {
         limit: 200,
         offset: 0,
       },
+      counts: { tagged: 0, drafts: 1, total: 1 },
+      latest_snapshot_modified: '2024-05-21T07:00:00.000Z',
+      latest_tagged_snapshot_modified: null,
     };
     http.get.mockReturnValue(of(response));
 

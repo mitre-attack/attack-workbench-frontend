@@ -15,7 +15,7 @@ import type {
   Composition,
   CreateReleaseTrackPayload,
   DraftCleanupResult,
-  DraftRetention,
+  CreateVirtualSnapshotPayload,
   ExportFormatType,
   PromoteQuarantinePayload,
   ReleasePayload,
@@ -26,6 +26,7 @@ import type {
   ReleaseTrackSnapshotOptions,
   ReviewPayload,
   SnapshotHistoryOptions,
+  SnapshotHistoryResponse,
   SnapshotSchedule,
   StixBundlePayload,
   StixObjectRef,
@@ -45,6 +46,7 @@ export type {
   ReleaseTrackSnapshotOptions,
   ReviewPayload,
   SnapshotHistoryOptions,
+  SnapshotHistoryResponse,
   StixBundlePayload,
   StixObjectRef,
   UpdateMetadataPayload,
@@ -225,7 +227,7 @@ export class ReleaseTracksConnectorService extends ApiConnector {
   public listSnapshots(
     id: string,
     options: SnapshotHistoryOptions = {}
-  ): Observable<Paginated<ReleaseTrackSnapshotHistoryItem>> {
+  ): Observable<SnapshotHistoryResponse> {
     const params = this.buildHttpParams({
       limit: 200,
       offset: 0,
@@ -233,16 +235,14 @@ export class ReleaseTracksConnectorService extends ApiConnector {
     });
     const url = `${this.apiUrl}/release-tracks/${id}/snapshots`;
     return this.http
-      .get<Paginated<ReleaseTrackSnapshotHistoryItem>>(url, {
+      .get<SnapshotHistoryResponse>(url, {
         params,
       })
       .pipe(
         tap(result =>
           logger.log(`retrieved snapshots for track ${id}`, result)
         ),
-        catchError(
-          this.handleError_raise<Paginated<ReleaseTrackSnapshotHistoryItem>>()
-        ),
+        catchError(this.handleError_raise<SnapshotHistoryResponse>()),
         share()
       );
   }
@@ -555,7 +555,7 @@ export class ReleaseTracksConnectorService extends ApiConnector {
    */
   public createVirtualSnapshot(
     id: string,
-    body?: { description?: string }
+    body?: CreateVirtualSnapshotPayload
   ): Observable<any> {
     const url = `${this.apiUrl}/release-tracks/${id}/virtual/snapshots/create`;
     return this.http.post(url, body || {}).pipe(
@@ -845,23 +845,6 @@ export class ReleaseTracksConnectorService extends ApiConnector {
       catchError(this.handleError_raise()),
       share()
     );
-  }
-
-  public updateDraftRetention(
-    id: string,
-    maxDrafts: number | null
-  ): Observable<{ draft_retention: DraftRetention }> {
-    const url = `${this.apiUrl}/release-tracks/${id}/virtual/draft-retention`;
-    return this.http
-      .put<{ draft_retention: DraftRetention }>(url, {
-        max_drafts: maxDrafts,
-      })
-      .pipe(
-        catchError(
-          this.handleError_raise<{ draft_retention: DraftRetention }>(false)
-        ),
-        share()
-      );
   }
 
   public listDraftCleanup(

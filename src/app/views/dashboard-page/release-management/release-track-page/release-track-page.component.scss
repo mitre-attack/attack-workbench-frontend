@@ -542,6 +542,7 @@ $released-members-disabled-dark: colors.on-color-deemphasis(dark);
     margin: 24px auto 0;
     padding-left: 72px;
     font-size: 13px;
+    font-variant-numeric: tabular-nums;
     line-height: 18px;
 
     .dark & {
@@ -2163,8 +2164,18 @@ $released-members-disabled-dark: colors.on-color-deemphasis(dark);
   margin: 1rem 0;
 }
 
-.draft-retention-card {
-  margin-bottom: 1rem;
+.history-controls {
+  justify-content: center;
+}
+
+.cleanup-notification {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+
+  button {
+    flex-shrink: 0;
+  }
 }
 
 .draft-lifecycle-message,

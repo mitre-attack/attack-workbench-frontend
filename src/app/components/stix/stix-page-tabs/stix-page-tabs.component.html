@@ -1,4 +1,8 @@
-<mat-tab-group dynamicHeight mat-stretch-tabs class="stix-page-tabs">
+<mat-tab-group
+  dynamicHeight
+  mat-stretch-tabs
+  class="stix-page-tabs"
+  (selectedIndexChange)="selectedIndexChange.emit($event)">
   <mat-tab>
     <ng-template mat-tab-label>
       <span class="nav-tab-label">{{ detailsLabel | uppercase }}</span>

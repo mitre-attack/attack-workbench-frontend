@@ -276,17 +276,51 @@
 
       <mat-divider style="margin: 12px 0"></mat-divider>
 
-      <section *ngIf="canConfigureRetention" class="section-block stack">
-        <div class="section-title">Draft retention</div>
+      <div class="section-block stack">
+        <div class="section-title">Snapshot Schedule</div>
+        <div class="section-sub">
+          Configure automatic snapshot scheduling for this virtual track
+        </div>
+      </div>
+
+      <div formGroupName="snapshotSchedule" class="snapshot-schedule">
+        <mat-form-field appearance="outline">
+          <mat-label>Mode</mat-label>
+          <mat-select formControlName="mode">
+            <mat-option *ngFor="let opt of snapshotModeOptions" [value]="opt">{{
+              opt === 'cron' ? 'Recurring' : formatOption(opt)
+            }}</mat-option>
+          </mat-select>
+          <mat-hint>Select mode for snapshot scheduling</mat-hint>
+        </mat-form-field>
+
+        <mat-form-field
+          appearance="outline"
+          *ngIf="form.get('snapshotSchedule.mode')?.value === 'cron'">
+          <mat-label>Cron Expression</mat-label>
+          <input
+            matInput
+            formControlName="cron"
+            placeholder="e.g., 0 0 1 1,7 *" />
+          <mat-hint>Cron expression (UTC) used when mode is 'cron'</mat-hint>
+        </mat-form-field>
+      </div>
+      <section
+        *ngIf="
+          canConfigureRetention &&
+          form.get('snapshotSchedule.mode')?.value === 'cron'
+        "
+        class="section-block stack">
+        <div class="section-title">Recurring draft retention</div>
         <mat-slide-toggle formControlName="retentionEnabled">
           Limit retained drafts
         </mat-slide-toggle>
         <p class="section-sub">
-          Disabled by default (unlimited). When enabled, all draft history
-          counts, including manual notes and quarantine choices. Older eligible
-          drafts and their notes are permanently deleted after new drafts are
-          created. Tagged releases are always preserved; protected drafts may
-          exceed the limit.
+          Disabled by default (unlimited). Applies only after recurring
+          scheduled snapshots, not initial creation or manual drafts. Counts all
+          draft history across the track. Older eligible drafts and their notes
+          are permanently deleted. Tagged releases and protected drafts are
+          preserved; protected drafts may exceed the limit.
         </p>
         <mat-form-field
           *ngIf="form.get('retentionEnabled')?.value"
@@ -306,36 +340,6 @@
           Enter a positive safe whole number.
         </p>
       </section>
-
-      <div class="section-block stack">
-        <div class="section-title">Snapshot Schedule</div>
-        <div class="section-sub">
-          Configure automatic snapshot scheduling for this virtual track
-        </div>
-      </div>
-
-      <div formGroupName="snapshotSchedule" class="snapshot-schedule">
-        <mat-form-field appearance="outline">
-          <mat-label>Mode</mat-label>
-          <mat-select formControlName="mode">
-            <mat-option *ngFor="let opt of snapshotModeOptions" [value]="opt">{{
-              formatOption(opt)
-            }}</mat-option>
-          </mat-select>
-          <mat-hint>Select mode for snapshot scheduling</mat-hint>
-        </mat-form-field>
-
-        <mat-form-field
-          appearance="outline"
-          *ngIf="form.get('snapshotSchedule.mode')?.value === 'cron'">
-          <mat-label>Cron Expression</mat-label>
-          <input
-            matInput
-            formControlName="cron"
-            placeholder="e.g., 0 0 1 1,7 *" />
-          <mat-hint>Cron expression (UTC) used when mode is 'cron'</mat-hint>
-        </mat-form-field>
-      </div>
     </div>
   </form>
 
