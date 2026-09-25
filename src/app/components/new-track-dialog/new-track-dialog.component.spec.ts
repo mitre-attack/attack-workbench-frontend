@@ -6,6 +6,7 @@ import { of } from 'rxjs';
 
 import { NewTrackDialogComponent } from './new-track-dialog.component';
 import { ReleaseTracksConnectorService } from 'src/app/services/connectors/rest-api/release-tracks.service';
+import { AuthenticationService } from 'src/app/services/connectors/authentication/authentication.service';
 import {
   DeduplicationStrategy,
   ReleaseTrackType,
@@ -66,6 +67,10 @@ describe('NewTrackDialogComponent', () => {
           useValue: { type: ReleaseTrackType.Virtual },
         },
         { provide: ReleaseTracksConnectorService, useValue: mockConnector },
+        {
+          provide: AuthenticationService,
+          useValue: { isAuthorized: vi.fn(() => true) },
+        },
       ],
       schemas: [NO_ERRORS_SCHEMA],
     }).compileComponents();
@@ -73,6 +78,59 @@ describe('NewTrackDialogComponent', () => {
     fixture = TestBed.createComponent(NewTrackDialogComponent);
     component = fixture.componentInstance;
     component.ngOnInit();
+  });
+
+  it('rejects unsafe draft limits before creating a retained virtual track', () => {
+    component.form.patchValue({
+      name: 'Retained virtual track',
+      retentionEnabled: true,
+      snapshotSchedule: { mode: SnapshotScheduleMode.Cron, cron: '0 * * * *' },
+    });
+    component.toggleComponentTrack(component.componentTrackOptions[0], true);
+    for (const maxDrafts of [0, -1, 1.5, Number.MAX_SAFE_INTEGER + 1]) {
+      component.form.patchValue({ maxDrafts });
+      component.handleCreate();
+    }
+    expect(mockConnector.createReleaseTrack).not.toHaveBeenCalled();
+
+    component.form.patchValue({ maxDrafts: 1 });
+    component.handleCreate();
+    expect(
+      mockConnector.createReleaseTrack.mock.calls[0][0].snapshot_schedule
+        .draft_retention
+    ).toEqual({ max_drafts: 1 });
+  });
+
+  it('does not submit destructive retention settings for non-administrators', () => {
+    component.form.patchValue({
+      name: 'Unretained virtual track',
+      retentionEnabled: true,
+      maxDrafts: 10,
+      snapshotSchedule: { mode: SnapshotScheduleMode.Cron, cron: '0 * * * *' },
+    });
+    component.toggleComponentTrack(component.componentTrackOptions[0], true);
+    vi.mocked(
+      TestBed.inject(AuthenticationService).isAuthorized
+    ).mockReturnValue(false);
+    component.handleCreate();
+    expect(
+      mockConnector.createReleaseTrack.mock.calls[0][0].snapshot_schedule
+        .draft_retention
+    ).toBeUndefined();
+  });
+
+  it('drops recurring retention when creating a manual track', () => {
+    component.form.patchValue({
+      name: 'Manual virtual track',
+      retentionEnabled: true,
+      maxDrafts: 0,
+      snapshotSchedule: { mode: SnapshotScheduleMode.Manual },
+    });
+    component.toggleComponentTrack(component.componentTrackOptions[0], true);
+    component.handleCreate();
+    const payload = mockConnector.createReleaseTrack.mock.calls[0][0];
+    expect(payload.snapshot_schedule).toEqual({ mode: 'manual' });
+    expect(payload.draft_retention).toBeUndefined();
   });
 
   it('should list standard tracks even when they have no tagged snapshots', () => {

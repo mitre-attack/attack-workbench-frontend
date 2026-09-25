@@ -288,7 +288,7 @@
           <mat-label>Mode</mat-label>
           <mat-select formControlName="mode">
             <mat-option *ngFor="let opt of snapshotModeOptions" [value]="opt">{{
-              formatOption(opt)
+              opt === 'cron' ? 'Recurring' : formatOption(opt)
             }}</mat-option>
           </mat-select>
           <mat-hint>Select mode for snapshot scheduling</mat-hint>
@@ -305,6 +305,41 @@
           <mat-hint>Cron expression (UTC) used when mode is 'cron'</mat-hint>
         </mat-form-field>
       </div>
+      <section
+        *ngIf="
+          canConfigureRetention &&
+          form.get('snapshotSchedule.mode')?.value === 'cron'
+        "
+        class="section-block stack">
+        <div class="section-title">Recurring draft retention</div>
+        <mat-slide-toggle formControlName="retentionEnabled">
+          Limit retained drafts
+        </mat-slide-toggle>
+        <p class="section-sub">
+          Disabled by default (unlimited). Applies only after recurring
+          scheduled snapshots, not initial creation or manual drafts. Counts all
+          draft history across the track. Older eligible drafts and their notes
+          are permanently deleted. Tagged releases and protected drafts are
+          preserved; protected drafts may exceed the limit.
+        </p>
+        <mat-form-field
+          *ngIf="form.get('retentionEnabled')?.value"
+          appearance="outline">
+          <mat-label>Maximum retained drafts</mat-label>
+          <input
+            matInput
+            type="number"
+            min="1"
+            step="1"
+            formControlName="maxDrafts" />
+          <mat-hint
+            >Positive whole number; suggested starting limit: 10.</mat-hint
+          >
+        </mat-form-field>
+        <p *ngIf="!isRetentionValid" role="alert">
+          Enter a positive safe whole number.
+        </p>
+      </section>
     </div>
   </form>
 

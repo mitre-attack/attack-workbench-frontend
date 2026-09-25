@@ -6,7 +6,11 @@ import {
   type ExportFormatType,
   type ReleasePreviewFormatType,
 } from './enums';
-import type { SnapshotSchedule } from './release-track';
+import type {
+  DraftRetention,
+  DraftSquashPreview,
+  SnapshotSchedule,
+} from './release-track';
 import type { SnapshotCreationCause } from './snapshot-creation-cause';
 import type { SnapshotCreationActor } from './snapshot-creation-actor';
 
@@ -20,6 +24,11 @@ export interface CreateReleaseTrackPayload {
   config?: ReleaseTrackConfig;
   composition?: Composition;
   snapshot_schedule?: SnapshotSchedule;
+}
+
+export interface CreateVirtualSnapshotPayload {
+  description?: string;
+  draft_retention?: DraftRetention | null;
 }
 
 export interface StixBundlePayload {
@@ -43,7 +52,11 @@ export type ReleasePayload = (
   | { increment: 'major' | 'minor'; version?: never }
   | { increment?: never; version: string }
   | { increment?: undefined; version?: undefined }
-) & { description?: string };
+) & {
+  description?: string;
+  squash_drafts?: boolean;
+  squash_fingerprint?: string;
+};
 
 export interface RetagReleasePayload {
   version: string;
@@ -75,6 +88,22 @@ export interface SnapshotHistoryOptions {
   tagged?: boolean;
   limit?: number;
   offset?: number;
+}
+
+/** Counts cover the selected tagged filter before pagination. */
+export interface SnapshotHistoryCounts {
+  tagged: number;
+  drafts: number;
+  total: number;
+}
+
+export interface SnapshotHistoryResponse {
+  data: ReleaseTrackSnapshotHistoryItem[];
+  pagination: { total: number; limit: number; offset: number };
+  counts: SnapshotHistoryCounts;
+  /** Unfiltered live identities, even when neither snapshot is on this page. */
+  latest_snapshot_modified: string | null;
+  latest_tagged_snapshot_modified: string | null;
 }
 
 export interface SnapshotContentStatistics {
@@ -151,6 +180,7 @@ export interface StandardReleasePreviewSummary extends ReleasePreviewSummaryBase
 
 export interface VirtualReleasePreviewSummary extends ReleasePreviewSummaryBase {
   type: ReleaseTrackType.Virtual;
+  draft_squash?: DraftSquashPreview;
   previous_release: {
     version: string;
     modified: string;

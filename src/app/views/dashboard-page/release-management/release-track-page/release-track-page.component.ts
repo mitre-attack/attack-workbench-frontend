@@ -1,13 +1,29 @@
 import { Clipboard } from '@angular/cdk/clipboard';
+import { HttpErrorResponse } from '@angular/common/http';
 import { SelectionModel } from '@angular/cdk/collections';
-import { Component, OnInit } from '@angular/core';
+import {
+  Component,
+  OnDestroy,
+  OnInit,
+  TemplateRef,
+  ViewChild,
+} from '@angular/core';
 import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { ErrorStateMatcher } from '@angular/material/core';
 import { MatDialog } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
+import { PageEvent } from '@angular/material/paginator';
 import { ActivatedRoute, Router } from '@angular/router';
-import { forkJoin, Observable, of } from 'rxjs';
-import { finalize, map, switchMap, take } from 'rxjs/operators';
+import {
+  forkJoin,
+  fromEvent,
+  interval,
+  merge,
+  Observable,
+  of,
+  Subject,
+} from 'rxjs';
+import { finalize, map, switchMap, take, takeUntil, tap } from 'rxjs/operators';
 import {
   ComponentTrack,
   Composition,
@@ -20,6 +36,8 @@ import {
   DeduplicationStrategy,
   DeduplicationStrategyType,
   ExportFormat,
+  DraftCleanupResult,
+  CreateVirtualSnapshotPayload,
   ExportFormatType,
   MemberSyncBehavior,
   MemberSyncBehaviorType,
@@ -39,6 +57,7 @@ import {
   ReleaseTrackType,
   ResolutionStrategy,
   SnapshotScheduleMode,
+  SnapshotHistoryCounts,
   SnapshotCreationCause,
   SnapshotCreationActor,
   SNAPSHOT_CREATION_CAUSE_LABELS,
@@ -66,6 +85,7 @@ import {
 } from 'src/app/components/release-review-dialog/release-review-dialog.component';
 import { ReleaseTrackObjectItem } from 'src/app/components/release-track-object-card/release-track-object-card.component';
 import { SnapshotDescriptionDialogComponent } from 'src/app/components/snapshot-description-dialog/snapshot-description-dialog.component';
+import { CreateDraftDialogComponent } from 'src/app/components/create-draft-dialog/create-draft-dialog.component';
 import { AuthenticationService } from 'src/app/services/connectors/authentication/authentication.service';
 import { ReleaseTracksConnectorService } from 'src/app/services/connectors/rest-api/release-tracks.service';
 import { RestApiConnectorService } from 'src/app/services/connectors/rest-api/rest-api-connector.service';
@@ -271,7 +291,7 @@ const VIRTUAL_MONTH_OPTIONS = [
   templateUrl: './release-track-page.component.html',
   styleUrls: ['./release-track-page.component.scss'],
 })
-export class ReleaseTrackPageComponent implements OnInit {
+export class ReleaseTrackPageComponent implements OnInit, OnDestroy {
   public id = '';
   public releaseTrack: ReleaseTrackSnapshot | null = null;
   public showReleasedMembers = false;
@@ -289,6 +309,37 @@ export class ReleaseTrackPageComponent implements OnInit {
   public isSavingConfig = false;
   public releaseTrackConfig: ReleaseTrackConfig = {};
   public snapshotHistory: SnapshotHistoryViewModel[] = [];
+  public historyFilter: 'releases' | 'drafts' | 'all' = 'all';
+  public historyPageIndex = 0;
+  public readonly historyPageSize = 25;
+  public historyTotal = 0;
+  public historyCounts: SnapshotHistoryCounts = {
+    tagged: 0,
+    drafts: 0,
+    total: 0,
+  };
+  public historyMessage = '';
+  public retentionForm: FormGroup;
+  public draftCleanupResults: DraftCleanupResult[] = [];
+  public cleanupMessage = '';
+  public retryingCleanup = new Set<string>();
+  private historyRequest = 0;
+  private trackRequest = 0;
+  private cleanupRequest = 0;
+  private configRequest = 0;
+  private latestSnapshotModified: string | null = null;
+  private latestTaggedSnapshotModified: string | null = null;
+  private selectedTabIndex = 0;
+  private isLoadingTrack = false;
+  private isLoadingCleanup = false;
+  private boardMutations = 0;
+  private destroyed = false;
+  private readonly destroy$ = new Subject<void>();
+  private readonly cancelRequests$ = new Subject<void>();
+  private readonly cancelHistory$ = new Subject<void>();
+  private announcedCleanup = new Set<string>();
+  @ViewChild('cleanupNotification', { static: true })
+  public cleanupNotification!: TemplateRef<unknown>;
   public configForm: FormGroup;
   private virtualComponentTrackSummaries = new Map<
     string,
@@ -309,7 +360,6 @@ export class ReleaseTrackPageComponent implements OnInit {
       this.virtualConfigComponentTracks
     );
   }
-  private createdDraftSnapshot: ReleaseTrackSnapshotHistoryItem | null = null;
   private updatingSnapshotDescriptionModified = new Set<string>();
   private convertingReleaseModified = new Set<string>();
   private deletingDraftModified = new Set<string>();
@@ -397,6 +447,10 @@ export class ReleaseTrackPageComponent implements OnInit {
     private clipboard: Clipboard,
     private fb: FormBuilder
   ) {
+    this.retentionForm = this.fb.group({
+      enabled: [false],
+      maxDrafts: [10],
+    });
     this.configForm = this.fb.group({
       alias: [
         '',
@@ -434,9 +488,12 @@ export class ReleaseTrackPageComponent implements OnInit {
       virtualScheduleDateMinute: [0],
       virtualComponentTrackSearch: [''],
     });
-    this.configForm.get('autoPromote')?.valueChanges.subscribe(autoPromote => {
-      this.syncCandidacyThresholdControl(!!autoPromote);
-    });
+    this.configForm
+      .get('autoPromote')
+      ?.valueChanges.pipe(takeUntil(this.destroy$))
+      .subscribe(autoPromote => {
+        this.syncCandidacyThresholdControl(!!autoPromote);
+      });
     [
       'virtualCronCadence',
       'virtualCronMinute',
@@ -446,25 +503,127 @@ export class ReleaseTrackPageComponent implements OnInit {
       'virtualCronMonthDay',
       'virtualCronMonths',
     ].forEach(controlName => {
-      this.configForm.get(controlName)?.valueChanges.subscribe(() => {
-        this.virtualCronUsesExistingExpression = false;
-        this.configForm
-          .get('virtualScheduleSearch')
-          ?.reset(null, { emitEvent: false });
-      });
+      this.configForm
+        .get(controlName)
+        ?.valueChanges.pipe(takeUntil(this.destroy$))
+        .subscribe(() => {
+          this.virtualCronUsesExistingExpression = false;
+          this.configForm
+            .get('virtualScheduleSearch')
+            ?.reset(null, { emitEvent: false });
+        });
     });
   }
 
   ngOnInit(): void {
-    this.route.params.subscribe(params => {
-      if (this.id !== params.id) this.showReleasedMembers = false;
+    this.route.params.pipe(takeUntil(this.destroy$)).subscribe(params => {
+      if (this.id !== params.id) {
+        this.cancelRequests$.next();
+        this.cancelHistory$.next();
+        this.showReleasedMembers = false;
+        this.historyFilter = 'all';
+        this.historyPageIndex = 0;
+        this.historyTotal = 0;
+        this.historyCounts = { tagged: 0, drafts: 0, total: 0 };
+        this.latestSnapshotModified = null;
+        this.latestTaggedSnapshotModified = null;
+        this.releaseTrack = null;
+        this.snapshotHistory = [];
+        this.draftCleanupResults = [];
+        this.announcedCleanup.clear();
+        this.snackbar.dismiss();
+        this.historyMessage = '';
+        this.cleanupMessage = '';
+        this.isEditingConfig = false;
+        this.isEditingDescription = false;
+        this.retentionForm.markAsPristine();
+        this.isLoadingTrack = false;
+        this.isSavingDescription = false;
+        ++this.trackRequest;
+        ++this.historyRequest;
+        ++this.cleanupRequest;
+        ++this.configRequest;
+      }
       this.id = params.id;
       if (this.id) {
         this.getReleaseTrack();
-        this.getSnapshotHistory();
         this.getConfig();
       }
     });
+
+    // Poll only lightweight history/cleanup while Releases is visible. Focus,
+    // visibility and tab entry refresh immediately; paused edits resume on a tick.
+    merge(
+      interval(30_000),
+      fromEvent(window, 'focus'),
+      fromEvent(document, 'visibilitychange')
+    )
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(() => this.refreshVisibleHistory());
+  }
+
+  ngOnDestroy(): void {
+    this.destroyed = true;
+    ++this.trackRequest;
+    ++this.historyRequest;
+    ++this.cleanupRequest;
+    ++this.configRequest;
+    this.cancelRequests$.next();
+    this.cancelRequests$.complete();
+    this.cancelHistory$.next();
+    this.cancelHistory$.complete();
+    this.destroy$.next();
+    this.destroy$.complete();
+    this.snackbar.dismiss();
+  }
+
+  public onSelectedTabChange(index: number): void {
+    this.selectedTabIndex = index;
+    if (index === 1) this.refreshVisibleHistory();
+  }
+
+  private get automaticHistoryRefreshPaused(): boolean {
+    return (
+      this.destroyed ||
+      !this.id ||
+      !this.releaseTrack ||
+      this.selectedTabIndex !== 1 ||
+      document.visibilityState !== 'visible' ||
+      this.isEditingConfig ||
+      this.isEditingDescription ||
+      this.dialog.openDialogs.length > 0 ||
+      this.isLoadingTrack ||
+      this.isLoadingConfig ||
+      this.isCreatingDraft ||
+      this.isReleasing ||
+      this.isDeleting ||
+      this.isSavingConfig ||
+      this.isSavingDescription ||
+      this.boardMutations > 0 ||
+      this.retryingCleanup.size > 0 ||
+      this.updatingSnapshotDescriptionModified.size > 0 ||
+      this.convertingReleaseModified.size > 0 ||
+      this.deletingDraftModified.size > 0 ||
+      this.retaggingReleaseModified.size > 0
+    );
+  }
+
+  private refreshVisibleHistory(): void {
+    if (
+      this.automaticHistoryRefreshPaused ||
+      this.isLoadingSnapshotHistory ||
+      this.isLoadingCleanup
+    )
+      return;
+    this.getSnapshotHistory(true);
+    this.loadDraftCleanup(true);
+  }
+
+  public trackSnapshotHistory(
+    _index: number,
+    item: SnapshotHistoryViewModel
+  ): string | null {
+    return item.modified;
   }
 
   public get releaseTrackName(): string {
@@ -530,16 +689,6 @@ export class ReleaseTrackPageComponent implements OnInit {
 
   public get virtualSnapshotSchedule(): any {
     return (this.releaseTrack as any)?.snapshot_schedule || {};
-  }
-
-  public get hasCurrentDraftSnapshot(): boolean {
-    return this.snapshotHistory.some((item, index) =>
-      this.isCurrentDraftHistoryItem(item, index)
-    );
-  }
-
-  public get taggedSnapshotCount(): number {
-    return this.snapshotHistory.filter(item => item.isTagged).length;
   }
 
   public get resolvedComponentSnapshots(): any[] {
@@ -725,20 +874,6 @@ export class ReleaseTrackPageComponent implements OnInit {
     );
   }
 
-  private isCurrentDraftHistoryItem(
-    item: SnapshotHistoryViewModel,
-    index: number
-  ): boolean {
-    return (
-      !item.isTagged &&
-      (typeof item.isCurrentDraft === 'boolean'
-        ? item.isCurrentDraft
-        : typeof item.isLatest === 'boolean'
-          ? item.isLatest
-          : index === 0)
-    );
-  }
-
   public get canEditReleaseTrack(): boolean {
     return this.authenticationService.canEdit();
   }
@@ -747,36 +882,180 @@ export class ReleaseTrackPageComponent implements OnInit {
     return this.authenticationService.canDelete();
   }
 
+  public get canManageDraftLifecycle(): boolean {
+    return this.authenticationService.isAuthorized([Role.ADMIN]);
+  }
+
+  public get isRetentionValid(): boolean {
+    const value = this.retentionForm.getRawValue();
+    return (
+      !value.enabled ||
+      (Number.isSafeInteger(value.maxDrafts) && value.maxDrafts > 0)
+    );
+  }
+
+  public loadDraftCleanup(background = false): void {
+    if (this.destroyed || !this.isVirtualReleaseTrack) return;
+    const request = ++this.cleanupRequest;
+    this.isLoadingCleanup = true;
+    this.connector
+      .listDraftCleanup(this.id)
+      .pipe(
+        take(1),
+        takeUntil(this.cancelRequests$),
+        finalize(() => {
+          if (request === this.cleanupRequest) this.isLoadingCleanup = false;
+        })
+      )
+      .subscribe({
+        next: result => {
+          if (
+            request !== this.cleanupRequest ||
+            (background && this.automaticHistoryRefreshPaused)
+          )
+            return;
+          this.cleanupMessage = '';
+          this.draftCleanupResults = [];
+          result.data.forEach(operation => this.captureDraftCleanup(operation));
+        },
+        error: () => {
+          if (
+            request !== this.cleanupRequest ||
+            (background && this.automaticHistoryRefreshPaused)
+          )
+            return;
+          this.cleanupMessage =
+            'Unable to load recent cleanup operations. Automatic refresh will retry.';
+        },
+      });
+  }
+
+  public retryDraftCleanup(operation: DraftCleanupResult): void {
+    if (
+      !this.canManageDraftLifecycle ||
+      this.retryingCleanup.has(operation.operation_id)
+    )
+      return;
+    this.retryingCleanup.add(operation.operation_id);
+    this.connector
+      .retryDraftCleanup(this.id, operation.operation_id)
+      .pipe(
+        take(1),
+        takeUntil(this.cancelRequests$),
+        finalize(() => {
+          this.retryingCleanup.delete(operation.operation_id);
+        })
+      )
+      .subscribe({
+        next: result => {
+          this.captureDraftCleanup(result);
+          this.getReleaseTrack();
+        },
+        error: err => {
+          this.cleanupMessage =
+            err?.error?.message ||
+            'Cleanup repair failed. The release is not re-tagged. Refresh to check the existing operation.';
+          this.getReleaseTrack();
+        },
+      });
+  }
+
+  private captureDraftCleanup(result?: DraftCleanupResult): void {
+    if (!result) return;
+    this.draftCleanupResults = this.draftCleanupResults.filter(
+      item => item.operation_id !== result.operation_id
+    );
+    if (result.status !== 'completed') {
+      this.draftCleanupResults.unshift(result);
+      this.cleanupMessage = result.release_committed
+        ? 'Release committed, but draft cleanup is incomplete. Use Retry cleanup; do not tag the release again.'
+        : 'The snapshot operation has deferred draft cleanup. Use Retry cleanup to repair the existing operation.';
+    } else {
+      if (!this.draftCleanupResults.length) this.cleanupMessage = '';
+      if (!this.announcedCleanup.has(result.operation_id)) {
+        this.announcedCleanup.add(result.operation_id);
+        this.snackbar.openFromTemplate(this.cleanupNotification, {
+          data: result,
+          verticalPosition: 'top',
+          horizontalPosition: 'center',
+          announcementMessage: `Draft cleanup completed. ${result.deleted_count} drafts deleted. Tagged releases preserved.`,
+        });
+      }
+    }
+  }
+
+  public dismissCleanupNotification(): void {
+    this.snackbar.dismiss();
+  }
+
+  public onHistoryFilterChange(filter: 'releases' | 'drafts' | 'all'): void {
+    this.historyFilter = filter;
+    this.historyPageIndex = 0;
+    this.snapshotHistory = [];
+    this.historyCounts = { tagged: 0, drafts: 0, total: 0 };
+    this.historyTotal = 0;
+    this.historyMessage = '';
+    this.getSnapshotHistory();
+  }
+
+  public onHistoryPageChange(event: PageEvent): void {
+    this.historyPageIndex = event.pageIndex;
+    this.getSnapshotHistory();
+  }
+
+  private showSnapshotError(err: HttpErrorResponse, fallback: string): void {
+    this.historyMessage =
+      err?.status === 404
+        ? 'This draft may have been removed by retention or release-time cleanup. History will refresh automatically.'
+        : err?.error?.message || fallback;
+    this.snackbar.open(this.historyMessage, 'Dismiss', { duration: 10000 });
+  }
+
   public getReleaseTrack(): void {
+    if (this.destroyed || !this.id) return;
+    const request = ++this.trackRequest;
+    this.cancelHistory$.next();
+    ++this.historyRequest;
+    this.isLoadingTrack = true;
     this.connector
       .getLatestSnapshot(this.id, {
         format: ExportFormat.Workbench,
         include: 'all',
       })
-      .pipe(take(1))
+      .pipe(take(1), takeUntil(this.cancelRequests$))
       .subscribe({
         next: res => {
+          if (request !== this.trackRequest) return;
           if (res) {
             this.setReleaseTrack(res);
           } else {
-            this.loadReleaseTrackSummary();
+            this.loadReleaseTrackSummary(request);
+            return;
           }
 
-          // this.loadCandidates();
+          this.isLoadingTrack = false;
+        },
+        error: () => {
+          if (request === this.trackRequest) this.isLoadingTrack = false;
         },
       });
   }
 
-  private loadReleaseTrackSummary(): void {
+  private loadReleaseTrackSummary(request: number): void {
     this.connector
       .listReleaseTracks()
-      .pipe(take(1))
+      .pipe(take(1), takeUntil(this.cancelRequests$))
       .subscribe({
         next: result => {
+          if (request !== this.trackRequest) return;
           const track = this.getReleaseTrackList(result).find(
             item => this.getReleaseTrackId(item) === this.id
           );
           if (track) this.setReleaseTrack(track);
+          this.isLoadingTrack = false;
+        },
+        error: () => {
+          if (request === this.trackRequest) this.isLoadingTrack = false;
         },
       });
   }
@@ -789,6 +1068,17 @@ export class ReleaseTrackPageComponent implements OnInit {
     if (this.releaseTrack.id && this.releaseTrack.id !== this.id) {
       this.id = this.releaseTrack.id;
     }
+    this.latestSnapshotModified =
+      this.toIsoString(this.releaseTrack.modified) ?? null;
+    this.latestTaggedSnapshotModified = (
+      this.releaseTrack.version_history ?? []
+    ).reduce<string | null>(
+      (latest, entry) => {
+        const modified = this.toIsoString(entry.snapshot_id);
+        return modified && (!latest || modified > latest) ? modified : latest;
+      },
+      this.releaseTrack.version ? this.latestSnapshotModified : null
+    );
     this.syncAliasControl();
     this.hydrateDynamicEntryDates();
 
@@ -805,6 +1095,7 @@ export class ReleaseTrackPageComponent implements OnInit {
 
     if (this.isVirtualReleaseTrack) {
       this.loadVirtualComponentTrackSummaries();
+      this.loadDraftCleanup();
     } else {
       this.virtualComponentTrackSummaries.clear();
     }
@@ -816,10 +1107,6 @@ export class ReleaseTrackPageComponent implements OnInit {
         this.setConfig(this.releaseTrack.config);
       }
     }
-  }
-
-  private refreshReleaseTrackState(): void {
-    this.getReleaseTrack();
     this.getSnapshotHistory();
   }
 
@@ -840,7 +1127,7 @@ export class ReleaseTrackPageComponent implements OnInit {
         )
       )
     )
-      .pipe(take(1))
+      .pipe(take(1), takeUntil(this.cancelRequests$))
       .subscribe(results => {
         results.forEach(({ entry, modified }) => {
           if (modified) {
@@ -893,7 +1180,7 @@ export class ReleaseTrackPageComponent implements OnInit {
 
     prompt
       .afterClosed()
-      .pipe(take(1))
+      .pipe(take(1), takeUntil(this.cancelRequests$))
       .subscribe(confirm => {
         if (!confirm) return;
 
@@ -902,6 +1189,7 @@ export class ReleaseTrackPageComponent implements OnInit {
           .deleteReleaseTrack(this.id)
           .pipe(
             take(1),
+            takeUntil(this.cancelRequests$),
             finalize(() => {
               this.isDeleting = false;
             })
@@ -947,7 +1235,7 @@ export class ReleaseTrackPageComponent implements OnInit {
 
     prompt
       .afterClosed()
-      .pipe(take(1))
+      .pipe(take(1), takeUntil(this.cancelRequests$))
       .subscribe(version => {
         if (!version || version === currentVersion) return;
 
@@ -956,6 +1244,7 @@ export class ReleaseTrackPageComponent implements OnInit {
           .retagRelease(this.id, modified, { version })
           .pipe(
             take(1),
+            takeUntil(this.cancelRequests$),
             finalize(() => this.retaggingReleaseModified.delete(modified))
           )
           .subscribe({
@@ -965,7 +1254,7 @@ export class ReleaseTrackPageComponent implements OnInit {
                 null,
                 { duration: 5000 }
               );
-              this.refreshReleaseTrackState();
+              this.getReleaseTrack();
             },
             error: err =>
               console.error('Failed to change release version', err),
@@ -1003,7 +1292,7 @@ export class ReleaseTrackPageComponent implements OnInit {
         },
       })
       .afterClosed()
-      .pipe(take(1))
+      .pipe(take(1), takeUntil(this.cancelRequests$))
       .subscribe(confirm => {
         if (!confirm) return;
         this.convertingReleaseModified.add(modified);
@@ -1011,6 +1300,7 @@ export class ReleaseTrackPageComponent implements OnInit {
           .convertReleaseToDraft(this.id, modified, version)
           .pipe(
             take(1),
+            takeUntil(this.cancelRequests$),
             finalize(() => this.convertingReleaseModified.delete(modified))
           )
           .subscribe({
@@ -1020,7 +1310,7 @@ export class ReleaseTrackPageComponent implements OnInit {
                 null,
                 { duration: 5000 }
               );
-              this.refreshReleaseTrackState();
+              this.getReleaseTrack();
             },
             error: err =>
               this.showSnapshotOperationError(
@@ -1059,7 +1349,7 @@ export class ReleaseTrackPageComponent implements OnInit {
         },
       })
       .afterClosed()
-      .pipe(take(1))
+      .pipe(take(1), takeUntil(this.cancelRequests$))
       .subscribe(confirm => {
         if (!confirm) return;
         this.deletingDraftModified.add(modified);
@@ -1067,6 +1357,7 @@ export class ReleaseTrackPageComponent implements OnInit {
           .deleteSnapshotByModified(this.id, modified)
           .pipe(
             take(1),
+            takeUntil(this.cancelRequests$),
             finalize(() => this.deletingDraftModified.delete(modified))
           )
           .subscribe({
@@ -1074,7 +1365,7 @@ export class ReleaseTrackPageComponent implements OnInit {
               this.snackbar.open('Draft snapshot deleted.', null, {
                 duration: 5000,
               });
-              this.refreshReleaseTrackState();
+              this.getReleaseTrack();
             },
             error: err =>
               this.showSnapshotOperationError(err, 'delete this draft'),
@@ -1083,6 +1374,10 @@ export class ReleaseTrackPageComponent implements OnInit {
   }
 
   private showSnapshotOperationError(err: any, operation: string): void {
+    if (err?.status === 404) {
+      this.showSnapshotError(err, `Unable to ${operation}.`);
+      return;
+    }
     const dependents = err?.error?.dependent_snapshots;
     this.snackbar.open(
       Array.isArray(dependents) && dependents.length
@@ -1093,45 +1388,105 @@ export class ReleaseTrackPageComponent implements OnInit {
     );
   }
 
-  public getSnapshotHistory(): void {
-    if (!this.id) return;
-
+  public getSnapshotHistory(background = false): void {
+    if (!this.id || this.destroyed) return;
+    this.cancelHistory$.next();
+    const request = ++this.historyRequest;
+    const virtual = this.isVirtualReleaseTrack;
+    const options = virtual
+      ? {
+          tagged:
+            this.historyFilter === 'all'
+              ? undefined
+              : this.historyFilter === 'releases',
+          limit: this.historyPageSize,
+          offset: this.historyPageIndex * this.historyPageSize,
+        }
+      : {};
     this.isLoadingSnapshotHistory = true;
-    this.connector
-      .listSnapshots(this.id)
+    const history = virtual
+      ? this.connector.listSnapshots(this.id, options)
+      : this.connector.listSnapshots(this.id);
+    history
       .pipe(
         take(1),
+        takeUntil(this.cancelHistory$),
+        takeUntil(this.cancelRequests$),
         finalize(() => {
-          this.isLoadingSnapshotHistory = false;
+          if (request === this.historyRequest)
+            this.isLoadingSnapshotHistory = false;
         })
       )
       .subscribe({
         next: result => {
-          const snapshots = Array.isArray(result) ? result : result?.data || [];
-          this.snapshotHistory = this.buildSnapshotHistory(
-            this.withCreatedDraftSnapshot(snapshots)
-          );
+          if (
+            request !== this.historyRequest ||
+            (background && this.automaticHistoryRefreshPaused)
+          )
+            return;
+          this.historyMessage = '';
+          this.latestSnapshotModified = result.latest_snapshot_modified;
+          this.latestTaggedSnapshotModified =
+            result.latest_tagged_snapshot_modified;
+          this.historyTotal = result.pagination.total;
+          if (virtual) {
+            this.historyCounts = result.counts;
+            const lastPage = Math.max(
+              0,
+              Math.ceil(this.historyTotal / this.historyPageSize) - 1
+            );
+            if (this.historyPageIndex > lastPage) {
+              this.historyPageIndex = lastPage;
+              this.getSnapshotHistory(background);
+              return;
+            }
+          }
+          this.snapshotHistory = this.buildSnapshotHistory(result.data);
+          if (!virtual) {
+            // Standard history intentionally hides retained rollback-source drafts.
+            const tagged = this.snapshotHistory.filter(
+              item => item.isTagged
+            ).length;
+            const total = this.snapshotHistory.length;
+            this.historyCounts = { tagged, drafts: total - tagged, total };
+          }
         },
         error: err => {
-          console.error('Failed to load release track snapshot history', err);
+          if (
+            request !== this.historyRequest ||
+            (background && this.automaticHistoryRefreshPaused)
+          )
+            return;
+          if (background) {
+            this.historyMessage =
+              'Unable to load snapshot history. Automatic refresh will retry.';
+          } else {
+            this.showSnapshotError(
+              err,
+              'Unable to load snapshot history. Automatic refresh will retry.'
+            );
+          }
         },
       });
   }
 
   public getConfig(): void {
-    if (!this.id) return;
+    if (!this.id || this.destroyed) return;
+    const request = ++this.configRequest;
 
     this.isLoadingConfig = true;
     this.connector
       .getConfig(this.id)
       .pipe(
         take(1),
+        takeUntil(this.cancelRequests$),
         finalize(() => {
-          this.isLoadingConfig = false;
+          if (request === this.configRequest) this.isLoadingConfig = false;
         })
       )
       .subscribe({
         next: config => {
+          if (request !== this.configRequest) return;
           if (!this.isEditingConfig) {
             if (this.isVirtualReleaseTrack) {
               this.setVirtualConfig();
@@ -1201,24 +1556,35 @@ export class ReleaseTrackPageComponent implements OnInit {
       maxHeight: '85vh',
     });
 
-    dialogRef.afterClosed().subscribe({
-      next: result => {
-        if (!result || !selection.selected.length) return;
+    dialogRef
+      .afterClosed()
+      .pipe(take(1), takeUntil(this.cancelRequests$))
+      .subscribe({
+        next: result => {
+          if (!result || !selection.selected.length) return;
 
-        const objectRefs = selection.selected.map(
-          id => selectedObjectRefs.get(id) || id
-        );
+          const objectRefs = selection.selected.map(
+            id => selectedObjectRefs.get(id) || id
+          );
 
-        this.connector.addCandidates(this.id, objectRefs).subscribe({
-          next: () => {
-            this.refreshReleaseTrackState();
-          },
-          error: err => {
-            console.error('Failed to add candidates', err);
-          },
-        });
-      },
-    });
+          ++this.boardMutations;
+          this.connector
+            .addCandidates(this.id, objectRefs)
+            .pipe(
+              take(1),
+              takeUntil(this.cancelRequests$),
+              finalize(() => --this.boardMutations)
+            )
+            .subscribe({
+              next: () => {
+                this.getReleaseTrack();
+              },
+              error: err => {
+                console.error('Failed to add candidates', err);
+              },
+            });
+        },
+      });
   }
 
   public getViewUrl(stixId: string): string | null {
@@ -1229,15 +1595,22 @@ export class ReleaseTrackPageComponent implements OnInit {
 
   public promote(objectIds: string[]): void {
     if (!objectIds.length) return;
-    const sub = this.connector.promoteCandidates(this.id, objectIds).subscribe({
-      next: () => {
-        this.refreshReleaseTrackState();
-      },
-      error: err => {
-        console.error('Failed to promote candidates', err);
-      },
-      complete: () => sub.unsubscribe(),
-    });
+    ++this.boardMutations;
+    this.connector
+      .promoteCandidates(this.id, objectIds)
+      .pipe(
+        take(1),
+        takeUntil(this.cancelRequests$),
+        finalize(() => --this.boardMutations)
+      )
+      .subscribe({
+        next: () => {
+          this.getReleaseTrack();
+        },
+        error: err => {
+          console.error('Failed to promote candidates', err);
+        },
+      });
   }
 
   public onPromoteAll(): void {
@@ -1255,15 +1628,22 @@ export class ReleaseTrackPageComponent implements OnInit {
 
   public demote(objectRefs: StixObjectRef[]): void {
     if (!objectRefs.length) return;
-    const sub = this.connector.demoteStaged(this.id, objectRefs).subscribe({
-      next: () => {
-        this.refreshReleaseTrackState();
-      },
-      error: err => {
-        console.error('Failed to demote staged objects', err);
-      },
-      complete: () => sub.unsubscribe(),
-    });
+    ++this.boardMutations;
+    this.connector
+      .demoteStaged(this.id, objectRefs)
+      .pipe(
+        take(1),
+        takeUntil(this.cancelRequests$),
+        finalize(() => --this.boardMutations)
+      )
+      .subscribe({
+        next: () => {
+          this.getReleaseTrack();
+        },
+        error: err => {
+          console.error('Failed to demote staged objects', err);
+        },
+      });
   }
 
   public onDemoteAll(): void {
@@ -1332,36 +1712,38 @@ export class ReleaseTrackPageComponent implements OnInit {
         : this.findMemberEntry(item.object_ref);
     const relationshipAddedAfter =
       this.getDiffObjectModified(relationshipBaseline);
-    diff.pipe(take(1)).subscribe(({ current, prior, expectedBaseline }) => {
-      if (!current) {
-        this.snackbar.open(
-          'Unable to load the current object version.',
-          undefined,
-          {
-            duration: 3000,
-          }
-        );
-        return;
-      }
+    diff
+      .pipe(take(1), takeUntil(this.cancelRequests$))
+      .subscribe(({ current, prior, expectedBaseline }) => {
+        if (!current) {
+          this.snackbar.open(
+            'Unable to load the current object version.',
+            undefined,
+            {
+              duration: 3000,
+            }
+          );
+          return;
+        }
 
-      if (expectedBaseline && !prior) {
-        this.snackbar.open(
-          'Unable to load the comparison baseline version.',
-          undefined,
-          {
-            duration: 3000,
-          }
-        );
-        return;
-      }
+        if (expectedBaseline && !prior) {
+          this.snackbar.open(
+            'Unable to load the comparison baseline version.',
+            undefined,
+            {
+              duration: 3000,
+            }
+          );
+          return;
+        }
 
-      this.openDiffDialog(
-        current,
-        prior,
-        tier === 'staged' ? this.getDiffObjectModified(item) : undefined,
-        relationshipAddedAfter
-      );
-    });
+        this.openDiffDialog(
+          current,
+          prior,
+          tier === 'staged' ? this.getDiffObjectModified(item) : undefined,
+          relationshipAddedAfter
+        );
+      });
   }
 
   public onReviewAndApprove(item: any): void {
@@ -1394,7 +1776,7 @@ export class ReleaseTrackPageComponent implements OnInit {
         },
       })
       .afterClosed()
-      .pipe(take(1))
+      .pipe(take(1), takeUntil(this.cancelRequests$))
       .subscribe(confirmed => {
         if (!confirmed) return;
         this.applyReviewResult({
@@ -1523,9 +1905,10 @@ export class ReleaseTrackPageComponent implements OnInit {
     this.isSavingDescription = true;
     this.connector
       .updateMetadataByLatest(this.id, { description })
-      .pipe(take(1))
+      .pipe(take(1), takeUntil(this.cancelRequests$))
       .subscribe({
-        next: () => {
+        next: result => {
+          this.captureDraftCleanup(result?.draft_cleanup);
           this.isEditingDescription = false;
           this.descriptionDraft = '';
           this.getReleaseTrack();
@@ -1758,7 +2141,7 @@ export class ReleaseTrackPageComponent implements OnInit {
   private loadVirtualComponentTrackSummaries(): void {
     this.connector
       .listReleaseTracks()
-      .pipe(take(1))
+      .pipe(take(1), takeUntil(this.cancelRequests$))
       .subscribe({
         next: result => {
           const summaries = new Map<string, VirtualComponentTrackSummary>();
@@ -2015,44 +2398,41 @@ export class ReleaseTrackPageComponent implements OnInit {
     if (!this.canCreateDraft) return;
 
     const trackName = this.releaseTrackName || this.id || 'this release track';
-    const dialogRef = this.dialog.open(SnapshotDescriptionDialogComponent, {
+    const dialogRef = this.dialog.open(CreateDraftDialogComponent, {
       autoFocus: false,
       data: {
-        title: 'Create draft snapshot',
-        message: `Create a copy of the latest snapshot for ${trackName}. Add optional notes so other analysts can understand this draft in history.`,
+        trackName,
         description: this.releaseTrack?.snapshot_description || '',
-        confirmLabel: 'Create draft',
+        canManageRetention: this.canManageDraftLifecycle,
       },
     });
 
-    dialogRef.afterClosed().subscribe(description => {
-      if (
-        description === undefined ||
-        !this.id ||
-        !this.isVirtualReleaseTrack
-      ) {
-        return;
-      }
-      this.createVirtualDraftSnapshot(description);
-    });
+    dialogRef
+      .afterClosed()
+      .pipe(take(1), takeUntil(this.cancelRequests$))
+      .subscribe((payload?: CreateVirtualSnapshotPayload) => {
+        if (!payload || !this.id || !this.isVirtualReleaseTrack) return;
+        this.createVirtualDraftSnapshot(payload);
+      });
   }
 
-  private createVirtualDraftSnapshot(description: string): void {
+  private createVirtualDraftSnapshot(
+    payload: CreateVirtualSnapshotPayload
+  ): void {
     this.isCreatingDraft = true;
     this.connector
-      .createVirtualSnapshot(this.id, {
-        description,
-      })
+      .createVirtualSnapshot(this.id, payload)
       .pipe(
         take(1),
+        takeUntil(this.cancelRequests$),
         finalize(() => {
           this.isCreatingDraft = false;
         })
       )
       .subscribe({
         next: snapshot => {
-          this.addCreatedDraftSnapshotToHistory(snapshot);
-          this.refreshReleaseTrackState();
+          this.captureDraftCleanup(snapshot?.draft_cleanup);
+          this.getReleaseTrack();
         },
         error: err => {
           console.error('Failed to create draft snapshot', err);
@@ -2060,87 +2440,17 @@ export class ReleaseTrackPageComponent implements OnInit {
       });
   }
 
-  private addCreatedDraftSnapshotToHistory(snapshot: any): void {
-    const draftSnapshot = this.getCreatedDraftSnapshot(snapshot);
-    if (!draftSnapshot) return;
-
-    this.createdDraftSnapshot = draftSnapshot;
-    this.snapshotHistory = this.buildSnapshotHistory(
-      this.withCreatedDraftSnapshot(
-        this.snapshotHistory.map(item => item.snapshot)
-      )
-    );
-  }
-
-  private getCreatedDraftSnapshot(
-    snapshot: any
-  ): ReleaseTrackSnapshotHistoryItem | null {
-    const draftSnapshot = snapshot?.data || snapshot?.snapshot || snapshot;
-    if (!draftSnapshot || this.isTaggedSnapshot(draftSnapshot)) return null;
-
-    const modified = this.getSnapshotModified(draftSnapshot);
-    if (!modified) return null;
-    const resolvedTotalObjects =
-      typeof draftSnapshot.composition_resolution?.total_objects === 'number'
-        ? draftSnapshot.composition_resolution.total_objects
-        : null;
-    const membersCount =
-      this.getSnapshotCount(draftSnapshot, 'members_count') ??
-      this.getSnapshotMembers(draftSnapshot).length;
-    const quarantineCount =
-      this.getSnapshotCount(
-        draftSnapshot,
-        'quarantine_count',
-        'quarantined_count'
-      ) ?? this.getSnapshotQuarantineCount(draftSnapshot);
-    const shouldUseResolvedTotal =
-      !membersCount && !quarantineCount && resolvedTotalObjects !== null;
-
-    return {
-      ...draftSnapshot,
-      modified,
-      version: null,
-      type: ReleaseTrackType.Virtual,
-      members_count: shouldUseResolvedTotal
-        ? resolvedTotalObjects
-        : membersCount,
-      quarantine_count: quarantineCount,
-    };
-  }
-
-  private withCreatedDraftSnapshot(
-    snapshots: ReleaseTrackSnapshotHistoryItem[]
-  ): ReleaseTrackSnapshotHistoryItem[] {
-    if (!this.createdDraftSnapshot) return snapshots;
-
-    const createdDraftModified = this.getSnapshotModified(
-      this.createdDraftSnapshot
-    );
-    const draftAlreadyLoaded = snapshots.some(
-      snapshot => this.getSnapshotModified(snapshot) === createdDraftModified
-    );
-
-    if (draftAlreadyLoaded) {
-      this.createdDraftSnapshot = null;
-      return snapshots;
-    }
-
-    return [...snapshots, this.createdDraftSnapshot];
-  }
-
   public onEditConfig(): void {
     if (this.isVirtualReleaseTrack) this.setVirtualConfig();
+    this.setConfig(this.releaseTrackConfig);
     this.loadPublicationOptions();
     this.syncAliasControl();
     this.isEditingConfig = true;
   }
 
   public onCancelConfigEdit(): void {
-    if (this.isVirtualReleaseTrack) {
-      this.setVirtualConfig();
-    } else {
-      this.setConfig(this.releaseTrackConfig);
-    }
+    if (this.isVirtualReleaseTrack) this.setVirtualConfig();
+    this.setConfig(this.releaseTrackConfig);
     this.syncAliasControl();
     this.isEditingConfig = false;
   }
@@ -2202,13 +2512,14 @@ export class ReleaseTrackPageComponent implements OnInit {
   private withAliasUpdate<T>(next: () => Observable<T>): Observable<T> {
     const update = this.getAliasUpdate();
     if (!update) return next();
-    return this.connector
-      .updateMetadataByLatest(this.id, update)
-      .pipe(switchMap(() => next()));
+    return this.connector.updateMetadataByLatest(this.id, update).pipe(
+      tap(result => this.captureDraftCleanup(result?.draft_cleanup)),
+      switchMap(() => next())
+    );
   }
 
   public onSaveConfig(): void {
-    if (!this.id || this.isSavingConfig) return;
+    if (!this.id || !this.isEditingConfig || this.isSavingConfig) return;
     const aliasControl = this.configForm.get('alias');
     if (aliasControl?.invalid) {
       aliasControl.markAsTouched();
@@ -2227,6 +2538,7 @@ export class ReleaseTrackPageComponent implements OnInit {
     this.withAliasUpdate(() => this.connector.updateConfig(this.id, payload))
       .pipe(
         take(1),
+        takeUntil(this.cancelRequests$),
         finalize(() => {
           this.isSavingConfig = false;
         })
@@ -2237,7 +2549,7 @@ export class ReleaseTrackPageComponent implements OnInit {
           this.setConfig(this.getConfigFromResponse(result, payload));
           if (this.releaseTrack)
             this.releaseTrack.config = this.releaseTrackConfig;
-          this.refreshReleaseTrackState();
+          this.getReleaseTrack();
           this.getConfig();
           if (aliasChanged) this.getReleaseTrack();
         },
@@ -2280,6 +2592,7 @@ export class ReleaseTrackPageComponent implements OnInit {
     preview
       .pipe(
         take(1),
+        takeUntil(this.cancelRequests$),
         finalize(() => {
           this.isReleasing = false;
           this.previewingSnapshotModified = null;
@@ -2289,7 +2602,7 @@ export class ReleaseTrackPageComponent implements OnInit {
         next: result => {
           if (!result.preview || !result.track) {
             this.snackbar.open(
-              'Unable to load the release preview. Please try again.',
+              'This snapshot may no longer exist. History will refresh automatically.',
               null,
               {
                 duration: 5000,
@@ -2306,7 +2619,10 @@ export class ReleaseTrackPageComponent implements OnInit {
           );
         },
         error: err => {
-          console.error('Failed to load objects for release preview', err);
+          this.showSnapshotError(
+            err,
+            'Unable to load the release preview. Try again after history refreshes.'
+          );
         },
       });
   }
@@ -2316,7 +2632,7 @@ export class ReleaseTrackPageComponent implements OnInit {
     const modified = item.modified;
 
     this.openExportFormatDialog('Export release track snapshot', true)
-      .pipe(take(1))
+      .pipe(take(1), takeUntil(this.cancelRequests$))
       .subscribe(choice => {
         if (!choice) return;
         if (choice === 'copy-summary') {
@@ -2419,7 +2735,7 @@ export class ReleaseTrackPageComponent implements OnInit {
 
     dialogRef
       .afterClosed()
-      .pipe(take(1))
+      .pipe(take(1), takeUntil(this.cancelRequests$))
       .subscribe((description: string | undefined) => {
         if (description === undefined) return;
 
@@ -2428,6 +2744,7 @@ export class ReleaseTrackPageComponent implements OnInit {
           .updateSnapshotDescription(this.id, modified, { description })
           .pipe(
             take(1),
+            takeUntil(this.cancelRequests$),
             finalize(() => {
               this.updatingSnapshotDescriptionModified.delete(modified);
             })
@@ -2443,12 +2760,6 @@ export class ReleaseTrackPageComponent implements OnInit {
               ) {
                 Object.assign(this.releaseTrack, snapshot);
               }
-              if (
-                this.createdDraftSnapshot &&
-                this.getSnapshotModified(this.createdDraftSnapshot) === modified
-              ) {
-                Object.assign(this.createdDraftSnapshot, snapshot);
-              }
 
               this.snackbar.open(
                 updatedDescription
@@ -2459,11 +2770,9 @@ export class ReleaseTrackPageComponent implements OnInit {
               );
             },
             error: err => {
-              console.error('Failed to update snapshot notes', err);
-              this.snackbar.open(
-                'Unable to save snapshot notes. Please try again.',
-                null,
-                { duration: 5000, panelClass: 'error' }
+              this.showSnapshotError(
+                err,
+                'Unable to save snapshot notes. Please try again.'
               );
             },
           });
@@ -2482,7 +2791,7 @@ export class ReleaseTrackPageComponent implements OnInit {
         selection.format,
         this.getSnapshotExportOptions(selection)
       )
-      .pipe(take(1))
+      .pipe(take(1), takeUntil(this.cancelRequests$))
       .subscribe({
         next: result => {
           this.restApiConnectorService.triggerBrowserDownload(
@@ -2491,7 +2800,10 @@ export class ReleaseTrackPageComponent implements OnInit {
           );
         },
         error: err => {
-          console.error('Failed to export release track snapshot', err);
+          this.showSnapshotError(
+            err,
+            'Unable to export this snapshot. Try again after history refreshes.'
+          );
         },
       });
   }
@@ -2562,7 +2874,7 @@ export class ReleaseTrackPageComponent implements OnInit {
         )
       )
     )
-      .pipe(take(1))
+      .pipe(take(1), takeUntil(this.cancelRequests$))
       .subscribe({
         next: resolvedItems => {
           const reviewItems = resolvedItems.filter(
@@ -2623,7 +2935,7 @@ export class ReleaseTrackPageComponent implements OnInit {
         restoreFocus: true,
       })
       .afterClosed()
-      .pipe(take(1))
+      .pipe(take(1), takeUntil(this.cancelRequests$))
       .subscribe(result => this.applyReviewResult(result));
   }
 
@@ -2655,14 +2967,19 @@ export class ReleaseTrackPageComponent implements OnInit {
 
     if (!requests.length) return;
 
+    ++this.boardMutations;
     forkJoin(requests)
-      .pipe(take(1))
+      .pipe(
+        take(1),
+        takeUntil(this.cancelRequests$),
+        finalize(() => --this.boardMutations)
+      )
       .subscribe({
         next: () => {
           this.snackbar.open('Review updates saved.', undefined, {
             duration: 3000,
           });
-          this.refreshReleaseTrackState();
+          this.getReleaseTrack();
         },
         error: err => {
           console.error('Failed to save release track review', err);
@@ -2670,7 +2987,7 @@ export class ReleaseTrackPageComponent implements OnInit {
             duration: 5000,
             panelClass: 'error',
           });
-          this.refreshReleaseTrackState();
+          this.getReleaseTrack();
         },
       });
   }
@@ -2993,6 +3310,7 @@ export class ReleaseTrackPageComponent implements OnInit {
     if (value.virtualSnapshotScheduleMode !== SnapshotScheduleMode.Cron) {
       return true;
     }
+    if (this.canManageDraftLifecycle && !this.isRetentionValid) return false;
     if (
       typeof this.configForm.get('virtualScheduleSearch')?.value === 'string' &&
       this.configForm.get('virtualScheduleSearch')?.value.trim()
@@ -3095,6 +3413,14 @@ export class ReleaseTrackPageComponent implements OnInit {
   private setVirtualConfig(): void {
     const deduplication = this.releaseTrack?.composition?.deduplication || {};
     const snapshotSchedule = this.virtualSnapshotSchedule;
+    const maxDrafts =
+      snapshotSchedule.mode === SnapshotScheduleMode.Cron
+        ? snapshotSchedule.draft_retention?.max_drafts
+        : null;
+    this.retentionForm.reset({
+      enabled: maxDrafts != null,
+      maxDrafts: maxDrafts ?? 10,
+    });
     this.virtualConfigComponentTracks = this.cloneVirtualComponentTracks(
       this.virtualComponentTracks
     );
@@ -3233,6 +3559,14 @@ export class ReleaseTrackPageComponent implements OnInit {
     );
     const aliasChanged = !!this.getAliasUpdate();
     const compositionChanged = this.hasVirtualCompositionChanges(payload);
+    const schedule = this.getVirtualSchedulePayload();
+    const scheduleChanged =
+      JSON.stringify(schedule) !== JSON.stringify(this.virtualSnapshotSchedule);
+    const savedPublication = this.getPublicationPayload(
+      this.getConfigFormValue(this.releaseTrackConfig)
+    );
+    const publicationChanged =
+      JSON.stringify(publication) !== JSON.stringify(savedPublication);
     this.isSavingConfig = true;
     this.withAliasUpdate(() =>
       compositionChanged
@@ -3242,23 +3576,28 @@ export class ReleaseTrackPageComponent implements OnInit {
       .pipe(
         take(1),
         switchMap(result =>
-          this.connector
-            .updateSchedule(this.id, this.getVirtualSchedulePayload())
-            .pipe(map(scheduleResult => ({ result, scheduleResult })))
+          (scheduleChanged
+            ? this.connector.updateSchedule(this.id, schedule)
+            : of({ snapshot_schedule: schedule })
+          ).pipe(map(scheduleResult => ({ result, scheduleResult })))
         ),
         switchMap(({ result, scheduleResult }) =>
-          this.connector
-            .updateConfig(this.id, { publication })
-            .pipe(
-              map(configResult => ({ result, scheduleResult, configResult }))
-            )
+          (publicationChanged
+            ? this.connector.updateConfig(this.id, { publication })
+            : of(null)
+          ).pipe(
+            map(configResult => ({ result, scheduleResult, configResult }))
+          )
         ),
+        takeUntil(this.cancelRequests$),
         finalize(() => {
           this.isSavingConfig = false;
         })
       )
       .subscribe({
         next: ({ result, scheduleResult, configResult }) => {
+          this.captureDraftCleanup(result?.draft_cleanup);
+          this.captureDraftCleanup(configResult?.draft_cleanup);
           this.isEditingConfig = false;
           if (this.releaseTrack) {
             this.releaseTrack.composition = this.getCompositionFromResponse(
@@ -3266,13 +3605,14 @@ export class ReleaseTrackPageComponent implements OnInit {
               payload
             );
             this.releaseTrack.snapshot_schedule =
-              scheduleResult?.snapshot_schedule ||
-              this.getVirtualSchedulePayload();
+              scheduleResult?.snapshot_schedule || schedule;
           }
-          this.setConfig(
-            this.getConfigFromResponse(configResult, { publication })
-          );
-          this.refreshReleaseTrackState();
+          if (publicationChanged) {
+            this.setConfig(
+              this.getConfigFromResponse(configResult, { publication })
+            );
+          }
+          this.getReleaseTrack();
           this.getConfig();
           if (aliasChanged) this.getReleaseTrack();
         },
@@ -3286,11 +3626,25 @@ export class ReleaseTrackPageComponent implements OnInit {
     const value =
       this.configForm.getRawValue() as VirtualReleaseTrackConfigFormValue;
     switch (value.virtualSnapshotScheduleMode) {
-      case SnapshotScheduleMode.Cron:
+      case SnapshotScheduleMode.Cron: {
+        const saved =
+          this.virtualSnapshotSchedule.mode === SnapshotScheduleMode.Cron
+            ? this.virtualSnapshotSchedule.draft_retention
+            : undefined;
+        const retention = this.retentionForm.getRawValue();
+        const policy = this.canManageDraftLifecycle
+          ? retention.enabled
+            ? { max_drafts: retention.maxDrafts }
+            : saved
+              ? { max_drafts: null }
+              : undefined
+          : saved;
         return {
           mode: SnapshotScheduleMode.Cron,
           cron: this.virtualCronExpression,
+          ...(policy ? { draft_retention: policy } : {}),
         };
+      }
       case SnapshotScheduleMode.Dates:
         return {
           mode: SnapshotScheduleMode.Dates,
@@ -3505,7 +3859,7 @@ export class ReleaseTrackPageComponent implements OnInit {
     if (typeof service?.getAllIdentities === 'function') {
       service
         .getAllIdentities()
-        .pipe(take(1))
+        .pipe(take(1), takeUntil(this.cancelRequests$))
         .subscribe({
           next: (result: any) => {
             this.publicationIdentityOptions = (result?.data ?? []).map(
@@ -3526,7 +3880,7 @@ export class ReleaseTrackPageComponent implements OnInit {
     if (typeof service?.getAllMarkingDefinitions === 'function') {
       service
         .getAllMarkingDefinitions()
-        .pipe(take(1))
+        .pipe(take(1), takeUntil(this.cancelRequests$))
         .subscribe({
           next: (result: any) => {
             this.publicationMarkingOptions = (result?.data ?? []).map(
@@ -3626,12 +3980,14 @@ export class ReleaseTrackPageComponent implements OnInit {
         conflicts: this.getReleaseConflicts(preview),
         proposedMinorVersion: preview?.version,
         previewSummary: preview,
+        canSquashDrafts:
+          this.isVirtualReleaseTrack && this.canManageDraftLifecycle,
       },
     });
 
     releaseRef
       .afterClosed()
-      .pipe(take(1))
+      .pipe(take(1), takeUntil(this.cancelRequests$))
       .subscribe((selection: ReleasePreviewSelection | undefined) => {
         if (!selection) return;
         this.releaseSnapshot(selection, item);
@@ -3672,19 +4028,37 @@ export class ReleaseTrackPageComponent implements OnInit {
       .releaseSnapshot(this.id, item.modified, selection)
       .pipe(
         take(1),
+        takeUntil(this.cancelRequests$),
         finalize(() => {
           this.isReleasing = false;
         })
       )
       .subscribe({
-        next: () => {
-          if (item.modified === this.createdDraftSnapshot?.modified) {
-            this.createdDraftSnapshot = null;
-          }
-          this.refreshReleaseTrackState();
+        next: result => {
+          this.captureDraftCleanup(result?.draft_cleanup);
+          this.getReleaseTrack();
         },
         error: err => {
-          console.error('Failed to tag release track snapshot', err);
+          const details = { ...err?.error?.details, ...err?.error };
+          this.captureDraftCleanup(details.draft_cleanup);
+          if (details.release_committed || details.operation_id) {
+            this.cleanupMessage = details.release_committed
+              ? `Release committed, but completion requires repair. Do not tag again. Cleanup operation: ${details.operation_id || 'see recent operations'}.`
+              : `Release did not complete. Review cleanup operation ${details.operation_id} before trying again.`;
+            this.getReleaseTrack();
+          } else if (err?.status === 409) {
+            this.historyMessage =
+              'The release preview is stale or the track changed. Open a new preview before tagging.';
+            this.snackbar.open(this.historyMessage, 'Dismiss', {
+              duration: 10000,
+            });
+          } else {
+            this.showSnapshotError(
+              err,
+              'Unable to tag this snapshot. Check its state after history refreshes before trying again.'
+            );
+            this.loadDraftCleanup();
+          }
         },
       });
   }
@@ -3705,19 +4079,23 @@ export class ReleaseTrackPageComponent implements OnInit {
           modified instanceof Date ? modified.toISOString() : String(modified)
         )
     );
-    const visibleSnapshots = snapshots.filter(snapshot => {
-      if (this.isTaggedSnapshot(snapshot)) return true;
-      const modified = this.getSnapshotModified(snapshot);
-      return !modified || !retainedSourceDrafts.has(modified);
-    });
+    const visibleSnapshots = this.isVirtualReleaseTrack
+      ? snapshots
+      : snapshots.filter(snapshot => {
+          if (this.isTaggedSnapshot(snapshot)) return true;
+          const modified = this.getSnapshotModified(snapshot);
+          return !modified || !retainedSourceDrafts.has(modified);
+        });
     const sorted = [...visibleSnapshots].sort(
       (a, b) => this.getSnapshotTime(b) - this.getSnapshotTime(a)
     );
-    const latestSnapshot =
-      sorted.find(snapshot => this.isLatestHistorySnapshot(snapshot)) ??
-      sorted[0];
-    const latestRelease = sorted.find(snapshot =>
-      this.isTaggedSnapshot(snapshot)
+    const latestSnapshot = sorted.find(
+      snapshot =>
+        this.getSnapshotModified(snapshot) === this.latestSnapshotModified
+    );
+    const latestRelease = sorted.find(
+      snapshot =>
+        this.getSnapshotModified(snapshot) === this.latestTaggedSnapshotModified
     );
 
     return sorted.map((snapshot, index) => {
@@ -4140,7 +4518,7 @@ export class ReleaseTrackPageComponent implements OnInit {
   private isLatestHistorySnapshot(
     snapshot: ReleaseTrackSnapshotHistoryItem
   ): boolean {
-    if (snapshot.is_latest) return true;
+    if (!this.isVirtualReleaseTrack && snapshot.is_latest) return true;
     if (!this.releaseTrack?.modified) return false;
     return (
       this.getSnapshotModified(snapshot) ===
