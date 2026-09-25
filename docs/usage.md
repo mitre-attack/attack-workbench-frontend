@@ -64,13 +64,38 @@ preferred tier and preferred status are not supported by the API.
 
 When creating a virtual track or editing its **Config**, each component's
 **Resolve from** selector offers **Latest tagged** (the default) and
-**Latest draft**. A draft source needs no tagged releases, but its newest
-snapshot must be an active draft; there is no fallback to a tagged release or
-older retained draft. Both options compose **members only**, excluding staged
-objects and candidates. Use **Create Draft** after saving composition to
-materialize it. The Releases tab labels draft component provenance **Draft**
-and shows the exact source snapshot timestamp; its content stays frozen even
-when the component advances or is later tagged.
+**Latest preview**. Latest tagged uses the newest published release. Latest
+preview uses the newest standard snapshot whether draft or tagged: draft
+previews include members plus staged changes under the source's release
+conflict rules, and tagged sources use published members. Candidates are
+excluded. A blocking source conflict must be resolved before materialization;
+virtual filters do not bypass it.
+
+Each added component also has an editable **Priority** field, both in the
+creation dialog and under **Config → Edit Config**. Lower numbers have higher
+priority. Values must be unique, non-negative whole numbers; gaps are allowed.
+Duplicate, empty or invalid priorities show an inline error and prevent saving.
+Edit these numbers to change precedence without removing/re-adding tracks.
+Existing priorities are preserved when saving or removing components, and new
+components receive an unused priority. Cancel restores the saved values.
+
+Priority determines precedence when using **prioritize higher priority** and
+provides tie-breaking where the other deduplication strategies use it. After
+saving changed priorities, use **Create Draft** to apply them to a new composed
+snapshot; existing snapshots retain their original content.
+
+Use **Create Draft** after saving composition to materialize the downstream
+preview. This does not tag, promote or otherwise change the standard source.
+The virtual snapshot freezes exact revisions and can be reviewed or tagged
+independently. Its provenance shows **Draft preview** for an untagged source
+or the source's actual version for a tagged one, with the exact source timestamp.
+**Preview members** counts the prospective member set before filters, not merely
+the source draft's stored members.
+
+Loaded **Latest draft** rules are retired members-only configuration. The editor
+requires explicitly choosing **Latest preview** or **Latest tagged** before
+saving or creating another snapshot; it never silently includes staged content.
+Historical draft-only provenance retains its original meaning.
 
 Virtual-track history defaults to **Releases + current draft**, so scheduled
 drafts do not crowd out releases. Use **Drafts** or **All snapshots** to inspect

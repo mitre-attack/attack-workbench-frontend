@@ -104,12 +104,16 @@ export const CANDIDACY_THRESHOLD_OPTIONS: WorkflowStatusType[] = Object.values(
 
 export enum ResolutionStrategy {
   LatestTagged = 'latest_tagged',
-  LatestDraft = 'latest_draft',
+  LatestPreview = 'latest_preview',
   SpecificVersion = 'specific_version',
   SpecificSnapshot = 'specific_snapshot',
 }
 
 export type ResolutionStrategyType = EnumValue<typeof ResolutionStrategy>;
+
+/** Read-only compatibility for saved rules and historical members-only results. */
+export type HistoricalResolutionStrategyType =
+  ResolutionStrategyType | 'latest_draft';
 
 export const RESOLUTION_STRATEGY_OPTIONS: ResolutionStrategyType[] =
   Object.values(ResolutionStrategy) as ResolutionStrategyType[];

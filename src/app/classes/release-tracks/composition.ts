@@ -6,13 +6,24 @@
 // -----------------------------------------------------------------------------
 
 import { DeduplicationStrategyType } from './enums';
-import { ComponentTrack, ComponentSnapshotResolution } from './component-track';
+import {
+  ComponentTrack,
+  ComponentSnapshotResolution,
+  LoadedComponentTrack,
+} from './component-track';
 
 export interface Composition {
   component_tracks?: ComponentTrack[];
   deduplication?: {
     strategy?: DeduplicationStrategyType;
   };
+}
+
+export interface LoadedComposition extends Omit<
+  Composition,
+  'component_tracks'
+> {
+  component_tracks?: LoadedComponentTrack[];
 }
 
 export interface CompositionResolution {

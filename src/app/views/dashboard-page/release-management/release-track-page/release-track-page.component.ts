@@ -3,6 +3,7 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { SelectionModel } from '@angular/cdk/collections';
 import { Component, OnInit } from '@angular/core';
 import { FormBuilder, FormGroup, Validators } from '@angular/forms';
+import { ErrorStateMatcher } from '@angular/material/core';
 import { MatDialog } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { PageEvent } from '@angular/material/paginator';
@@ -11,6 +12,11 @@ import { forkJoin, Observable, of } from 'rxjs';
 import { finalize, map, switchMap, take, tap } from 'rxjs/operators';
 import {
   ComponentTrack,
+  Composition,
+  LoadedComponentTrack,
+  getComponentPriorityError,
+  hasValidComponentPriorities,
+  nextComponentPriority,
   ConflictPolicy,
   ConflictPolicyType,
   DeduplicationStrategy,
@@ -304,7 +310,20 @@ export class ReleaseTrackPageComponent implements OnInit {
     VirtualComponentTrackSummary
   >();
   public virtualComponentTrackOptions: VirtualComponentTrackOption[] = [];
-  public virtualConfigComponentTracks: any[] = [];
+  public virtualConfigComponentTracks: LoadedComponentTrack[] = [];
+  public readonly componentPriorityErrorMatcher: ErrorStateMatcher = {
+    isErrorState: control =>
+      control != null && this.componentPriorityError(control.value) !== null,
+  };
+
+  public componentPriorityError(
+    priority: number | null | undefined
+  ): string | null {
+    return getComponentPriorityError(
+      priority,
+      this.virtualConfigComponentTracks
+    );
+  }
   private updatingSnapshotDescriptionModified = new Set<string>();
   private convertingReleaseModified = new Set<string>();
   private deletingDraftModified = new Set<string>();
@@ -494,14 +513,32 @@ export class ReleaseTrackPageComponent implements OnInit {
     return this.releaseTrack?.members ?? [];
   }
 
-  public get virtualComponentTracks(): any[] {
+  public get virtualComponentTracks(): LoadedComponentTrack[] {
     return this.releaseTrack?.composition?.component_tracks ?? [];
   }
 
-  public get displayedVirtualConfigComponentTracks(): any[] {
+  public get displayedVirtualConfigComponentTracks(): LoadedComponentTrack[] {
     return this.isEditingConfig
       ? this.virtualConfigComponentTracks
       : this.virtualComponentTracks;
+  }
+
+  public isRetiredComponentTrack(track: LoadedComponentTrack): boolean {
+    return track.resolution_strategy === 'latest_draft';
+  }
+
+  public get hasRetiredComponentTracks(): boolean {
+    return this.virtualComponentTracks.some(track =>
+      this.isRetiredComponentTrack(track)
+    );
+  }
+
+  public get isVirtualCompositionValid(): boolean {
+    return (
+      !this.virtualConfigComponentTracks.some(track =>
+        this.isRetiredComponentTrack(track)
+      ) && hasValidComponentPriorities(this.virtualConfigComponentTracks)
+    );
   }
 
   public get filteredVirtualComponentTrackOptions(): VirtualComponentTrackOption[] {
@@ -718,6 +755,7 @@ export class ReleaseTrackPageComponent implements OnInit {
       !!this.id &&
       this.isVirtualReleaseTrack &&
       this.virtualComponentTracks.length > 0 &&
+      !this.hasRetiredComponentTracks &&
       !this.isCreatingDraft
     );
   }
@@ -1798,8 +1836,14 @@ export class ReleaseTrackPageComponent implements OnInit {
   }
 
   public getResolvedComponentLabel(component: any): string {
-    if (component.strategy_used === ResolutionStrategy.LatestDraft) {
-      return 'Resolved Draft';
+    if (component.strategy_used === 'latest_draft') {
+      return 'Resolved draft (retired members-only strategy)';
+    }
+    if (
+      component.strategy_used === ResolutionStrategy.LatestPreview &&
+      component.resolved_version === null
+    ) {
+      return 'Resolved draft preview';
     }
     const version =
       component.resolved_version ||
@@ -1816,7 +1860,9 @@ export class ReleaseTrackPageComponent implements OnInit {
 
   public getVirtualResolvedVersion(row: VirtualResolutionRow): string {
     if (row.resolvedVersion === null && row.resolvedSnapshotId) {
-      return 'Draft';
+      return row.strategy === ResolutionStrategy.LatestPreview
+        ? 'Draft preview'
+        : 'Draft';
     }
     if (!row.resolvedVersion) return '-';
     return row.resolvedVersion.startsWith('v')
@@ -1854,7 +1900,7 @@ export class ReleaseTrackPageComponent implements OnInit {
       {
         track_id: option.trackId,
         resolution_strategy: ResolutionStrategy.LatestTagged,
-        priority: this.virtualConfigComponentTracks.length,
+        priority: nextComponentPriority(this.virtualConfigComponentTracks),
       },
     ];
     this.configForm
@@ -1868,7 +1914,7 @@ export class ReleaseTrackPageComponent implements OnInit {
   }
 
   public setVirtualComponentTrackResolution(
-    track: ComponentTrack,
+    track: LoadedComponentTrack,
     strategy: ResolutionStrategy
   ): void {
     if (track.resolution_strategy === strategy) return;
@@ -2056,7 +2102,9 @@ export class ReleaseTrackPageComponent implements OnInit {
     };
   }
 
-  private cloneVirtualComponentTracks(tracks: any[]): any[] {
+  private cloneVirtualComponentTracks(
+    tracks: LoadedComponentTrack[]
+  ): LoadedComponentTrack[] {
     return tracks.map(track => ({
       ...track,
       filters: track.filters
@@ -2337,7 +2385,8 @@ export class ReleaseTrackPageComponent implements OnInit {
       return;
     }
     if (this.isVirtualReleaseTrack) {
-      if (!this.isVirtualScheduleValid) return;
+      if (!this.isVirtualScheduleValid || !this.isVirtualCompositionValid)
+        return;
       this.saveVirtualConfig();
       return;
     }
@@ -3021,6 +3070,7 @@ export class ReleaseTrackPageComponent implements OnInit {
 
   public formatConfigOption(value: any): string {
     if (value === null || value === undefined || value === '') return 'not set';
+    if (value === 'latest_draft') return 'latest draft (retired, members only)';
     return String(value).replace(/[_-]+/g, ' ');
   }
 
@@ -3051,10 +3101,6 @@ export class ReleaseTrackPageComponent implements OnInit {
       default:
         return 'Manual';
     }
-  }
-
-  public getVirtualTrackPriority(track: any, index: number): number {
-    return typeof track?.priority === 'number' ? track.priority : index;
   }
 
   public getVirtualScheduleValue(key: string): string {
@@ -3238,9 +3284,11 @@ export class ReleaseTrackPageComponent implements OnInit {
       { emitEvent: false }
     );
     this.configureVirtualCronExpression(snapshotSchedule.cron);
-    this.initialVirtualComposition = JSON.stringify(
-      this.getVirtualCompositionPayload()
-    );
+    // A retired rule can be displayed but cannot form a writable baseline.
+    // Its explicit replacement must always persist a composition update.
+    this.initialVirtualComposition = this.isVirtualCompositionValid
+      ? JSON.stringify(this.getVirtualCompositionPayload())
+      : '';
   }
 
   private configureVirtualCronExpression(cron?: string): void {
@@ -3696,16 +3744,26 @@ export class ReleaseTrackPageComponent implements OnInit {
     return payload;
   }
 
-  private getVirtualCompositionPayload(): any {
+  private getVirtualCompositionPayload(): Composition {
     const value =
       this.configForm.getRawValue() as VirtualReleaseTrackConfigFormValue;
 
     return {
       component_tracks: this.virtualConfigComponentTracks.map(
-        (track, index) => {
-          const component = { ...track, priority: index };
+        (track): ComponentTrack => {
+          if (track.resolution_strategy === 'latest_draft') {
+            throw new Error(
+              'Replace the retired latest_draft rule before saving.'
+            );
+          }
+          const component: ComponentTrack = {
+            ...track,
+            resolution_strategy: track.resolution_strategy,
+          };
           if (
-            component.resolution_strategy === ResolutionStrategy.LatestDraft
+            component.resolution_strategy ===
+              ResolutionStrategy.LatestPreview ||
+            component.resolution_strategy === ResolutionStrategy.LatestTagged
           ) {
             delete component.version;
             delete component.snapshot;
