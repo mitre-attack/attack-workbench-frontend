@@ -16,6 +16,9 @@ export class DeleteDialogComponent {
   public get warning(): string {
     return this.config?.warning || '';
   }
+  public get confirmLabel(): string {
+    return this.config?.confirmLabel || 'yes, delete';
+  }
   public get confirmationText(): string {
     return this.config?.stixId || this.config?.stixID || 'DELETE';
   }

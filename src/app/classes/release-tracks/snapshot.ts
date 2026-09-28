@@ -1,6 +1,9 @@
+import type { SnapshotBundleHashes, SnapshotPublication } from './api';
 import { Composition, CompositionResolution } from './composition';
 import { ReleaseTrackConfig } from './config';
 import { ReleaseTrackType } from './enums';
+import { SnapshotCreationCause } from './snapshot-creation-cause';
+import { SnapshotCreationActor } from './snapshot-creation-actor';
 import { VersionHistoryEntry } from './history';
 import { SnapshotSchedule } from './release-track';
 import {
@@ -17,11 +20,18 @@ export class ReleaseTrackSnapshot {
   public modified: Date = new Date();
   public version?: string | null;
   public name = '';
+  /** Registry alias for the track, attached to workbench responses. */
+  public alias?: string | null;
   public description?: string;
   public snapshot_description?: string;
+  public creation_cause: SnapshotCreationCause = SnapshotCreationCause.Unknown;
+  public creation_actor: SnapshotCreationActor = { kind: 'unknown' };
   public created: Date = new Date();
   public created_by_ref?: string;
-  public object_marking_refs?: string[];
+  public content_manifest_id?: string;
+  public publication?: SnapshotPublication;
+  public bundle_id?: string;
+  public bundle_hashes?: SnapshotBundleHashes;
 
   public config: ReleaseTrackConfig = {} as ReleaseTrackConfig;
   public version_history: VersionHistoryEntry[] = [];
@@ -87,17 +97,23 @@ export class ReleaseTrackSnapshot {
     if (!raw) return;
 
     if ('id' in raw) this.id = raw.id;
+    this.creation_cause = raw.creation_cause || SnapshotCreationCause.Unknown;
+    this.creation_actor = raw.creation_actor || { kind: 'unknown' };
     if ('type' in raw) this.type = raw.type;
     if ('modified' in raw) this.modified = new Date(raw.modified);
     if ('version' in raw) this.version = raw.version;
     if ('name' in raw) this.name = raw.name;
+    if ('alias' in raw) this.alias = raw.alias;
     if ('description' in raw) this.description = raw.description;
     if ('snapshot_description' in raw)
       this.snapshot_description = raw.snapshot_description;
     if ('created' in raw) this.created = new Date(raw.created);
     if ('created_by_ref' in raw) this.created_by_ref = raw.created_by_ref;
-    if ('object_marking_refs' in raw && Array.isArray(raw.object_marking_refs))
-      this.object_marking_refs = raw.object_marking_refs.slice();
+    if ('content_manifest_id' in raw)
+      this.content_manifest_id = raw.content_manifest_id;
+    if ('publication' in raw) this.publication = raw.publication;
+    if ('bundle_id' in raw) this.bundle_id = raw.bundle_id;
+    if ('bundle_hashes' in raw) this.bundle_hashes = raw.bundle_hashes;
 
     if ('config' in raw) this.config = raw.config;
     if ('summary' in raw) this.summary = raw.summary;
@@ -194,9 +210,14 @@ export class ReleaseTrackSnapshot {
       name: this.name,
       description: this.description,
       snapshot_description: this.snapshot_description,
+      creation_cause: this.creation_cause,
+      creation_actor: this.creation_actor,
       created: this.created ? this.created.toISOString() : undefined,
       created_by_ref: this.created_by_ref,
-      object_marking_refs: this.object_marking_refs,
+      content_manifest_id: this.content_manifest_id,
+      publication: this.publication,
+      bundle_id: this.bundle_id,
+      bundle_hashes: this.bundle_hashes,
       config: this.config,
       summary: this.summary,
       version_history: this.version_history?.map(v => ({
@@ -306,6 +327,8 @@ export class ReleaseTrackSnapshot {
       version: this.version,
       modified: this.modified,
       snapshot_description: this.snapshot_description,
+      creation_cause: this.creation_cause,
+      creation_actor: this.creation_actor,
       counts: {
         members: this.memberCount,
         staged: this.stagedCount,

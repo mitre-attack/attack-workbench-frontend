@@ -24,7 +24,7 @@ export interface ComponentSnapshotResolution {
   track_id: string;
   track_name: string;
   track_type: string;
-  resolved_snapshot_id: Date;
+  resolved_snapshot_id: Date | string;
   resolved_version?: string | null;
   strategy_used: string;
   filters_applied?: ComponentTrackFilters;

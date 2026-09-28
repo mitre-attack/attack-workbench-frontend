@@ -10,6 +10,19 @@ import { forkJoin } from 'rxjs';
 import { Relationship } from 'src/app/classes/stix/relationship';
 import { ConfirmationDialogComponent } from 'src/app/components/confirmation-dialog/confirmation-dialog.component';
 
+export interface CrossDomainRelationshipRow {
+  stixId: string;
+  relationshipType: string;
+  source: any;
+  target: any;
+  sourceId: string;
+  targetId: string;
+  sourceName: string;
+  targetName: string;
+  sourceDomains: string[];
+  targetDomains: string[];
+}
+
 interface ParallelRelationshipGroup {
   key: string;
   sourceRef: string;
@@ -45,6 +58,11 @@ export class DataQualityComponent implements OnInit {
   loadingParallel = false;
   parallelError?: string;
 
+  crossDomainRelationships: CrossDomainRelationshipRow[] = [];
+  objectsWithoutDomains: any[] = [];
+  loadingDomainConsistency = false;
+  domainConsistencyError?: string;
+
   stixRelationshipConfig: StixListConfig = {
     type: 'relationship',
     stixObjects: [],
@@ -59,6 +77,76 @@ export class DataQualityComponent implements OnInit {
   ngOnInit(): void {
     this.loadParallelRelationships();
     this.loadMissingLinks();
+    this.loadDomainConsistency();
+  }
+
+  /**
+   * Release-track bundles only ship a relationship when both endpoints are
+   * members of the same track, so endpoints that share no domain can never be
+   * published together.
+   */
+  loadDomainConsistency(): void {
+    this.loadingDomainConsistency = true;
+    this.reportService.getDomainConsistencyReport().subscribe({
+      next: report => {
+        this.crossDomainRelationships = (
+          report?.cross_domain_relationships ?? []
+        ).map((entry: any) => this.mapCrossDomainRelationship(entry));
+        this.objectsWithoutDomains = report?.objects_without_domains ?? [];
+        this.loadingDomainConsistency = false;
+        this.domainConsistencyError = undefined;
+      },
+      error: err => {
+        this.domainConsistencyError =
+          'Failed to load domain consistency report';
+        this.loadingDomainConsistency = false;
+        console.error(err);
+      },
+    });
+  }
+
+  private mapCrossDomainRelationship(entry: any): CrossDomainRelationshipRow {
+    const source = entry?.source_object;
+    const target = entry?.target_object;
+    const attackId = (object: any) =>
+      object?.workspace?.attack_id ||
+      object?.stix?.external_references?.[0]?.external_id ||
+      object?.stix?.id ||
+      '';
+    return {
+      stixId: entry?.stix?.id,
+      relationshipType: entry?.stix?.relationship_type,
+      source,
+      target,
+      sourceId: attackId(source),
+      targetId: attackId(target),
+      sourceName: source?.stix?.name || '',
+      targetName: target?.stix?.name || '',
+      sourceDomains: entry?.source_domains ?? [],
+      targetDomains: entry?.target_domains ?? [],
+    };
+  }
+
+  // Use stix-list for objects without domains with id and name columns
+  stixConfigForObjectsWithoutDomains(): StixListConfig {
+    return {
+      type: 'relationship', // use relationship so stix-list table styling matches
+      stixObjects: (this.objectsWithoutDomains || []).map(item => {
+        const s = item?.stix || item;
+        return {
+          stixID: s.id,
+          attackType: StixTypeToAttackType[s.type],
+          type: s.type,
+          attackID: item?.workspace?.attack_id || '',
+          name: s.name || s.id,
+        } as any;
+      }),
+      columnsPreset: 'id-name',
+      showControls: false,
+      showFilters: false,
+      showDeprecatedFilter: false,
+      clickBehavior: 'linkToObjectPage',
+    };
   }
 
   private transformParallelRelationships(

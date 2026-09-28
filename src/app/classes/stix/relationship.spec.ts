@@ -23,7 +23,7 @@ function rawObject(type: string, id: string, state: string) {
 }
 
 describe('Relationship revision workflow', () => {
-  it('creates WIP revisions of related SDOs after saving a relationship revision', async () => {
+  it('resets related SDOs to WIP in place after saving a relationship revision', async () => {
     const source = rawObject(
       'intrusion-set',
       'intrusion-set--00000000-0000-4000-8000-000000000001',
@@ -55,16 +55,16 @@ describe('Relationship revision workflow', () => {
       calls.push('relationship:post');
       return createAsyncObservable(value);
     });
-    const postGroup = vi.fn((value: Group) => {
-      calls.push('source:post');
+    const postGroup = vi.fn();
+    const postMitigation = vi.fn();
+    const putGroup = vi.fn((value: Group) => {
+      calls.push('source:put');
       return createAsyncObservable(value);
     });
-    const postMitigation = vi.fn((value: Mitigation) => {
-      calls.push('target:post');
+    const putMitigation = vi.fn((value: Mitigation) => {
+      calls.push('target:put');
       return createAsyncObservable(value);
     });
-    const putGroup = vi.fn();
-    const putMitigation = vi.fn();
     const restApiService = {
       postRelationship,
       postGroup,
@@ -75,15 +75,16 @@ describe('Relationship revision workflow', () => {
 
     await firstValueFrom(relationship.save(restApiService));
 
-    expect(calls).toEqual(['relationship:post', 'source:post', 'target:post']);
+    expect(calls).toEqual(['relationship:post', 'source:put', 'target:put']);
     expect(postRelationship).toHaveBeenCalledWith(relationship);
-    expect(postGroup).toHaveBeenCalledOnce();
-    expect(postMitigation).toHaveBeenCalledOnce();
-    expect(postGroup.mock.calls[0][0].workflow?.state).toBe('work-in-progress');
-    expect(postMitigation.mock.calls[0][0].workflow?.state).toBe(
+    expect(putGroup).toHaveBeenCalledOnce();
+    expect(putMitigation).toHaveBeenCalledOnce();
+    expect(putGroup.mock.calls[0][0].workflow?.state).toBe('work-in-progress');
+    expect(putMitigation.mock.calls[0][0].workflow?.state).toBe(
       'work-in-progress'
     );
-    expect(putGroup).not.toHaveBeenCalled();
-    expect(putMitigation).not.toHaveBeenCalled();
+    // Workflow state is workspace metadata: no new SDO revisions are created.
+    expect(postGroup).not.toHaveBeenCalled();
+    expect(postMitigation).not.toHaveBeenCalled();
   });
 });

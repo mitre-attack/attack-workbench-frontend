@@ -73,6 +73,39 @@
         </article>
       </section>
 
+      <section
+        *ngIf="relationshipChanges"
+        class="release-summary release-summary--relationships"
+        aria-label="Relationships sealed by this release">
+        <article class="release-stat release-stat--included">
+          <strong>{{ relationshipSelectedCount }}</strong>
+          <span>Relationships sealed</span>
+        </article>
+        <article class="release-stat release-stat--new">
+          <strong>{{ relationshipAddedCount }}</strong>
+          <span>Relationships added</span>
+        </article>
+        <article class="release-stat release-stat--excluded">
+          <strong>{{ relationshipRemovedCount }}</strong>
+          <span>Relationships dropped</span>
+        </article>
+        <article
+          class="release-stat"
+          [class.release-stat--updated]="staleEndpointRelationships.length">
+          <strong>{{ staleEndpointRelationships.length }}</strong>
+          <span>Authored against other revisions</span>
+        </article>
+      </section>
+      <p
+        *ngIf="staleEndpointRelationships.length"
+        class="release-relationship-warning">
+        <mat-icon aria-hidden="true">info_outline</mat-icon>
+        {{ staleEndpointRelationships.length }} relationship(s) will ship
+        against a newer revision of an endpoint than the one they were authored
+        on. Review them in the released bundle if their descriptions reference
+        revision-specific content.
+      </p>
+
       <mat-form-field
         appearance="outline"
         class="release-snapshot-description-field">

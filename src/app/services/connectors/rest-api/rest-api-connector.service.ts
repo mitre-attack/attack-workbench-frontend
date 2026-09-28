@@ -3142,6 +3142,26 @@ export class RestApiConnectorService extends ApiConnector {
     );
   }
   /**
+   * Retrieve relationships whose endpoints share no domain and objects that
+   * declare no domain
+   */
+  public getDomainConsistencyReport(): Observable<any> {
+    const url = `${this.apiUrl}/reports/domain-consistency`;
+    return this.http.get(url).pipe(
+      tap(results =>
+        logger.log('retrieved domain consistency report', results)
+      ),
+      catchError(
+        this.handleError_continue({
+          cross_domain_relationships: [],
+          objects_without_domains: [],
+        })
+      ),
+      share() // multicast so that multiple subscribers don't trigger the call twice. THIS MUST BE THE LAST LINE OF THE PIPE
+    );
+  }
+
+  /**
    * Retrieve groups of parallel relationships between the same source/target/type
    */
   public getParallelRelationships(): Observable<any> {
