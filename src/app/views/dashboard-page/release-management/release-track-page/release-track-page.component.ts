@@ -175,7 +175,12 @@ interface VirtualReleaseTrackConfigFormValue {
 }
 
 type VirtualCronCadence =
-  'interval' | 'hourly' | 'daily' | 'weekly' | 'monthly' | 'yearly';
+  | 'interval'
+  | 'hourly'
+  | 'daily'
+  | 'weekly'
+  | 'monthly'
+  | 'yearly';
 
 interface SchedulePreset {
   label: string;
