@@ -542,6 +542,7 @@ $released-members-disabled-dark: colors.on-color-deemphasis(dark);
     margin: 24px auto 0;
     padding-left: 72px;
     font-size: 13px;
+    font-variant-numeric: tabular-nums;
     line-height: 18px;
 
     .dark & {
@@ -2153,4 +2154,46 @@ $released-members-disabled-dark: colors.on-color-deemphasis(dark);
   font-size: 0.8rem;
   opacity: 0.8;
   word-break: break-all;
+}
+
+.draft-lifecycle-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1rem;
+  margin: 1rem 0;
+}
+
+.history-controls {
+  justify-content: center;
+}
+
+.cleanup-notification {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+
+  button {
+    flex-shrink: 0;
+  }
+}
+
+.draft-lifecycle-message,
+.draft-cleanup-operation {
+  padding: 1rem;
+  border: 1px solid currentColor;
+  border-radius: 4px;
+  margin-bottom: 1rem;
+}
+
+.draft-cleanup-operation {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+
+  code {
+    overflow-wrap: anywhere;
+  }
 }
