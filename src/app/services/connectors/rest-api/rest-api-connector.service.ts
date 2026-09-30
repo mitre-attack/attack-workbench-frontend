@@ -533,6 +533,7 @@ export class RestApiConnectorService extends ApiConnector {
     deprecated?: boolean;
     deserialize?: boolean;
     versions?: 'all' | 'latest';
+    excludeIDs?: string[];
     lastUpdatedBy?: string[];
     search?: string;
   }) {
@@ -557,6 +558,8 @@ export class RestApiConnectorService extends ApiConnector {
         options.deprecated ? 'true' : 'false'
       );
     if (options?.versions) query = query.set('versions', options.versions);
+    if (options?.excludeIDs)
+      options.excludeIDs.forEach(id => (query = query.append('excludeID', id)));
     // searching
     if (options?.search) query = query.set('search', options.search);
     // lastUpdatedBy
