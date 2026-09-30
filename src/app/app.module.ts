@@ -78,6 +78,7 @@ import { ReferenceEditDialogComponent } from './components/reference-edit-dialog
 import { ReleasePreviewDialogComponent } from './components/release-preview-dialog/release-preview-dialog.component';
 import { ReleaseVersionDialogComponent } from './components/release-version-dialog/release-version-dialog.component';
 import { SnapshotDescriptionDialogComponent } from './components/snapshot-description-dialog/snapshot-description-dialog.component';
+import { VirtualSnapshotContentsComponent } from './components/virtual-snapshot-contents/virtual-snapshot-contents.component';
 import { HistoryTimelineComponent } from './components/stix/stix-page-tabs/history-timeline/history-timeline.component';
 import { MembershipSectionComponent } from './components/stix/stix-page-tabs/membership-section/membership-section.component';
 import { ReferenceSidebarComponent } from './components/resources-drawer/reference-sidebar/reference-sidebar.component';
@@ -169,6 +170,8 @@ import { UserAccountsPageComponent } from './views/dashboard-page/user-accounts-
 import { DefaultMarkingDefinitionsComponent } from './views/dashboard-page/default-marking-definitions/default-marking-definitions.component';
 import { ValidationBypassRuleDialogComponent } from './views/dashboard-page/validation-bypasses/validation-bypass-rule-dialog/validation-bypass-rule-dialog.component';
 import { ValidationBypassesComponent } from './views/dashboard-page/validation-bypasses/validation-bypasses.component';
+import { AllowedValuesComponent } from './views/dashboard-page/allowed-values/allowed-values.component';
+import { AllowedValueDialogComponent } from './views/dashboard-page/allowed-values/allowed-value-dialog/allowed-value-dialog.component';
 import { ProfilePageComponent } from './views/profile-page/profile-page.component';
 import { ReferenceManagerComponent } from './views/reference-manager/reference-manager.component';
 
@@ -320,6 +323,8 @@ export function initConfig(appConfigService: AppConfigService) {
     DefaultMarkingDefinitionsComponent,
     ValidationBypassesComponent,
     ValidationBypassRuleDialogComponent,
+    AllowedValuesComponent,
+    AllowedValueDialogComponent,
     ProfilePageComponent,
     ReferenceManagerComponent,
     StixDialogComponent,
@@ -443,6 +448,7 @@ export function initConfig(appConfigService: AppConfigService) {
   ],
   bootstrap: [AppComponent],
   imports: [
+    VirtualSnapshotContentsComponent,
     MarkdownModule.forRoot({
       loader: HttpClient,
     }),

@@ -84,6 +84,45 @@ export interface ValidationBypassRule {
   __v?: number;
 }
 
+export interface AllowedValueOption {
+  value: string;
+  enabled: boolean;
+  objectTypes: string[];
+}
+
+export interface AllowedValueRule {
+  propertyName: string;
+  domainName: string;
+  objectTypes: string[];
+  values: AllowedValueOption[];
+  invalidValues: (AllowedValueOption & { reason: string })[];
+}
+
+export interface AllowedValueDefinition {
+  propertyName: string;
+  domainName: string;
+  objectTypes: string[];
+  valueType: 'enum' | 'formatted';
+  choices: { value: string; objectTypes: string[] }[];
+  description: string;
+}
+
+export interface AllowedValueCatalog {
+  admVersion: string;
+  rules: AllowedValueDefinition[];
+}
+
+export interface AllowedValues {
+  objectType: string;
+  properties: {
+    propertyName: string;
+    domains: {
+      domainName: string;
+      allowedValues: string[];
+    }[];
+  }[];
+}
+
 export interface MitreIdentityWrites {
   enabled: boolean;
 }
@@ -1111,6 +1150,10 @@ export class RestApiConnectorService extends ApiConnector {
    */
   public get getMarkingDefinition() {
     return this.getStixObjectFactory<MarkingDefinition>('marking-definition');
+  }
+
+  public get getRelationship() {
+    return this.getStixObjectFactory<Relationship>('relationship');
   }
 
   /**
@@ -2481,30 +2524,79 @@ export class RestApiConnectorService extends ApiConnector {
 
   /**
    * Get all allowed values
-   * @returns {Observable<any>} all allowed values
+   * @returns enabled choices, grouped by supported object type, property, and domain
    */
-  private allowedValues;
-  public getAllAllowedValues(): Observable<any> {
-    if (this.allowedValues) {
-      return of(this.allowedValues);
-    }
-
-    const data$ = this.http
-      .get<any>(`${this.apiUrl}/config/allowed-values`)
+  public getAllAllowedValues(): Observable<AllowedValues[]> {
+    return this.http
+      .get<AllowedValues[]>(`${this.apiUrl}/config/allowed-values`)
       .pipe(
-        tap(_ => logger.log('retrieved allowed values')),
-        map(result => result as any),
-        catchError(this.handleError_continue<string[]>([]))
+        tap(() => logger.log('retrieved allowed values')),
+        catchError(this.handleError_continue<AllowedValues[]>([]))
       );
-    const subscription = data$.subscribe({
-      next: data => {
-        this.allowedValues = data;
-      },
-      complete: () => {
-        subscription.unsubscribe();
-      },
-    });
-    return data$;
+  }
+
+  public getAllowedValueRules(): Observable<AllowedValueRule[]> {
+    return this.http
+      .get<AllowedValueRule[]>(`${this.apiUrl}/config/allowed-values/rules`)
+      .pipe(catchError(this.handleError_raise<AllowedValueRule[]>()));
+  }
+
+  public getAllowedValueCatalog(): Observable<AllowedValueCatalog> {
+    return this.http
+      .get<AllowedValueCatalog>(`${this.apiUrl}/config/allowed-values/catalog`)
+      .pipe(catchError(this.handleError_raise<AllowedValueCatalog>()));
+  }
+
+  public postAllowedValueRule(
+    propertyName: string,
+    domainName: string,
+    values: AllowedValueOption[]
+  ): Observable<AllowedValueRule> {
+    return this.http
+      .post<AllowedValueRule>(`${this.apiUrl}/config/allowed-values/rules`, {
+        propertyName,
+        domainName,
+        values,
+      })
+      .pipe(
+        tap(this.handleSuccess('allowed values created')),
+        catchError(this.handleError_raise<AllowedValueRule>())
+      );
+  }
+
+  public validateAllowedValue(
+    propertyName: string,
+    domainName: string,
+    objectTypes: string[],
+    value: string
+  ): Observable<{ value: string }> {
+    return this.http
+      .post<{ value: string }>(
+        `${this.apiUrl}/config/allowed-values/validate`,
+        {
+          propertyName,
+          domainName,
+          objectTypes,
+          value,
+        }
+      )
+      .pipe(catchError(this.handleError_raise<{ value: string }>()));
+  }
+
+  public putAllowedValueRule(
+    propertyName: string,
+    domainName: string,
+    values: AllowedValueOption[]
+  ): Observable<AllowedValueRule> {
+    return this.http
+      .put<AllowedValueRule>(
+        `${this.apiUrl}/config/allowed-values/rules/${encodeURIComponent(propertyName)}/${encodeURIComponent(domainName)}`,
+        { values }
+      )
+      .pipe(
+        tap(this.handleSuccess('allowed values updated')),
+        catchError(this.handleError_raise<AllowedValueRule>())
+      );
   }
 
   /**

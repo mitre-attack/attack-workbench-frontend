@@ -1,0 +1,129 @@
+<div
+  class="validation-bypasses-page allowed-values-page list-page grid spacing-20">
+  <div class="list-page-header">
+    <h1>Allowed Values</h1>
+    <button
+      mat-raised-button
+      color="primary"
+      type="button"
+      (click)="editValues()"
+      [disabled]="loading || !catalog || !!error">
+      <mat-icon>add</mat-icon> Add New Property
+    </button>
+  </div>
+  <p>
+    Configure values by property and domain, then choose one object type at a
+    time. Only choices approved by the backend ADM can be configured; validation
+    bypasses do not apply. Disabling or removing values does not change existing
+    objects.
+  </p>
+  <p *ngIf="catalog">
+    Backend ADM {{ catalog.admVersion }} ·
+    {{ dataSource.data.length }} configured property/domain groups
+  </p>
+  <div role="alert" *ngIf="error">
+    {{ error }}
+    <button mat-button type="button" (click)="loadRules()" [disabled]="loading">
+      retry
+    </button>
+  </div>
+  <app-loading-overlay
+    *ngIf="loading"
+    message="loading allowed values"></app-loading-overlay>
+  <div class="table-container">
+    <div class="controls">
+      <div class="input-group">
+        <mat-form-field class="search" appearance="fill">
+          <mat-label>search</mat-label>
+          <input matInput #search (input)="applySearch(search.value)" />
+        </mat-form-field>
+      </div>
+    </div>
+    <div class="scroll-container">
+      <table
+        mat-table
+        matSort
+        [dataSource]="dataSource"
+        aria-label="allowed values table">
+        <ng-container matColumnDef="propertyName">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>property</th>
+          <td mat-cell *matCellDef="let row">{{ row.propertyName }}</td>
+        </ng-container>
+        <ng-container matColumnDef="domainName">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>domain</th>
+          <td mat-cell *matCellDef="let row">{{ row.domainName }}</td>
+        </ng-container>
+        <ng-container matColumnDef="objectTypes">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>
+            object types
+          </th>
+          <td mat-cell *matCellDef="let row">
+            {{ row.objectTypes.join(', ') }}
+          </td>
+        </ng-container>
+        <ng-container matColumnDef="values">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>value set</th>
+          <td mat-cell *matCellDef="let row" class="value-summary">
+            <span
+              >{{ row.valueCount }}
+              {{ row.valueCount === 1 ? 'value' : 'values' }}</span
+            >
+            <span *ngIf="row.disabledCount">
+              · {{ row.disabledCount }} disabled options</span
+            >
+            <p *ngIf="row.invalidValues.length" role="status">
+              {{ row.invalidValues.length }} unavailable legacy settings
+              excluded from dropdowns. Open the editor to review.
+            </p>
+            <div class="value-preview">
+              <span
+                *ngFor="let option of row.preview"
+                class="value-option"
+                [class.disabled]="!option.enabled"
+                [matTooltip]="option.objectTypes.join(', ')">
+                {{ option.value }}{{ option.enabled ? '' : ' (disabled)' }}
+              </span>
+              <span
+                class="remaining-values"
+                *ngIf="row.values.length > row.preview.length">
+                +{{ row.values.length - row.preview.length }} more options
+              </span>
+            </div>
+          </td>
+        </ng-container>
+        <ng-container matColumnDef="actions">
+          <th mat-header-cell *matHeaderCellDef>actions</th>
+          <td mat-cell *matCellDef="let row" class="action-cell">
+            <button
+              mat-button
+              color="primary"
+              (click)="editValues(row)"
+              [disabled]="loading || !catalog || !!error"
+              [attr.aria-label]="
+                'Edit values for ' + row.propertyName + ' in ' + row.domainName
+              ">
+              <mat-icon>edit</mat-icon> edit values
+            </button>
+          </td>
+        </ng-container>
+        <tr mat-header-row *matHeaderRowDef="columnsToDisplay"></tr>
+        <tr
+          mat-row
+          *matRowDef="let row; columns: columnsToDisplay"
+          class="element-row"></tr>
+        <tr *matNoDataRow>
+          <td [attr.colspan]="columnsToDisplay.length">
+            <span *ngIf="loaded && !loading">{{
+              dataSource.filter
+                ? 'No matching allowed value rules.'
+                : 'No configured properties. Use Add New Property to begin.'
+            }}</span>
+          </td>
+        </tr>
+      </table>
+    </div>
+    <mat-paginator
+      [pageSizeOptions]="[10, 25, 100]"
+      [pageSize]="25"></mat-paginator>
+  </div>
+</div>

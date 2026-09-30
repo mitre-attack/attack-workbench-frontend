@@ -50,6 +50,57 @@ snapshot. Standard tracks retain their most recent rolling draft plus preserved
 release sources and drafts referenced by virtual provenance, so these labels
 describe surviving snapshots rather than every past action.
 
+Virtual release tracks open on **Releases**, not a Board. **Open Snapshot** on
+each card enters a read-only, URL-addressable contents view for that exact
+snapshot. Search by name, STIX ID, ATT&CK ID, or revision, combine **STIX type**
+and **Source track** filters, and inspect the selected revision's JSON. Each row
+shows its recorded component origins. A deduplicated revision contributed by
+multiple tracks appears once and matches any of its sources. **Source not
+recorded** identifies objects without captured origin metadata; current component
+membership is never substituted for snapshot provenance. Relationships and supporting objects
+are included; the generated collection projection is not a manifest member.
+**Back to Releases** returns to the snapshot cards. Standard tracks retain
+their Board workflow.
+
+The Releases history filter and pagination remain available for virtual tracks.
+Automatic history and cleanup refresh runs while Releases is visible, and pauses
+in Config, inside a snapshot, or while a dialog or edit is active. Virtual track
+descriptions can be edited from the Releases introduction.
+
+Every contents row offers **Preview**, **View in Object Library**, and JSON
+inspection when its payload is available. Preview opens the pinned snapshot
+revision read-only, including relationships, identities, and marking definitions.
+Closing it preserves the table's filters and position. If a manifest contains only
+an exact reference, Preview retrieves that revision and reports failures inline
+instead of substituting the latest object. Relationship previews use endpoint
+revisions from the same snapshot.
+
+**View in Object Library** opens the object's library page in a new tab; that
+page can show newer workspace content than the snapshot. Relationship library
+pages are read-only. Object previews fit their content width and remain within
+the viewport rather than inheriting the wider quarantine modal's dimensions.
+
+**View Quarantined Objects** appears inside a snapshot only when that snapshot's
+deduplication strategy is `quarantine` and its quarantine contains entries.
+The modal groups competing revisions by object and shows their component sources
+side by side on wider screens, stacked on narrow screens. Each revision's
+**View JSON** can remain open independently; **Compare JSON** opens all revisions
+in that group for comparison. JSON comes from the exact revision endpoint and
+retains the original STIX fields. **View details** opens that revision read-only
+without losing the comparison or selection. **View in Object Library**
+opens the ordinary object page in a new tab and is explicitly distinct from the
+historical revision views. Retrieval failures or mismatched revisions are shown
+inline with Retry; they never substitute the latest revision.
+An editor can select an exact revision in the latest untagged snapshot; resolving
+it creates a new draft rather than changing the viewed snapshot. Historical
+and tagged snapshots are review-only.
+
+The [isolated design preview](local-dev.md#virtual-snapshot-design-preview)
+demonstrates the complete manifest, including non-exported LinkById dependencies.
+The current production API does not expose those dependency records. Against
+that API, the contents view explicitly labels its exported-only coverage instead
+of claiming to list the complete manifest.
+
 For a virtual track's recurring schedule, use **Find a schedule** in the Config
 tab: typing `hou` suggests **Hourly — at minute 0**, and typing `every 15`
 suggests **Every 15 minutes**. Select a suggestion to apply it; unmatched text
@@ -154,7 +205,7 @@ while you are viewing it, the automatic history refresh lets you select a surviv
 
 The release preview offers minor and major relative tags as well as an exact `MAJOR.MINOR` version. Relative tags are calculated from the tagged snapshot immediately before the selected draft. When releasing an older draft, the exact version must also remain below the next tagged snapshot; the dialog shows these exclusive bounds. Optional release notes are stored on that snapshot and become the `x-mitre-collection` description in exported STIX bundles.
 
-The release-track page follows a draft-then-tag flow: the Board tab manages what the next draft contains (candidates, staged objects, and for virtual tracks the Create Draft action), and the Releases tab previews and tags a draft from its card. For virtual tracks, each snapshot card shows its own Composition Resolution provenance: the exact component track snapshot, tagged version, snapshot creation timestamp, resolution strategy and filters, and source/filter/contribution counts used for that materialization. Any snapshot can be exported from its card as a STIX 2.0 bundle, a STIX 2.1 bundle, or Workbench JSON. Historical snapshot exports can also copy a concise summary. Every snapshot seals its content when its members are written, so exports replay the exact members, relationships, and supporting objects in either STIX version; released snapshots also show their stable bundle identifier and SHA-256 hashes. Saving a relationship resets its source and target to work-in-progress in place without creating new revisions of those objects. A standard release preserves its exact pre-release draft, which remains hidden while the release exists. Administrators can convert the most recent tagged release back to a draft from the Releases tab by confirming its version. Standard tracks restore the preserved pre-release draft; virtual tracks retain the same snapshot and composition provenance while removing its tag and publication metadata. Conversion is blocked when any downstream virtual snapshot resolved that release. Tagged releases cannot be deleted directly. Editors can separately delete the current draft, provided it is not the track's only snapshot, a preserved source of a tagged release, or a resolved component of a downstream virtual snapshot. Administrators can also correct a tagged snapshot's version from its card when the replacement remains valid between adjacent releases. A track can carry an alias (a short lowercase slug set in the Config tab) that works in place of its ID in page URLs and API paths; the track list opens aliased tracks by their alias. Virtual-track schedules are configured in the Config tab as manual, recurring, or specific dates; recurring schedules use guided cadence/day/time controls that generate a five-field UTC cron expression, and specific dates use controlled future UTC date and time inputs. Scheduled drafts run only when the connected REST API has its global scheduler enabled. The dashboard's Data Quality page adds a domain consistency report: relationships whose objects share no domain (and objects with no domain) can never ship in the same bundle, so fix them at the source rather than expecting the bundle to pull in related objects. Only the most recent tagged release offers Convert to draft, and only the current draft offers Delete draft, a progress bar with a status message appears under the page header while a long operation runs, and deleting an entire track lives in the danger zone at the bottom of the Config tab.
+The release-track page follows a draft-then-tag flow: standard tracks use the Board to manage candidates and staged objects; virtual tracks use Releases to browse atomic snapshots, with Create Draft in the page header. The Releases tab previews and tags a draft from its card. For virtual tracks, each snapshot card has a collapsible Component provenance section: the exact component track snapshot, tagged version, snapshot creation timestamp, resolution strategy and filters, and source/filter/contribution counts used for that materialization. Any snapshot can be exported from its card as a STIX 2.0 bundle, a STIX 2.1 bundle, or Workbench JSON. Historical snapshot exports can also copy a concise summary. Every snapshot seals its content when its members are written, so exports replay the exact members, relationships, and supporting objects in either STIX version; released snapshots also show their stable bundle identifier and SHA-256 hashes. Saving a relationship resets its source and target to work-in-progress in place without creating new revisions of those objects. A standard release preserves its exact pre-release draft, which remains hidden while the release exists. Administrators can convert the most recent tagged release back to a draft from the Releases tab by confirming its version. Standard tracks restore the preserved pre-release draft; virtual tracks retain the same snapshot and composition provenance while removing its tag and publication metadata. Conversion is blocked when any downstream virtual snapshot resolved that release. Tagged releases cannot be deleted directly. Editors can separately delete the current draft, provided it is not the track's only snapshot, a preserved source of a tagged release, or a resolved component of a downstream virtual snapshot. Administrators can also correct a tagged snapshot's version from its card when the replacement remains valid between adjacent releases. A track can carry an alias (a short lowercase slug set in the Config tab) that works in place of its ID in page URLs and API paths; the track list opens aliased tracks by their alias. Virtual-track schedules are configured in the Config tab as manual, recurring, or specific dates; recurring schedules use guided cadence/day/time controls that generate a five-field UTC cron expression, and specific dates use controlled future UTC date and time inputs. Scheduled drafts run only when the connected REST API has its global scheduler enabled. The dashboard's Data Quality page adds a domain consistency report: relationships whose objects share no domain (and objects with no domain) can never ship in the same bundle, so fix them at the source rather than expecting the bundle to pull in related objects. Only the most recent tagged release offers Convert to draft, and only the current draft offers Delete draft, a progress bar with a status message appears under the page header while a long operation runs, and deleting an entire track lives in the danger zone at the bottom of the Config tab.
 
 On a virtual track's **Board**, **Composition Resolution** starts collapsed to
 leave more room for Members and Quarantine. Click its heading, or focus it and
@@ -268,6 +319,64 @@ Objects imported from collections can be modified, or new objects created. The p
 The Workbench will attribute edits to you when you edit existing objects or create new objects. Attribution is shown next to created and modified dates and in the object history timeline. Attribution is represented by an automatically generated icon to easily distinguish different editing/creating organizations or individuals; hovering over the icon will display the full organization name or user display name. Your user display name can be edited or removed through the user profile page. If removed, your username will be shown in its place for attribution.
 
 Edits you make in the knowledge base are attributed to your _organization identity_, which is unique to your Workbench instance. The organization identity can be edited from the admin page accessible from the application homepage; when you first open the application you will be prompted to edit the organization identity to ensure the placeholder identity is not used. Changes to your organization identity will automatically update objects in the knowledge base, but attribution within exported collections will not be automatically affected.
+
+### Managing Allowed Values
+
+Administrators can open **Dashboard → Admin → Allowed Values**, immediately
+below **Validation Bypasses** in the sidebar. The searchable, sortable table
+contains **one row per property and domain**, not one row per value or object
+type. It starts with 15 configured rules, fitting on the default 25-row page.
+Each row shows supported object types, a value count, and a compact preview.
+The page identifies the backend ADM version supplying the permitted choices.
+
+**Add New Property** opens a guided workflow:
+
+1. Choose a supported property.
+2. Choose an ADM-valid domain and one object type.
+3. Select permitted values from a searchable checklist.
+4. Review the configuration and choose **Create property**.
+
+If that property/domain is already configured, choose **Open existing editor**
+instead of creating a duplicate. New scopes are available only where the
+installed backend ADM accepts the property for that domain and object type;
+this does not create arbitrary STIX schema fields.
+
+**Edit values** uses the same checklist, with one object-type selector above it
+instead of repeated applicability controls for every value:
+
+- Check an approved value to enable it; uncheck it to keep it disabled.
+- **Remove** clears that value's configuration for the selected object type.
+- Switch object type to edit another scope. Other types' settings are retained.
+- **Save all values** applies the draft atomically; **Cancel** discards it.
+
+Enum fields have no freeform value input. For the data-source/component field,
+enter the two names separately and choose **Validate and add**. ADM must accept
+the combined value before it enters the draft. Unvalidated input blocks saving
+until it is approved or cleared.
+
+Saving an empty set leaves the configured rule available for later editing.
+
+Supported properties remain the original configurable fields: platforms for
+analytics, techniques, software, data sources and assets; technique tactic/impact
+types, permissions and data-source/component names; collection layers; asset
+sectors and related-asset sectors; and identity classes and sectors. Available
+domains and permissible values are derived from the backend ADM Zod schemas.
+
+Changes persist across restarts. Open or reopen an editor to load the latest
+enabled choices. An existing unavailable selection remains visible but is not a
+newly selectable option. Remove list/subtype selections using their chip's
+remove control; once removed, they cannot be reselected unless an administrator
+re-enables or adds the value.
+
+Allowed Values configuration is always ADM-validated, including disabled
+options. General validation settings and **ADM Validation Bypasses** cannot
+permit non-compliant configuration values. The frontend uses the backend's
+catalog, so a different frontend ADM package version cannot broaden choices.
+
+Legacy configuration values that no longer comply with ADM are marked
+**unavailable** and excluded from dropdowns. They remain stored until the rule
+is saved; the editor explains that saving removes those unavailable settings.
+Existing ATT&CK objects are never rewritten by this configuration workflow.
 
 ### Quality Control Workflows
 

@@ -1,0 +1,226 @@
+<div class="snapshot-quarantine-dialog">
+  <h2 mat-dialog-title>Quarantined objects</h2>
+  <mat-dialog-content>
+    <div class="snapshot-context">
+      <strong>{{ data.title }}</strong>
+      <span
+        >Snapshot modified
+        <time [attr.datetime]="data.modified">{{ data.modified }}</time></span
+      >
+    </div>
+
+    <p>
+      These objects have conflicting revisions from component tracks. Their
+      quarantined revisions are excluded from this snapshot's graph.
+    </p>
+    <p class="review-notice" *ngIf="data.canResolve; else readOnlyNotice">
+      Select a revision for one object, then choose
+      <strong>Use selected revision</strong>. A successful choice creates a new
+      draft and leaves this viewed snapshot unchanged. Review any remaining
+      conflicts in the new draft.
+    </p>
+    <ng-template #readOnlyNotice>
+      <p class="review-notice">
+        Review only. Historical and tagged snapshots cannot be edited. Resolving
+        conflicts requires the latest untagged draft and permission to edit this
+        track.
+      </p>
+    </ng-template>
+
+    <p *ngIf="!groups.length">This snapshot has no quarantined objects.</p>
+
+    <section
+      class="conflict-group"
+      *ngFor="let group of groups; let groupIndex = index"
+      [attr.aria-labelledby]="'quarantine-object-' + groupIndex">
+      <header>
+        <h3 [id]="'quarantine-object-' + groupIndex">
+          {{ group.name || group.objectRef }}
+        </h3>
+        <code *ngIf="group.name">{{ group.objectRef }}</code>
+        <span class="revision-count">
+          {{ group.revisions.length }} conflicting
+          {{ group.revisions.length === 1 ? 'revision' : 'revisions' }}
+        </span>
+        <div class="comparison-actions">
+          <button type="button" mat-stroked-button (click)="compareJson(group)">
+            Compare JSON
+          </button>
+          <a
+            *ngIf="group.currentObjectRoute"
+            mat-button
+            [routerLink]="group.currentObjectRoute"
+            target="_blank"
+            rel="noopener noreferrer"
+            [attr.aria-label]="
+              'View ' +
+              (group.name || group.objectRef) +
+              ' in Object Library (new tab)'
+            ">
+            View in Object Library
+          </a>
+        </div>
+      </header>
+
+      <mat-radio-group
+        *ngIf="data.canResolve; else reviewRevisions"
+        class="revision-list"
+        [attr.aria-labelledby]="'quarantine-object-' + groupIndex"
+        [disabled]="savingObjectRef !== null"
+        [value]="group.selectedModified"
+        (change)="group.selectedModified = $event.value">
+        <div
+          *ngFor="let revision of group.revisions"
+          class="revision-card"
+          [class.selected]="group.selectedModified === revision.modified">
+          <mat-radio-button [value]="revision.modified">
+            <span class="revision-label"
+              >Use revision
+              <time [attr.datetime]="revision.modified">{{
+                revision.modified
+              }}</time></span
+            >
+          </mat-radio-button>
+          <ng-container
+            *ngTemplateOutlet="
+              revisionDetails;
+              context: { $implicit: revision, group: group }
+            "></ng-container>
+        </div>
+      </mat-radio-group>
+
+      <ng-template #reviewRevisions>
+        <div class="revision-list">
+          <article
+            *ngFor="let revision of group.revisions"
+            class="revision-card">
+            <div class="revision-label">
+              Revision
+              <time [attr.datetime]="revision.modified">{{
+                revision.modified
+              }}</time>
+            </div>
+            <ng-container
+              *ngTemplateOutlet="
+                revisionDetails;
+                context: { $implicit: revision, group: group }
+              "></ng-container>
+          </article>
+        </div>
+      </ng-template>
+
+      <div class="resolution-actions" *ngIf="data.canResolve">
+        <button
+          type="button"
+          mat-stroked-button
+          color="primary"
+          [disabled]="!group.selectedModified || savingObjectRef !== null"
+          (click)="useSelectedRevision(group)">
+          {{
+            savingObjectRef === group.objectRef
+              ? 'Creating new draft…'
+              : 'Use selected revision'
+          }}
+        </button>
+        <p
+          class="resolution-error"
+          role="alert"
+          *ngIf="errorMessage && errorObjectRef === group.objectRef">
+          {{ errorMessage }}
+        </p>
+      </div>
+    </section>
+
+    <ng-template #revisionDetails let-revision let-group="group">
+      <div class="revision-details">
+        <p class="revision-name" *ngIf="revision.name || revision.attackId">
+          <strong *ngIf="revision.name">{{ revision.name }}</strong>
+          <span *ngIf="revision.attackId">{{ revision.attackId }}</span>
+        </p>
+        <dl *ngFor="let source of revision.sources" class="revision-source">
+          <dt>Source track</dt>
+          <dd>
+            <span *ngIf="source.trackName">{{ source.trackName }}</span>
+            <code>{{ source.trackId }}</code>
+            <span *ngIf="source.version">Release {{ source.version }}</span>
+          </dd>
+          <dt>Conflict reason</dt>
+          <dd>{{ source.reason }}</dd>
+        </dl>
+        <div class="revision-actions">
+          <button
+            type="button"
+            mat-button
+            *ngIf="group.canViewDetails"
+            [disabled]="savingObjectRef !== null || revision.loading"
+            [attr.aria-label]="'View details for revision ' + revision.modified"
+            (click)="viewDetails(group, revision)">
+            View details
+          </button>
+          <button
+            type="button"
+            mat-button
+            [attr.aria-expanded]="revision.showJson"
+            [attr.aria-controls]="revision.panelId"
+            [attr.aria-label]="
+              (revision.showJson ? 'Hide' : 'View') +
+              ' JSON for revision ' +
+              revision.modified
+            "
+            (click)="toggleJson(group, revision)">
+            {{ revision.showJson ? 'Hide JSON' : 'View JSON' }}
+          </button>
+        </div>
+        <p class="details-unavailable" *ngIf="!group.canViewDetails">
+          This object type has no read-only details dialog. View JSON to inspect
+          the exact revision.
+        </p>
+        <p class="revision-loading" role="status" *ngIf="revision.loading">
+          Loading exact revision {{ revision.modified }}…
+        </p>
+        <div class="revision-error" role="alert" *ngIf="revision.error">
+          <p>{{ revision.error }}</p>
+          <button
+            type="button"
+            mat-stroked-button
+            [disabled]="revision.loading || savingObjectRef !== null"
+            [attr.aria-label]="'Retry loading revision ' + revision.modified"
+            (click)="loadRevision(group, revision)">
+            Retry
+          </button>
+        </div>
+        <section
+          *ngIf="revision.showJson"
+          class="revision-json"
+          [id]="revision.panelId"
+          [attr.aria-label]="
+            'Raw STIX JSON for ' +
+            group.objectRef +
+            ', revision ' +
+            revision.modified
+          "
+          [attr.aria-busy]="revision.loading">
+          <pre
+            *ngIf="revision.json"
+            tabindex="0"
+            [attr.aria-label]="
+              'Raw STIX JSON for revision ' + revision.modified
+            "><code>{{ revision.json }}</code></pre>
+        </section>
+      </div>
+    </ng-template>
+
+    <p class="resolution-status" role="status" *ngIf="savingObjectRef">
+      Creating a new draft with the selected revision…
+    </p>
+  </mat-dialog-content>
+  <mat-dialog-actions align="end">
+    <button
+      type="button"
+      mat-button
+      [disabled]="savingObjectRef !== null"
+      [mat-dialog-close]="false">
+      Close
+    </button>
+  </mat-dialog-actions>
+</div>

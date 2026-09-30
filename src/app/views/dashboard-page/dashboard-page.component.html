@@ -22,6 +22,14 @@
         ADM Validation Bypasses
       </button>
       <button
+        *ngIf="canManageAllowedValues"
+        mat-button
+        color="primary"
+        type="button"
+        routerLink="/dashboard/allowed-values">
+        Allowed Values
+      </button>
+      <button
         mat-icon-button
         color="primary"
         type="button"

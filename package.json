@@ -21,6 +21,7 @@
   "scripts": {
     "ng": "ng",
     "start": "ng serve",
+    "preview:snapshots": "node scripts/snapshot-preview.mjs",
     "build": "ng build",
     "postbuild": "npm run generate:build-info",
     "build-prod": "ng build --configuration production",

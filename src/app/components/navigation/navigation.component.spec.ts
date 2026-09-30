@@ -177,11 +177,12 @@ describe('NavigationComponent', () => {
         exact: true,
       })
     );
-    expect(component.dashboardAdminItems.map(item => item.label)).toEqual([
-      'Organization Settings',
-      'User Accounts',
-      'Default Marking Definitions',
-      'Validation Bypasses',
+    expect(component.dashboardAdminItems.map(item => item.path)).toEqual([
+      '/dashboard/org-settings',
+      '/dashboard/user-accounts',
+      '/dashboard/default-marking-definitions',
+      '/dashboard/validation-bypasses',
+      '/dashboard/allowed-values',
     ]);
   });
 

@@ -103,6 +103,13 @@
                 (closeDialogEvent)="close()">
               </app-relationship-view>
             }
+            @case ('identity') {
+              <app-identity-view [config]="config"></app-identity-view>
+            }
+            @case ('marking-definition') {
+              <app-marking-definition-view
+                [config]="config"></app-marking-definition-view>
+            }
             @case ('intrusion-set') {
               <app-group-view [config]="config"> </app-group-view>
             }

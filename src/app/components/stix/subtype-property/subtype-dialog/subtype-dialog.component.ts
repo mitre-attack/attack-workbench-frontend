@@ -71,8 +71,9 @@ export class SubtypeDialogComponent implements OnInit, OnDestroy {
 
     // create a form control for each 'select' field
     selections.forEach(fieldName => {
-      if (!this.data[fieldName]) this.data[fieldName] = [];
-      this.selectControls[fieldName] = new FormControl(this.data[fieldName]);
+      this.selectControls[fieldName] = new FormControl(
+        this.data[fieldName] || []
+      );
     });
 
     // load allowed values for 'select' fields
@@ -85,19 +86,19 @@ export class SubtypeDialogComponent implements OnInit, OnDestroy {
           );
           selections.forEach(field => {
             const values = new Set<string>();
-            const property = allAllowedValues.properties.find(
+            const property = allAllowedValues?.properties?.find(
               p => p.propertyName == field
             );
             if ('domains' in this.config.object) {
               const obj = this.config.object as any;
-              property.domains.forEach(domain => {
+              property?.domains?.forEach(domain => {
                 if (obj.domains.includes(domain.domainName)) {
                   domain.allowedValues.forEach(values.add, values);
                 }
               });
             } else {
               // domains not specified on object
-              property.domains.forEach(domain => {
+              property?.domains?.forEach(domain => {
                 domain.allowedValues.forEach(values.add, values);
               });
             }
@@ -134,12 +135,25 @@ export class SubtypeDialogComponent implements OnInit, OnDestroy {
     this.dialogRef.close();
   }
 
+  public getOptions(fieldName: string): string[] {
+    return [
+      ...new Set<string>([
+        ...(this.allowedValues[fieldName] || []),
+        ...(this.selectControls[fieldName].value || []),
+      ]),
+    ];
+  }
+
   /** Handles onSelectionChange event to add or remove the
    *  user's selection from a multi-select field */
   public change(event: MatOptionSelectionChange, fieldName: string): void {
     if (!event.isUserInput) return;
-    if (event.source.selected) this.data[fieldName].push(event.source.value);
-    else this.remove(fieldName, event.source.value);
+    if (event.source.selected) {
+      this.data[fieldName] = [
+        ...(this.data[fieldName] || []),
+        event.source.value,
+      ];
+    } else this.remove(fieldName, event.source.value);
   }
 
   /** Remove value from multi-select field */

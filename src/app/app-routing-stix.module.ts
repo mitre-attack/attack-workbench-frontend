@@ -164,6 +164,24 @@ stixRouteData.forEach(stixRoute => {
 });
 
 stixRoutes.push({
+  path: 'relationship/:id',
+  canActivateChild: [AuthorizationGuard],
+  data: { breadcrumb: 'loading...' },
+  children: [
+    {
+      path: '',
+      data: {
+        breadcrumb: 'view',
+        editable: false,
+        title: 'view relationship',
+        roles: viewRoles,
+      },
+      component: StixPageComponent,
+    },
+  ],
+});
+
+stixRoutes.push({
   path: 'marking-definition',
   canActivateChild: [AuthorizationGuard],
   data: {
