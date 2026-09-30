@@ -1088,6 +1088,110 @@ $released-members-disabled-dark: colors.on-color-deemphasis(dark);
     overflow: hidden;
   }
 
+  .virtual-resolution-panel {
+    flex: 0 0 auto;
+    min-width: 0;
+
+    &.collapsed > .content .virtual-resolution-header {
+      margin-bottom: 0;
+    }
+  }
+
+  .virtual-resolution-header {
+    flex-wrap: wrap;
+    gap: 8px 24px;
+  }
+
+  .virtual-resolution-toggle {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    border: 0;
+    padding: 0;
+    color: inherit;
+    background: transparent;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+
+    .mat-icon {
+      flex: 0 0 auto;
+    }
+
+    &:focus-visible {
+      outline: 2px solid currentColor;
+      outline-offset: 2px;
+    }
+  }
+
+  .virtual-resolution-table {
+    width: 100%;
+    min-width: 0;
+    overflow-x: auto;
+
+    table {
+      width: 100%;
+      min-width: 960px;
+      table-layout: fixed;
+      border-collapse: collapse;
+      font-size: 14px;
+      line-height: 20px;
+    }
+
+    .virtual-resolution-component-col {
+      width: 34%;
+    }
+
+    .virtual-resolution-strategy-col,
+    .virtual-resolution-version-col {
+      width: 18%;
+    }
+
+    .virtual-resolution-count-col {
+      width: 10%;
+    }
+
+    th,
+    td {
+      padding: 12px;
+      text-align: left;
+      vertical-align: middle;
+      overflow-wrap: anywhere;
+    }
+
+    th:nth-child(n + 4),
+    td:nth-child(n + 4) {
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .component-track-id {
+      display: block;
+      color: colors.on-color-deemphasis(light);
+
+      :host-context(.dark) & {
+        color: colors.on-color-deemphasis(dark);
+      }
+    }
+
+    tbody tr {
+      border-top: 1px solid colors.border-color(light);
+
+      :host-context(.dark) & {
+        border-color: colors.border-color(dark);
+      }
+    }
+
+    .clickable-row:focus-visible {
+      outline-offset: -2px;
+    }
+
+    .virtual-empty-cell {
+      padding: 24px 12px;
+      text-align: center;
+    }
+  }
+
   .snapshot-composition-components {
     display: grid;
   }

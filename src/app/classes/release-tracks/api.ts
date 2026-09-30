@@ -202,7 +202,8 @@ export interface VirtualReleasePreviewSummary extends ReleasePreviewSummaryBase 
 }
 
 export type ReleasePreviewSummary =
-  StandardReleasePreviewSummary | VirtualReleasePreviewSummary;
+  | StandardReleasePreviewSummary
+  | VirtualReleasePreviewSummary;
 
 export interface SnapshotBundleHashes {
   manifest_id: string;

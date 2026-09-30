@@ -101,7 +101,11 @@ export const WORKFLOW_STATUS_RANK: Record<WorkflowStatusType, number> = {
  * Collection/release changelog categories
  */
 export type ChangelogCategory =
-  'additions' | 'changes' | 'minor_changes' | 'revocations' | 'deprecations';
+  | 'additions'
+  | 'changes'
+  | 'minor_changes'
+  | 'revocations'
+  | 'deprecations';
 
 export interface ReleaseTrackStatus {
   trackId: string;

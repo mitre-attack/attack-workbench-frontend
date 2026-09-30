@@ -71,7 +71,14 @@ export class ReleaseManagementComponent implements OnInit, OnDestroy {
 
   private tracksWithComputedData(data: any[]): any[] {
     return data.map((track: any) => {
-      const summary = track.summary ?? {};
+      const summary =
+        track.summary ??
+        track.latest_snapshot?.summary ??
+        track.statistics ??
+        {};
+      const componentTracks = track.composition?.component_tracks;
+      const members = track.members;
+      const quarantine = track.quarantine;
 
       return {
         ...track,
@@ -80,8 +87,17 @@ export class ReleaseManagementComponent implements OnInit, OnDestroy {
         stats: {
           candidates: summary.candidates_count ?? 0,
           staged: summary.staged_count ?? 0,
-          members: summary.members_count ?? 0,
-          quarantined: 0,
+          members:
+            summary.members_count ??
+            (Array.isArray(members) ? members.length : 0),
+          quarantined:
+            summary.quarantine_count ??
+            summary.quarantined_count ??
+            (Array.isArray(quarantine) ? quarantine.length : 0),
+          components:
+            summary.component_tracks_count ??
+            summary.components_count ??
+            (Array.isArray(componentTracks) ? componentTracks.length : 0),
         },
       };
     });
