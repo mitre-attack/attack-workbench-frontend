@@ -14,6 +14,8 @@ import type {
   ClonePayload,
   Composition,
   CreateReleaseTrackPayload,
+  DraftCleanupResult,
+  CreateVirtualSnapshotPayload,
   ExportFormatType,
   PromoteQuarantinePayload,
   ReleasePayload,
@@ -24,6 +26,7 @@ import type {
   ReleaseTrackSnapshotOptions,
   ReviewPayload,
   SnapshotHistoryOptions,
+  SnapshotHistoryResponse,
   SnapshotSchedule,
   StixBundlePayload,
   StixObjectRef,
@@ -43,6 +46,7 @@ export type {
   ReleaseTrackSnapshotOptions,
   ReviewPayload,
   SnapshotHistoryOptions,
+  SnapshotHistoryResponse,
   StixBundlePayload,
   StixObjectRef,
   UpdateMetadataPayload,
@@ -223,7 +227,7 @@ export class ReleaseTracksConnectorService extends ApiConnector {
   public listSnapshots(
     id: string,
     options: SnapshotHistoryOptions = {}
-  ): Observable<Paginated<ReleaseTrackSnapshotHistoryItem>> {
+  ): Observable<SnapshotHistoryResponse> {
     const params = this.buildHttpParams({
       limit: 200,
       offset: 0,
@@ -231,16 +235,14 @@ export class ReleaseTracksConnectorService extends ApiConnector {
     });
     const url = `${this.apiUrl}/release-tracks/${id}/snapshots`;
     return this.http
-      .get<Paginated<ReleaseTrackSnapshotHistoryItem>>(url, {
+      .get<SnapshotHistoryResponse>(url, {
         params,
       })
       .pipe(
         tap(result =>
           logger.log(`retrieved snapshots for track ${id}`, result)
         ),
-        catchError(
-          this.handleError_raise<Paginated<ReleaseTrackSnapshotHistoryItem>>()
-        ),
+        catchError(this.handleError_raise<SnapshotHistoryResponse>()),
         share()
       );
   }
@@ -471,7 +473,7 @@ export class ReleaseTracksConnectorService extends ApiConnector {
     const url = `${this.apiUrl}/release-tracks/${id}/snapshots/${encodeURIComponent(modified)}/release`;
     return this.http.post(url, body).pipe(
       tap(result => logger.log(`released snapshot ${modified}`, result)),
-      catchError(this.handleError_raise()),
+      catchError(this.handleError_raise(false)),
       share()
     );
   }
@@ -553,7 +555,7 @@ export class ReleaseTracksConnectorService extends ApiConnector {
    */
   public createVirtualSnapshot(
     id: string,
-    body?: { description?: string }
+    body?: CreateVirtualSnapshotPayload
   ): Observable<any> {
     const url = `${this.apiUrl}/release-tracks/${id}/virtual/snapshots/create`;
     return this.http.post(url, body || {}).pipe(
@@ -843,6 +845,33 @@ export class ReleaseTracksConnectorService extends ApiConnector {
       catchError(this.handleError_raise()),
       share()
     );
+  }
+
+  public listDraftCleanup(
+    id: string
+  ): Observable<{ data: DraftCleanupResult[] }> {
+    const url = `${this.apiUrl}/release-tracks/${id}/virtual/draft-cleanup`;
+    return this.http
+      .get<{ data: DraftCleanupResult[] }>(url)
+      .pipe(
+        catchError(
+          this.handleError_raise<{ data: DraftCleanupResult[] }>(false)
+        ),
+        share()
+      );
+  }
+
+  public retryDraftCleanup(
+    id: string,
+    operationId: string
+  ): Observable<DraftCleanupResult> {
+    const url = `${this.apiUrl}/release-tracks/${id}/virtual/draft-cleanup/${encodeURIComponent(operationId)}/retry`;
+    return this.http
+      .post<DraftCleanupResult>(url, {})
+      .pipe(
+        catchError(this.handleError_raise<DraftCleanupResult>(false)),
+        share()
+      );
   }
 
   // -----------------------------------------------------------------------------

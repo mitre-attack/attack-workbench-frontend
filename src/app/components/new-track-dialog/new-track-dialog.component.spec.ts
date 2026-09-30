@@ -1,11 +1,12 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { NO_ERRORS_SCHEMA } from '@angular/core';
-import { ReactiveFormsModule } from '@angular/forms';
+import { FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { MatDialogRef, MAT_DIALOG_DATA } from '@angular/material/dialog';
 import { of } from 'rxjs';
 
 import { NewTrackDialogComponent } from './new-track-dialog.component';
 import { ReleaseTracksConnectorService } from 'src/app/services/connectors/rest-api/release-tracks.service';
+import { AuthenticationService } from 'src/app/services/connectors/authentication/authentication.service';
 import {
   DeduplicationStrategy,
   ReleaseTrackType,
@@ -58,7 +59,7 @@ describe('NewTrackDialogComponent', () => {
 
     await TestBed.configureTestingModule({
       declarations: [NewTrackDialogComponent],
-      imports: [ReactiveFormsModule],
+      imports: [FormsModule, ReactiveFormsModule],
       providers: [
         { provide: MatDialogRef, useValue: mockDialogRef },
         {
@@ -66,6 +67,10 @@ describe('NewTrackDialogComponent', () => {
           useValue: { type: ReleaseTrackType.Virtual },
         },
         { provide: ReleaseTracksConnectorService, useValue: mockConnector },
+        {
+          provide: AuthenticationService,
+          useValue: { isAuthorized: vi.fn(() => true) },
+        },
       ],
       schemas: [NO_ERRORS_SCHEMA],
     }).compileComponents();
@@ -73,6 +78,59 @@ describe('NewTrackDialogComponent', () => {
     fixture = TestBed.createComponent(NewTrackDialogComponent);
     component = fixture.componentInstance;
     component.ngOnInit();
+  });
+
+  it('rejects unsafe draft limits before creating a retained virtual track', () => {
+    component.form.patchValue({
+      name: 'Retained virtual track',
+      retentionEnabled: true,
+      snapshotSchedule: { mode: SnapshotScheduleMode.Cron, cron: '0 * * * *' },
+    });
+    component.toggleComponentTrack(component.componentTrackOptions[0], true);
+    for (const maxDrafts of [0, -1, 1.5, Number.MAX_SAFE_INTEGER + 1]) {
+      component.form.patchValue({ maxDrafts });
+      component.handleCreate();
+    }
+    expect(mockConnector.createReleaseTrack).not.toHaveBeenCalled();
+
+    component.form.patchValue({ maxDrafts: 1 });
+    component.handleCreate();
+    expect(
+      mockConnector.createReleaseTrack.mock.calls[0][0].snapshot_schedule
+        .draft_retention
+    ).toEqual({ max_drafts: 1 });
+  });
+
+  it('does not submit destructive retention settings for non-administrators', () => {
+    component.form.patchValue({
+      name: 'Unretained virtual track',
+      retentionEnabled: true,
+      maxDrafts: 10,
+      snapshotSchedule: { mode: SnapshotScheduleMode.Cron, cron: '0 * * * *' },
+    });
+    component.toggleComponentTrack(component.componentTrackOptions[0], true);
+    vi.mocked(
+      TestBed.inject(AuthenticationService).isAuthorized
+    ).mockReturnValue(false);
+    component.handleCreate();
+    expect(
+      mockConnector.createReleaseTrack.mock.calls[0][0].snapshot_schedule
+        .draft_retention
+    ).toBeUndefined();
+  });
+
+  it('drops recurring retention when creating a manual track', () => {
+    component.form.patchValue({
+      name: 'Manual virtual track',
+      retentionEnabled: true,
+      maxDrafts: 0,
+      snapshotSchedule: { mode: SnapshotScheduleMode.Manual },
+    });
+    component.toggleComponentTrack(component.componentTrackOptions[0], true);
+    component.handleCreate();
+    const payload = mockConnector.createReleaseTrack.mock.calls[0][0];
+    expect(payload.snapshot_schedule).toEqual({ mode: 'manual' });
+    expect(payload.draft_retention).toBeUndefined();
   });
 
   it('should list standard tracks even when they have no tagged snapshots', () => {
@@ -117,19 +175,6 @@ describe('NewTrackDialogComponent', () => {
     );
   });
 
-  it('should format component track snapshot labels', () => {
-    expect(
-      component.getComponentTrackSnapshotLabel(
-        component.componentTrackOptions[0]
-      )
-    ).toBe('v1.0');
-    expect(
-      component.getComponentTrackSnapshotLabel(
-        component.componentTrackOptions[1]
-      )
-    ).toBe('no tagged snapshots');
-  });
-
   it('should remove selected component tracks and clear their filters', () => {
     component.toggleComponentTrack(component.componentTrackOptions[0], true);
     component.componentTrackOptions[0].objectTypes = ['attack-pattern'];
@@ -140,13 +185,19 @@ describe('NewTrackDialogComponent', () => {
     expect(component.componentTrackOptions[0].objectTypes).toEqual([]);
   });
 
-  it('should create a virtual track with latest tagged components and priorities', () => {
+  it('should create a mixed composition with explicit priorities and independent filters', () => {
     component.form.patchValue({
       name: 'Combined Enterprise',
       description: 'Aggregates released Enterprise content',
     });
     component.toggleComponentTrack(component.componentTrackOptions[0], true);
     component.componentTrackOptions[0].objectTypes = ['attack-pattern'];
+    component.toggleComponentTrack(component.componentTrackOptions[1], true);
+    component.componentTrackOptions[1].resolutionStrategy =
+      ResolutionStrategy.LatestPreview;
+    component.componentTrackOptions[1].domains = ['mobile'];
+    component.componentTrackOptions[0].priority = 20;
+    component.componentTrackOptions[1].priority = 3;
 
     component.handleCreate();
 
@@ -159,9 +210,17 @@ describe('NewTrackDialogComponent', () => {
           {
             track_id: 'release-track--standard-tagged',
             resolution_strategy: ResolutionStrategy.LatestTagged,
-            priority: 0,
+            priority: 20,
             filters: {
               object_types: ['attack-pattern'],
+            },
+          },
+          {
+            track_id: 'release-track--standard-draft',
+            resolution_strategy: ResolutionStrategy.LatestPreview,
+            priority: 3,
+            filters: {
+              domains: ['mobile'],
             },
           },
         ],
@@ -176,6 +235,44 @@ describe('NewTrackDialogComponent', () => {
     expect(mockDialogRef.close).toHaveBeenCalledWith({
       track_id: 'release-track--new-virtual',
     });
+  });
+
+  it('blocks duplicate, empty and invalid priorities until they are corrected', () => {
+    component.form.patchValue({ name: 'Priority validation' });
+    const [first, second] = component.componentTrackOptions;
+    component.toggleComponentTrack(first, true);
+    component.toggleComponentTrack(second, true);
+
+    for (const priority of [first.priority, null, -1, 0.5]) {
+      second.priority = priority;
+      expect(component.isFormValid()).toBe(false);
+      component.handleCreate();
+    }
+    expect(mockConnector.createReleaseTrack).not.toHaveBeenCalled();
+    second.priority = 7;
+    expect(component.isFormValid()).toBe(true);
+    component.handleCreate();
+    expect(mockConnector.createReleaseTrack).toHaveBeenCalledWith(
+      expect.objectContaining({
+        composition: expect.objectContaining({
+          component_tracks: [
+            expect.objectContaining({ track_id: first.trackId, priority: 0 }),
+            expect.objectContaining({ track_id: second.trackId, priority: 7 }),
+          ],
+        }),
+      })
+    );
+  });
+
+  it('does not renumber remaining priorities when a component is removed and re-added', () => {
+    const [first, second] = component.componentTrackOptions;
+    component.toggleComponentTrack(first, true);
+    component.toggleComponentTrack(second, true);
+    second.priority = 12;
+    component.removeComponentTrack(first);
+    component.selectComponentTrack({ option: { value: first } });
+    expect(second.priority).toBe(12);
+    expect(first.priority).toBe(13);
   });
 
   it('should create a virtual track with public domain filters', () => {

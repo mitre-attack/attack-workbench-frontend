@@ -104,7 +104,12 @@
       <div class="section-block stack">
         <div class="section-title">Component Tracks</div>
         <div class="section-sub">
-          Standard tracks to include in this virtual release track.
+          Latest tagged uses the newest published release. Latest preview uses
+          the newest snapshot, draft or released. Draft previews include members
+          plus staged objects under the source track's release conflict rules;
+          released snapshots use their published members. Candidates are
+          excluded. Revisions are frozen when the virtual snapshot is
+          materialized, without tagging or changing the source track.
         </div>
       </div>
 
@@ -187,6 +192,39 @@
               {{ track.description }}
             </p>
 
+            <mat-form-field appearance="outline" class="object-type-filter">
+              <mat-label>Priority</mat-label>
+              <input
+                matInput
+                type="number"
+                min="0"
+                step="1"
+                required
+                [attr.aria-label]="'Priority for ' + track.name"
+                [(ngModel)]="track.priority"
+                [ngModelOptions]="{ standalone: true }"
+                [errorStateMatcher]="componentPriorityErrorMatcher" />
+              <mat-hint
+                >Lower numbers have higher priority. Each value must be
+                unique.</mat-hint
+              >
+              <mat-error>{{
+                componentPriorityError(track.priority)
+              }}</mat-error>
+            </mat-form-field>
+
+            <mat-form-field appearance="outline" class="object-type-filter">
+              <mat-label>Resolve from</mat-label>
+              <mat-select [(value)]="track.resolutionStrategy">
+                <mat-option [value]="ResolutionStrategy.LatestTagged">
+                  Latest tagged
+                </mat-option>
+                <mat-option [value]="ResolutionStrategy.LatestPreview">
+                  Latest preview
+                </mat-option>
+              </mat-select>
+            </mat-form-field>
+
             <mat-form-field
               *ngIf="track.selected"
               appearance="outline"
@@ -250,7 +288,7 @@
           <mat-label>Mode</mat-label>
           <mat-select formControlName="mode">
             <mat-option *ngFor="let opt of snapshotModeOptions" [value]="opt">{{
-              formatOption(opt)
+              opt === 'cron' ? 'Recurring' : formatOption(opt)
             }}</mat-option>
           </mat-select>
           <mat-hint>Select mode for snapshot scheduling</mat-hint>
@@ -267,6 +305,41 @@
           <mat-hint>Cron expression (UTC) used when mode is 'cron'</mat-hint>
         </mat-form-field>
       </div>
+      <section
+        *ngIf="
+          canConfigureRetention &&
+          form.get('snapshotSchedule.mode')?.value === 'cron'
+        "
+        class="section-block stack">
+        <div class="section-title">Recurring draft retention</div>
+        <mat-slide-toggle formControlName="retentionEnabled">
+          Limit retained drafts
+        </mat-slide-toggle>
+        <p class="section-sub">
+          Disabled by default (unlimited). Applies only after recurring
+          scheduled snapshots, not initial creation or manual drafts. Counts all
+          draft history across the track. Older eligible drafts and their notes
+          are permanently deleted. Tagged releases and protected drafts are
+          preserved; protected drafts may exceed the limit.
+        </p>
+        <mat-form-field
+          *ngIf="form.get('retentionEnabled')?.value"
+          appearance="outline">
+          <mat-label>Maximum retained drafts</mat-label>
+          <input
+            matInput
+            type="number"
+            min="1"
+            step="1"
+            formControlName="maxDrafts" />
+          <mat-hint
+            >Positive whole number; suggested starting limit: 10.</mat-hint
+          >
+        </mat-form-field>
+        <p *ngIf="!isRetentionValid" role="alert">
+          Enter a positive safe whole number.
+        </p>
+      </section>
     </div>
   </form>
 

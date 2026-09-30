@@ -46,8 +46,9 @@ creator is not used as a substitute for the snapshot's creator.
 Older snapshots without recorded provenance show **Creation cause unavailable**.
 Saving virtual-track configuration can create a configuration draft after the
 schedule is saved; the schedule's later execution creates a separate scheduled
-snapshot. Standard tracks retain only their most recent rolling draft, so
-these labels describe the surviving snapshots rather than every past action.
+snapshot. Standard tracks retain their most recent rolling draft plus preserved
+release sources and drafts referenced by virtual provenance, so these labels
+describe surviving snapshots rather than every past action.
 
 For a virtual track's recurring schedule, use **Find a schedule** in the Config
 tab: typing `hou` suggests **Hourly — at minute 0**, and typing `every 15`
@@ -60,6 +61,96 @@ intervals align to the clock rather than the time you click Save.
 Saving only a schedule leaves the virtual track's composition and draft
 unchanged. Deduplication configuration supports the strategy selector;
 preferred tier and preferred status are not supported by the API.
+
+When creating a virtual track or editing its **Config**, each component's
+**Resolve from** selector offers **Latest tagged** (the default) and
+**Latest preview**. Latest tagged uses the newest published release. Latest
+preview uses the newest standard snapshot whether draft or tagged: draft
+previews include members plus staged changes under the source's release
+conflict rules, and tagged sources use published members. Candidates are
+excluded. A blocking source conflict must be resolved before materialization;
+virtual filters do not bypass it.
+
+Each added component also has an editable **Priority** field, both in the
+creation dialog and under **Config → Edit Config**. Lower numbers have higher
+priority. Values must be unique, non-negative whole numbers; gaps are allowed.
+Duplicate, empty or invalid priorities show an inline error and prevent saving.
+Edit these numbers to change precedence without removing/re-adding tracks.
+Existing priorities are preserved when saving or removing components, and new
+components receive an unused priority. Cancel restores the saved values.
+
+Priority determines precedence when using **prioritize higher priority** and
+provides tie-breaking where the other deduplication strategies use it. After
+saving changed priorities, use **Create Draft** to apply them to a new composed
+snapshot; existing snapshots retain their original content.
+
+Use **Create Draft** after saving composition to materialize the downstream
+preview. This does not tag, promote or otherwise change the standard source.
+The virtual snapshot freezes exact revisions and can be reviewed or tagged
+independently. Its provenance shows **Draft preview** for an untagged source
+or the source's actual version for a tagged one, with the exact source timestamp.
+**Preview members** counts the prospective member set before filters, not merely
+the source draft's stored members.
+
+Loaded **Latest draft** rules are retired members-only configuration. The editor
+requires explicitly choosing **Latest preview** or **Latest tagged** before
+saving or creating another snapshot; it never silently includes staged content.
+Historical draft-only provenance retains its original meaning.
+
+Virtual-track history offers **Drafts only**, **Releases only**, and **All
+releases** (the default). All releases includes both drafts and tagged releases;
+Releases only never inserts a current draft into the results. The paginator loads
+25 entries per page, newest first.
+
+The smaller summary below the selector shows **Tagged releases**, **Drafts**, and
+**Total** for the selected view across all matching pages, not just the visible
+page. For example, a track with two tags and three drafts reports `2 / 3 / 5` in
+All releases, `2 / 0 / 2` in Releases only, and `0 / 3 / 3` in Drafts only.
+Zero-result views still show all three counters.
+
+History refreshes automatically every 30 seconds while the Releases tab is
+visible, and immediately when entering that tab or returning browser focus or
+visibility. This picks up cron-created snapshots and other users' changes
+without a Refresh history button. Refresh pauses while editing, while a dialog
+is open, or while an operation/request is in flight. It preserves the selected
+filter, page and scroll position; if cleanup removes the last page, it moves to
+the last remaining page. Local changes still refresh immediately.
+
+Automatic refresh reads lightweight history and cleanup status rather than
+reloading full snapshot contents or configuration. The **LATEST** pill and
+latest-only actions use unfiltered server identities, so an older filtered page
+is not mistaken for the current snapshot.
+
+**Create Draft** offers administrators **Delete older drafts after creating this
+draft**, off by default every time the dialog opens. A positive whole-number
+limit applies to that request only; it is never saved or inherited from a
+schedule.
+
+To configure persistent retention, click **Edit Config** and select **Recurring**
+schedule mode. **Recurring draft retention** is read-only outside edit mode;
+administrators can change its limit while editing. **Cancel** restores the saved
+policy. **Save Config** sends schedule-only changes without creating a content
+draft or deleting anything immediately. Actual cron runs apply this policy;
+manual creation and dated schedules do not. The former global policy has been
+removed, so configure the recurring policy explicitly.
+
+Both policies count all untagged snapshots across the track, regardless of how
+they were created. Tagged releases and protected sources survive. Configuration,
+metadata, composition and quarantine edits never trigger retention.
+
+The virtual release preview offers administrators an unchecked **Delete earlier
+drafts after tagging** option. It shows eligible/protected counts and the strict
+interval since the preceding release (or track creation). This permanently
+deletes history, not content; the selected release and newer snapshots survive.
+If the reviewed deletion set changes, fetch a fresh preview.
+
+If a release commits but cleanup fails, the page says so and exposes **Retry
+cleanup**. This repairs the existing operation without tagging again. Pending
+operations are rediscovered when reopening the track. Completed cleanup appears
+as a floating notification with an **X** dismiss button; dismissal survives
+ordinary history refreshes. Pending/failed operations retain their repair
+controls. Large cleanups can need more than one retry. If a draft is removed
+while you are viewing it, the automatic history refresh lets you select a surviving snapshot.
 
 The release preview offers minor and major relative tags as well as an exact `MAJOR.MINOR` version. Relative tags are calculated from the tagged snapshot immediately before the selected draft. When releasing an older draft, the exact version must also remain below the next tagged snapshot; the dialog shows these exclusive bounds. Optional release notes are stored on that snapshot and become the `x-mitre-collection` description in exported STIX bundles.
 

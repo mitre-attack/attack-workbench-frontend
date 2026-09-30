@@ -1,4 +1,4 @@
-import { ReleaseTrackType, SnapshotScheduleModeType } from './enums';
+import { ReleaseTrackType } from './enums';
 
 export interface ReleaseTrack {
   track_id: string;
@@ -19,8 +19,41 @@ export interface ReleaseTrack {
   snapshot_schedule?: SnapshotSchedule;
 }
 
-export interface SnapshotSchedule {
-  mode?: SnapshotScheduleModeType;
-  cron?: string | null;
-  dates?: (Date | string)[];
+export type SnapshotSchedule =
+  | { mode: 'manual'; cron?: never; dates?: never; draft_retention?: never }
+  | {
+      mode: 'dates';
+      dates: (Date | string)[];
+      cron?: never;
+      draft_retention?: never;
+    }
+  | {
+      mode: 'cron';
+      cron: string;
+      dates?: never;
+      draft_retention?: DraftRetention;
+    };
+
+export interface DraftRetention {
+  max_drafts: number | null;
+}
+
+export interface DraftCleanupResult {
+  operation_id: string;
+  status: 'pending' | 'completed' | 'failed';
+  kind: 'retention' | 'squash';
+  eligible_count: number;
+  deleted_count: number;
+  protected_count: number;
+  target_modified?: string;
+  release_committed?: boolean;
+  error?: string;
+}
+
+export interface DraftSquashPreview {
+  lower_bound: string | null;
+  upper_bound: string;
+  eligible_count: number;
+  protected_count: number;
+  fingerprint: string;
 }

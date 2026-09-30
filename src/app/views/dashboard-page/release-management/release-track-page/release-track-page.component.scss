@@ -235,14 +235,20 @@ $released-members-disabled-dark: colors.on-color-deemphasis(dark);
   }
 
   .config-component-row {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
+    display: grid;
+    grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+    align-items: start;
     gap: 16px;
     box-sizing: border-box;
     border: 1px solid;
     border-radius: 4px;
     padding: 12px;
+    overflow-wrap: anywhere;
+
+    > [role='alert'] {
+      grid-column: 1 / -1;
+      margin: 0;
+    }
 
     .dark & {
       border-color: colors.border-color(dark);
@@ -256,7 +262,7 @@ $released-members-disabled-dark: colors.on-color-deemphasis(dark);
   }
 
   .config-component-row-editing {
-    flex-direction: column;
+    grid-template-columns: minmax(0, 1fr);
     width: 100%;
   }
 
@@ -266,6 +272,7 @@ $released-members-disabled-dark: colors.on-color-deemphasis(dark);
     justify-content: space-between;
     gap: 12px;
     width: 100%;
+    min-width: 0;
 
     > .config-copy {
       flex: 1 1 auto;
@@ -293,23 +300,30 @@ $released-members-disabled-dark: colors.on-color-deemphasis(dark);
 
   .config-value-list {
     display: flex;
-    flex: 0 0 auto;
+    min-width: 0;
     flex-wrap: wrap;
     justify-content: flex-end;
     gap: 6px;
-    max-width: 36%;
+
+    .config-value {
+      box-sizing: border-box;
+      min-width: 0;
+      max-width: 100%;
+      overflow-wrap: anywhere;
+      white-space: normal;
+    }
   }
 
   .component-track-id {
     margin-top: 3px;
-    overflow-wrap: normal;
+    overflow-wrap: anywhere;
     font-family:
       Roboto Mono,
       monospace;
     font-size: 11px;
     font-weight: 400;
     line-height: 15px;
-    white-space: nowrap;
+    white-space: normal;
 
     .dark & {
       color: color.mix(
@@ -528,6 +542,7 @@ $released-members-disabled-dark: colors.on-color-deemphasis(dark);
     margin: 24px auto 0;
     padding-left: 72px;
     font-size: 13px;
+    font-variant-numeric: tabular-nums;
     line-height: 18px;
 
     .dark & {
@@ -2076,18 +2091,12 @@ $released-members-disabled-dark: colors.on-color-deemphasis(dark);
     }
 
     .config-component-row {
-      flex-direction: column;
+      grid-template-columns: minmax(0, 1fr);
       gap: 10px;
     }
 
     .config-value-list {
       justify-content: flex-start;
-      max-width: none;
-    }
-
-    .component-track-id {
-      overflow-wrap: anywhere;
-      white-space: normal;
     }
   }
 }
@@ -2145,4 +2154,46 @@ $released-members-disabled-dark: colors.on-color-deemphasis(dark);
   font-size: 0.8rem;
   opacity: 0.8;
   word-break: break-all;
+}
+
+.draft-lifecycle-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1rem;
+  margin: 1rem 0;
+}
+
+.history-controls {
+  justify-content: center;
+}
+
+.cleanup-notification {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+
+  button {
+    flex-shrink: 0;
+  }
+}
+
+.draft-lifecycle-message,
+.draft-cleanup-operation {
+  padding: 1rem;
+  border: 1px solid currentColor;
+  border-radius: 4px;
+  margin-bottom: 1rem;
+}
+
+.draft-cleanup-operation {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+
+  code {
+    overflow-wrap: anywhere;
+  }
 }
