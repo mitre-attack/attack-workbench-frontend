@@ -1,6 +1,8 @@
 import { Component, OnInit, ViewEncapsulation } from '@angular/core';
 import { finalize, take } from 'rxjs/operators';
 import { RestApiConnectorService } from 'src/app/services/connectors/rest-api/rest-api-connector.service';
+import { AuthenticationService } from 'src/app/services/connectors/authentication/authentication.service';
+import { Role } from 'src/app/classes/authn/role';
 import {
   AttackTypeToPlural,
   StixTypeToAttackType,
@@ -213,7 +215,14 @@ export class DashboardPageComponent implements OnInit {
   private rootNode?: DashboardNode;
   private relationshipRootNode?: DashboardNode;
 
-  constructor(private restApiConnector: RestApiConnectorService) {}
+  constructor(
+    private restApiConnector: RestApiConnectorService,
+    private authenticationService: AuthenticationService
+  ) {}
+
+  public get canManageAllowedValues(): boolean {
+    return this.authenticationService.isAuthorized([Role.ADMIN]);
+  }
 
   ngOnInit(): void {
     this.loadObjects();

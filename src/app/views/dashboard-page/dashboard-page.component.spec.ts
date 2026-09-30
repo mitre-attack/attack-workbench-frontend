@@ -4,6 +4,7 @@ import { of } from 'rxjs';
 
 import { DashboardPageComponent } from './dashboard-page.component';
 import { RestApiConnectorService } from 'src/app/services/connectors/rest-api/rest-api-connector.service';
+import { AuthenticationService } from 'src/app/services/connectors/authentication/authentication.service';
 
 describe('DashboardPageComponent', () => {
   let component: DashboardPageComponent;
@@ -85,6 +86,10 @@ describe('DashboardPageComponent', () => {
       declarations: [DashboardPageComponent],
       providers: [
         { provide: RestApiConnectorService, useValue: mockRestApiConnector },
+        {
+          provide: AuthenticationService,
+          useValue: { isAuthorized: () => false },
+        },
       ],
       schemas: [NO_ERRORS_SCHEMA],
     }).compileComponents();

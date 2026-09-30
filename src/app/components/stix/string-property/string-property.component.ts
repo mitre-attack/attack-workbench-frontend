@@ -80,7 +80,14 @@ export class StringPropertyComponent implements OnInit, OnChanges {
     }
   }
 
-  public getOptions(): Set<string> {
+  public getOptions(enabledOptions = this.getEnabledOptions()): Set<string> {
+    const options = new Set(enabledOptions);
+    const current = this.selectControl?.value;
+    if (current) options.add(current);
+    return options;
+  }
+
+  public getEnabledOptions(): Set<string> {
     const options = new Set<string>();
     if (this.loading) return options;
     const allowedValuesProperty =
@@ -95,9 +102,6 @@ export class StringPropertyComponent implements OnInit, OnChanges {
           d.allowedValues.forEach(options.add, options);
         }
       });
-      if (this.config.object[this.config.field]) {
-        options.add(this.config.object[this.config.field]);
-      }
     }
     return options;
   }

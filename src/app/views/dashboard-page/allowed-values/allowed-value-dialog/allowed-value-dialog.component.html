@@ -1,0 +1,293 @@
+<h2 mat-dialog-title>
+  {{ rule ? 'Edit Allowed Values' : 'Add New Property' }}
+</h2>
+<mat-dialog-content>
+  <p>
+    Choices are validated by backend ADM {{ data.catalog.admVersion }}. Existing
+    objects are not changed.
+  </p>
+  <p class="draft-error" role="alert" *ngIf="error">{{ error }}</p>
+  <ng-container *ngIf="rule; else createWorkflow">
+    <p class="rule-identity">
+      <strong>{{ propertyName }}</strong> · {{ domainName }}
+    </p>
+    <div class="legacy-warning" role="alert" *ngIf="rule.invalidValues.length">
+      <strong>{{ rule.invalidValues.length }} unavailable settings</strong>
+      <p>
+        These legacy settings do not conform to the backend ADM and are not
+        offered in dropdowns. Saving removes them from this property/domain
+        configuration.
+      </p>
+      <ul>
+        <li *ngFor="let option of rule.invalidValues">
+          {{ option.value }} · {{ option.objectTypes.join(', ') }}:
+          {{ option.reason }}
+        </li>
+      </ul>
+    </div>
+    <p class="draft-error" role="alert" *ngIf="!definition">
+      This property/domain is unavailable in the backend ADM catalog. Saving is
+      disabled.
+    </p>
+    <mat-form-field appearance="outline">
+      <mat-label>object type</mat-label>
+      <mat-select
+        [value]="objectType"
+        (selectionChange)="selectObjectType($event.value)"
+        [disabled]="busy || pendingInput">
+        <mat-option
+          *ngFor="let type of definition?.objectTypes"
+          [value]="type"
+          >{{ type }}</mat-option
+        >
+      </mat-select>
+      <mat-hint>Changes for other object types are retained.</mat-hint>
+    </mat-form-field>
+    <ng-container *ngTemplateOutlet="valueEditor"></ng-container>
+  </ng-container>
+  <ng-template #createWorkflow>
+    <mat-stepper orientation="horizontal" linear #stepper>
+      <mat-step [completed]="!!propertyName" [editable]="!busy">
+        <ng-template matStepLabel>Property</ng-template>
+        <mat-form-field appearance="outline">
+          <mat-label>property</mat-label>
+          <mat-select
+            [value]="propertyName"
+            (selectionChange)="selectProperty($event.value)"
+            [disabled]="busy">
+            <mat-option
+              *ngFor="let property of properties"
+              [value]="property"
+              >{{ property }}</mat-option
+            >
+          </mat-select>
+        </mat-form-field>
+        <div class="step-actions">
+          <button
+            mat-button
+            matStepperNext
+            type="button"
+            [disabled]="!propertyName || busy">
+            next: scope
+          </button>
+        </div>
+      </mat-step>
+      <mat-step
+        [completed]="scopeReady && !existingRule"
+        [editable]="!busy && !pendingInput">
+        <ng-template matStepLabel>Scope</ng-template>
+        <p>Choose one domain and object type supported by the backend ADM.</p>
+        <div class="scope-fields">
+          <mat-form-field appearance="outline">
+            <mat-label>domain</mat-label>
+            <mat-select
+              [value]="domainName"
+              (selectionChange)="selectDomain($event.value)"
+              [disabled]="busy">
+              <mat-option
+                *ngFor="let domain of domains"
+                [value]="domain.domainName"
+                >{{ domain.domainName }}</mat-option
+              >
+            </mat-select>
+          </mat-form-field>
+          <mat-form-field appearance="outline">
+            <mat-label>object type</mat-label>
+            <mat-select
+              [value]="objectType"
+              (selectionChange)="selectObjectType($event.value)"
+              [disabled]="busy || pendingInput || !definition">
+              <mat-option
+                *ngFor="let type of definition?.objectTypes"
+                [value]="type"
+                >{{ type }}</mat-option
+              >
+            </mat-select>
+          </mat-form-field>
+        </div>
+        <p *ngIf="existingRule">
+          This property and domain are already configured. Open the editor for
+          the selected object type instead of creating a duplicate.
+        </p>
+        <div class="step-actions">
+          <button mat-button matStepperPrevious type="button" [disabled]="busy">
+            back
+          </button>
+          <button
+            *ngIf="existingRule; else newScope"
+            mat-raised-button
+            color="primary"
+            type="button"
+            (click)="openExisting()"
+            [disabled]="!scopeReady || busy">
+            open existing editor
+          </button>
+          <ng-template #newScope>
+            <button
+              mat-button
+              matStepperNext
+              type="button"
+              [disabled]="!scopeReady || busy">
+              next: values
+            </button>
+          </ng-template>
+        </div>
+      </mat-step>
+      <mat-step [completed]="canSave" [editable]="!busy">
+        <ng-template matStepLabel>Values</ng-template>
+        <p class="rule-identity">
+          {{ propertyName }} · {{ domainName }} · {{ objectType }}
+        </p>
+        <ng-container *ngTemplateOutlet="valueEditor"></ng-container>
+        <div class="step-actions">
+          <button
+            mat-button
+            matStepperPrevious
+            type="button"
+            [disabled]="busy || pendingInput">
+            back
+          </button>
+          <button mat-button matStepperNext type="button" [disabled]="!canSave">
+            next: review
+          </button>
+        </div>
+      </mat-step>
+      <mat-step>
+        <ng-template matStepLabel>Review/save</ng-template>
+        <p class="rule-identity">
+          <strong>{{ propertyName }}</strong> · {{ domainName }} ·
+          {{ objectType }}
+        </p>
+        <p>
+          Only {{ objectType }} will be configured. Other object types start
+          empty.
+        </p>
+        <ul class="review-values">
+          <li *ngFor="let option of values">
+            {{ option.value }} — {{ option.enabled ? 'enabled' : 'disabled' }}
+          </li>
+        </ul>
+        <p *ngIf="!values.length">
+          This creates an empty configuration. No values will be offered for
+          this property and domain.
+        </p>
+        <div class="step-actions">
+          <button mat-button matStepperPrevious type="button" [disabled]="busy">
+            back
+          </button>
+          <button
+            mat-raised-button
+            color="primary"
+            type="button"
+            [disabled]="!canSave"
+            (click)="confirm()">
+            {{ saving ? 'saving…' : 'create property' }}
+          </button>
+        </div>
+      </mat-step>
+    </mat-stepper>
+  </ng-template>
+  <ng-template #valueEditor>
+    <ng-container *ngIf="scopeReady">
+      <p>{{ definition?.description }}</p>
+      <p>
+        Check to enable a value; uncheck to keep it disabled. Remove clears the
+        setting for {{ objectType }} only.
+      </p>
+      <mat-form-field class="search" appearance="outline">
+        <mat-label>search approved choices</mat-label>
+        <input matInput [(ngModel)]="search" [disabled]="busy" />
+      </mat-form-field>
+      <div
+        class="option-list"
+        role="group"
+        [attr.aria-label]="'Allowed values for ' + objectType">
+        <div class="option-row" *ngFor="let value of visibleChoices">
+          <mat-checkbox
+            [checked]="state(value) === true"
+            [disabled]="busy"
+            (change)="setEnabled(value, $event.checked)"
+            >{{ value }}</mat-checkbox
+          >
+          <span class="option-state">{{
+            state(value) === undefined
+              ? 'not configured'
+              : state(value)
+                ? 'enabled'
+                : 'disabled'
+          }}</span>
+          <button
+            mat-icon-button
+            type="button"
+            *ngIf="state(value) !== undefined"
+            [disabled]="busy"
+            (click)="removeValue(value)"
+            [attr.aria-label]="'Remove ' + value + ' for ' + objectType"
+            matTooltip="remove setting for this object type">
+            <mat-icon>delete</mat-icon>
+          </button>
+        </div>
+      </div>
+      <p *ngIf="!visibleChoices.length">No matching approved choices.</p>
+      <ng-container *ngIf="definition?.valueType === 'formatted'">
+        <h3>Add a data source component</h3>
+        <p>
+          Enter the data source and component separately. The backend ADM must
+          approve the combined value before it can be added.
+        </p>
+        <div class="formatted-fields" [formGroup]="formatted">
+          <mat-form-field appearance="outline">
+            <mat-label>data source</mat-label>
+            <input
+              matInput
+              formControlName="source"
+              placeholder="Process"
+              [readonly]="busy" />
+            <mat-error>Enter a data source</mat-error>
+          </mat-form-field>
+          <mat-form-field appearance="outline">
+            <mat-label>data component</mat-label>
+            <input
+              matInput
+              formControlName="component"
+              placeholder="Process Creation"
+              [readonly]="busy" />
+            <mat-error>Enter a data component</mat-error>
+          </mat-form-field>
+          <button
+            mat-stroked-button
+            type="button"
+            (click)="addFormatted()"
+            [disabled]="busy || formatted.invalid">
+            {{ validating ? 'validating…' : 'validate and add' }}
+          </button>
+          <button
+            mat-button
+            type="button"
+            (click)="clearInput()"
+            [disabled]="busy || !pendingInput">
+            clear input
+          </button>
+        </div>
+        <p *ngIf="pendingInput">
+          Validate and add this input, or clear it before saving or changing
+          object type.
+        </p>
+      </ng-container>
+    </ng-container>
+  </ng-template>
+</mat-dialog-content>
+<mat-dialog-actions align="end">
+  <button mat-button type="button" [disabled]="busy" (click)="cancel()">
+    cancel
+  </button>
+  <button
+    *ngIf="rule"
+    mat-raised-button
+    color="primary"
+    type="button"
+    [disabled]="!canSave"
+    (click)="confirm()">
+    {{ saving ? 'saving…' : 'save all values' }}
+  </button>
+</mat-dialog-actions>
