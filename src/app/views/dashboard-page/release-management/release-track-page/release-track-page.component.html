@@ -567,19 +567,38 @@
           </div>
         </div>
 
-        <section class="labelled-box virtual-resolution-panel">
+        <section
+          class="labelled-box virtual-resolution-panel"
+          [class.collapsed]="!showCompositionResolution">
           <div class="content no-label">
             <div class="card-header member-list virtual-resolution-header">
-              <h3 class="view-color">Composition Resolution</h3>
+              <h3 class="view-color">
+                <button
+                  class="virtual-resolution-toggle"
+                  type="button"
+                  aria-controls="composition-resolution-table"
+                  [attr.aria-expanded]="showCompositionResolution"
+                  (click)="
+                    showCompositionResolution = !showCompositionResolution
+                  ">
+                  <mat-icon aria-hidden="true">{{
+                    showCompositionResolution ? 'expand_more' : 'chevron_right'
+                  }}</mat-icon>
+                  Composition Resolution
+                </button>
+              </h3>
               <span *ngIf="virtualResolvedAt" class="text-deemphasis">
                 Resolved at:
                 {{ virtualResolvedAt | date: 'MMM d, y, h:mm:ss a' }}
               </span>
             </div>
 
-            <mat-divider></mat-divider>
+            <mat-divider *ngIf="showCompositionResolution"></mat-divider>
 
-            <div class="virtual-resolution-table">
+            <div
+              id="composition-resolution-table"
+              class="virtual-resolution-table"
+              [hidden]="!showCompositionResolution">
               <table>
                 <colgroup>
                   <col class="virtual-resolution-component-col" />

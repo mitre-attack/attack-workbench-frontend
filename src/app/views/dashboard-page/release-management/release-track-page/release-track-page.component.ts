@@ -300,6 +300,7 @@ export class ReleaseTrackPageComponent implements OnInit, OnDestroy {
   public id = '';
   public releaseTrack: ReleaseTrackSnapshot | null = null;
   public showReleasedMembers = false;
+  public showCompositionResolution = false;
   public descriptionDraft = '';
   public isEditingDescription = false;
   public isSavingDescription = false;
@@ -526,6 +527,7 @@ export class ReleaseTrackPageComponent implements OnInit, OnDestroy {
         this.cancelRequests$.next();
         this.cancelHistory$.next();
         this.showReleasedMembers = false;
+        this.showCompositionResolution = false;
         this.historyFilter = 'all';
         this.historyPageIndex = 0;
         this.historyTotal = 0;
