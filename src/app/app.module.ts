@@ -169,6 +169,8 @@ import { UserAccountsPageComponent } from './views/dashboard-page/user-accounts-
 import { DefaultMarkingDefinitionsComponent } from './views/dashboard-page/default-marking-definitions/default-marking-definitions.component';
 import { ValidationBypassRuleDialogComponent } from './views/dashboard-page/validation-bypasses/validation-bypass-rule-dialog/validation-bypass-rule-dialog.component';
 import { ValidationBypassesComponent } from './views/dashboard-page/validation-bypasses/validation-bypasses.component';
+import { AllowedValuesComponent } from './views/dashboard-page/allowed-values/allowed-values.component';
+import { AllowedValueDialogComponent } from './views/dashboard-page/allowed-values/allowed-value-dialog/allowed-value-dialog.component';
 import { ProfilePageComponent } from './views/profile-page/profile-page.component';
 import { ReferenceManagerComponent } from './views/reference-manager/reference-manager.component';
 
@@ -320,6 +322,8 @@ export function initConfig(appConfigService: AppConfigService) {
     DefaultMarkingDefinitionsComponent,
     ValidationBypassesComponent,
     ValidationBypassRuleDialogComponent,
+    AllowedValuesComponent,
+    AllowedValueDialogComponent,
     ProfilePageComponent,
     ReferenceManagerComponent,
     StixDialogComponent,

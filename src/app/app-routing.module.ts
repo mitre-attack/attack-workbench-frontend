@@ -8,6 +8,7 @@ import { OrgSettingsPageComponent } from './views/dashboard-page/org-settings-pa
 import { UserAccountsPageComponent } from './views/dashboard-page/user-accounts-page/user-accounts-page.component';
 import { DefaultMarkingDefinitionsComponent } from './views/dashboard-page/default-marking-definitions/default-marking-definitions.component';
 import { ValidationBypassesComponent } from './views/dashboard-page/validation-bypasses/validation-bypasses.component';
+import { AllowedValuesComponent } from './views/dashboard-page/allowed-values/allowed-values.component';
 import { ProfilePageComponent } from './views/profile-page/profile-page.component';
 import { AuthorizationGuard } from './services/helpers/authorization.guard';
 import { Role } from './classes/authn/role';
@@ -160,6 +161,15 @@ export const routes: Routes = [
               roles: [Role.ADMIN],
             },
             component: ValidationBypassesComponent,
+          },
+          {
+            path: 'allowed-values',
+            data: {
+              breadcrumb: 'allowed values',
+              title: 'Allowed Values',
+              roles: [Role.ADMIN],
+            },
+            component: AllowedValuesComponent,
           },
         ],
       },

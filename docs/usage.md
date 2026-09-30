@@ -269,6 +269,64 @@ The Workbench will attribute edits to you when you edit existing objects or crea
 
 Edits you make in the knowledge base are attributed to your _organization identity_, which is unique to your Workbench instance. The organization identity can be edited from the admin page accessible from the application homepage; when you first open the application you will be prompted to edit the organization identity to ensure the placeholder identity is not used. Changes to your organization identity will automatically update objects in the knowledge base, but attribution within exported collections will not be automatically affected.
 
+### Managing Allowed Values
+
+Administrators can open **Dashboard → Admin → Allowed Values**, immediately
+below **Validation Bypasses** in the sidebar. The searchable, sortable table
+contains **one row per property and domain**, not one row per value or object
+type. It starts with 15 configured rules, fitting on the default 25-row page.
+Each row shows supported object types, a value count, and a compact preview.
+The page identifies the backend ADM version supplying the permitted choices.
+
+**Add New Property** opens a guided workflow:
+
+1. Choose a supported property.
+2. Choose an ADM-valid domain and one object type.
+3. Select permitted values from a searchable checklist.
+4. Review the configuration and choose **Create property**.
+
+If that property/domain is already configured, choose **Open existing editor**
+instead of creating a duplicate. New scopes are available only where the
+installed backend ADM accepts the property for that domain and object type;
+this does not create arbitrary STIX schema fields.
+
+**Edit values** uses the same checklist, with one object-type selector above it
+instead of repeated applicability controls for every value:
+
+- Check an approved value to enable it; uncheck it to keep it disabled.
+- **Remove** clears that value's configuration for the selected object type.
+- Switch object type to edit another scope. Other types' settings are retained.
+- **Save all values** applies the draft atomically; **Cancel** discards it.
+
+Enum fields have no freeform value input. For the data-source/component field,
+enter the two names separately and choose **Validate and add**. ADM must accept
+the combined value before it enters the draft. Unvalidated input blocks saving
+until it is approved or cleared.
+
+Saving an empty set leaves the configured rule available for later editing.
+
+Supported properties remain the original configurable fields: platforms for
+analytics, techniques, software, data sources and assets; technique tactic/impact
+types, permissions and data-source/component names; collection layers; asset
+sectors and related-asset sectors; and identity classes and sectors. Available
+domains and permissible values are derived from the backend ADM Zod schemas.
+
+Changes persist across restarts. Open or reopen an editor to load the latest
+enabled choices. An existing unavailable selection remains visible but is not a
+newly selectable option. Remove list/subtype selections using their chip's
+remove control; once removed, they cannot be reselected unless an administrator
+re-enables or adds the value.
+
+Allowed Values configuration is always ADM-validated, including disabled
+options. General validation settings and **ADM Validation Bypasses** cannot
+permit non-compliant configuration values. The frontend uses the backend's
+catalog, so a different frontend ADM package version cannot broaden choices.
+
+Legacy configuration values that no longer comply with ADM are marked
+**unavailable** and excluded from dropdowns. They remain stored until the rule
+is saved; the editor explains that saving removes those unavailable settings.
+Existing ATT&CK objects are never rewritten by this configuration workflow.
+
 ### Quality Control Workflows
 
 The ATT&CK Workbench provides optional quality control workflows to assist in the creation of ATT&CK data. Objects are marked with a "workflow status," reflecting their place in the quality control pipeline:
