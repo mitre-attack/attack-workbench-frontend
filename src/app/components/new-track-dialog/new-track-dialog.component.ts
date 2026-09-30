@@ -1,6 +1,7 @@
 import { Component, OnInit, ViewEncapsulation, Inject } from '@angular/core';
 import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { MatDialogRef, MAT_DIALOG_DATA } from '@angular/material/dialog';
+import { ErrorStateMatcher } from '@angular/material/core';
 import {
   MemberSyncStrategy,
   MemberSyncBehavior,
@@ -10,6 +11,14 @@ import {
   ResolutionStrategy,
   SnapshotScheduleMode,
 } from 'src/app/classes/release-tracks/enums';
+import {
+  ComponentTrack,
+  ComponentTrackFilters,
+  Composition,
+  getComponentPriorityError,
+  hasValidComponentPriorities,
+  nextComponentPriority,
+} from 'src/app/classes/release-tracks';
 import { ReleaseTracksConnectorService } from 'src/app/services/connectors/rest-api/release-tracks.service';
 import { WorkflowStatus, StixType } from 'src/app/utils/types';
 import {
@@ -17,6 +26,8 @@ import {
   StixTypeToAttackType,
 } from 'src/app/utils/type-mappings';
 import { finalize, take } from 'rxjs/operators';
+import { AuthenticationService } from 'src/app/services/connectors/authentication/authentication.service';
+import { Role } from 'src/app/classes/authn/role';
 
 const OBJECT_FILTER_OPTIONS: StixType[] = [
   'attack-pattern',
@@ -50,6 +61,7 @@ export class NewTrackDialogComponent implements OnInit {
   public MemberSyncStrategy = MemberSyncStrategy;
   public MemberSyncBehavior = MemberSyncBehavior;
   public ReleaseTrack = ReleaseTrackType;
+  public ResolutionStrategy = ResolutionStrategy;
 
   public candidacyOptions = Object.values(WorkflowStatus);
   public memberSyncOptions = Object.values(MemberSyncStrategy);
@@ -64,6 +76,14 @@ export class NewTrackDialogComponent implements OnInit {
     value: type,
   }));
   public domainOptions = DOMAIN_FILTER_OPTIONS;
+  public readonly componentPriorityErrorMatcher: ErrorStateMatcher = {
+    isErrorState: control =>
+      control != null && this.componentPriorityError(control.value) !== null,
+  };
+
+  public componentPriorityError(priority: number | null): string | null {
+    return getComponentPriorityError(priority, this.selectedComponentTracks);
+  }
 
   public mode: 'standard' | 'virtual' = 'standard';
 
@@ -71,16 +91,34 @@ export class NewTrackDialogComponent implements OnInit {
     return this.mode === ReleaseTrackType.Virtual;
   }
 
+  public get canConfigureRetention(): boolean {
+    return this.authenticationService.isAuthorized([Role.ADMIN]);
+  }
+
+  public get isRetentionValid(): boolean {
+    const count = this.form.get('maxDrafts')?.value;
+    return (
+      !this.canConfigureRetention ||
+      this.form.get('snapshotSchedule.mode')?.value !==
+        SnapshotScheduleMode.Cron ||
+      !this.form.get('retentionEnabled')?.value ||
+      (Number.isSafeInteger(count) && count > 0)
+    );
+  }
+
   constructor(
     public dialogRef: MatDialogRef<NewTrackDialogComponent>,
     @Inject(MAT_DIALOG_DATA) public data: any,
     private fb: FormBuilder,
-    private connector: ReleaseTracksConnectorService
+    private connector: ReleaseTracksConnectorService,
+    private authenticationService: AuthenticationService
   ) {
     this.form = this.fb.group({
       name: ['', [Validators.required]],
       description: [''],
       snapshotDescription: ['', [Validators.maxLength(4000)]],
+      retentionEnabled: [false],
+      maxDrafts: [10],
       autoPromote: [false],
       candidacyThreshold: [{ value: WorkflowStatus.Reviewed, disabled: true }],
       memberSync: [MemberSyncStrategy.TrackLatest],
@@ -128,7 +166,13 @@ export class NewTrackDialogComponent implements OnInit {
   public isFormValid(): boolean {
     const nameValid = !!this.form.get('name')?.value?.trim();
     if (this.isVirtual) {
-      return nameValid && this.selectedComponentTracks.length > 0;
+      const tracks = this.selectedComponentTracks;
+      return (
+        nameValid &&
+        tracks.length > 0 &&
+        hasValidComponentPriorities(tracks) &&
+        this.isRetentionValid
+      );
     }
     return this.form.valid && nameValid;
   }
@@ -144,6 +188,9 @@ export class NewTrackDialogComponent implements OnInit {
     track: VirtualComponentTrackOption,
     selected: boolean
   ): void {
+    if (selected && !track.selected) {
+      track.priority = nextComponentPriority(this.selectedComponentTracks);
+    }
     track.selected = selected;
   }
 
@@ -174,7 +221,7 @@ export class NewTrackDialogComponent implements OnInit {
     const track = event?.option?.value as VirtualComponentTrackOption;
     if (!track) return;
 
-    track.selected = true;
+    this.toggleComponentTrack(track, true);
     this.form
       .get('composition.componentTrackSearch')
       ?.setValue('', { emitEvent: false });
@@ -267,20 +314,21 @@ export class NewTrackDialogComponent implements OnInit {
       });
   }
 
-  private buildVirtualComposition(): any {
-    const deduplication: any = {};
+  private buildVirtualComposition(): Composition {
     const strategy = this.form.get('composition.deduplicationStrategy')?.value;
-    if (strategy) deduplication.strategy = strategy;
+    const deduplication: Composition['deduplication'] = strategy
+      ? { strategy }
+      : {};
 
     return {
-      component_tracks: this.selectedComponentTracks.map((track, priority) => {
-        const componentTrack: any = {
+      component_tracks: this.selectedComponentTracks.map(track => {
+        const componentTrack: ComponentTrack = {
           track_id: track.trackId,
-          resolution_strategy: ResolutionStrategy.LatestTagged,
-          priority,
+          resolution_strategy: track.resolutionStrategy,
+          priority: track.priority!,
         };
 
-        const filters: any = {};
+        const filters: ComponentTrackFilters = {};
         if (track.objectTypes.length) filters.object_types = track.objectTypes;
         if (track.domains.length) filters.domains = track.domains;
         if (Object.keys(filters).length) componentTrack.filters = filters;
@@ -301,6 +349,15 @@ export class NewTrackDialogComponent implements OnInit {
 
     const payload: any = { mode };
     if (mode === SnapshotScheduleMode.Cron && cron) payload.cron = cron;
+    if (
+      mode === SnapshotScheduleMode.Cron &&
+      this.canConfigureRetention &&
+      this.form.get('retentionEnabled')?.value
+    ) {
+      payload.draft_retention = {
+        max_drafts: this.form.get('maxDrafts')?.value,
+      };
+    }
     return payload;
   }
 
@@ -326,6 +383,8 @@ export class NewTrackDialogComponent implements OnInit {
       latestTaggedVersion,
       taggedReleaseCount,
       selected: false,
+      resolutionStrategy: ResolutionStrategy.LatestTagged,
+      priority: null,
       objectTypes: [],
       domains: [],
     };
@@ -386,6 +445,8 @@ interface VirtualComponentTrackOption {
   latestTaggedVersion: string | null;
   taggedReleaseCount: number;
   selected: boolean;
+  resolutionStrategy: ResolutionStrategy;
+  priority: number | null;
   objectTypes: StixType[];
   domains: string[];
 }

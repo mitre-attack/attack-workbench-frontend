@@ -456,3 +456,18 @@
     flex-shrink: 0;
   }
 }
+
+.release-draft-squash {
+  margin: 1.5rem 0 0;
+  padding: 1rem;
+  border: 1px solid currentColor;
+  border-radius: 4px;
+
+  code {
+    overflow-wrap: anywhere;
+  }
+
+  p:last-child {
+    margin-bottom: 0;
+  }
+}

@@ -1,3 +1,19 @@
+<ng-template #cleanupNotification let-operation>
+  <div class="cleanup-notification" role="status">
+    <span>
+      Draft cleanup completed: {{ operation.deleted_count }} drafts deleted;
+      {{ operation.protected_count }} protected drafts and all tagged releases
+      preserved.
+    </span>
+    <button
+      mat-icon-button
+      type="button"
+      aria-label="Dismiss draft cleanup notification"
+      (click)="dismissCleanupNotification()">
+      <mat-icon>close</mat-icon>
+    </button>
+  </div>
+</ng-template>
 <div class="release-track-page">
   <div class="release-track-header">
     <h1>
@@ -33,6 +49,50 @@
       {{ message }} Stay on this page until it finishes.
     </p>
   </div>
+  <section
+    *ngIf="
+      isVirtualReleaseTrack && (cleanupMessage || draftCleanupResults.length)
+    "
+    class="draft-cleanup-status"
+    aria-label="Draft cleanup operations">
+    <p *ngIf="cleanupMessage" role="status">{{ cleanupMessage }}</p>
+    <article
+      *ngFor="let operation of draftCleanupResults"
+      class="draft-cleanup-operation">
+      <div>
+        <strong
+          >{{
+            operation.kind === 'squash' ? 'Release-time' : 'Retention'
+          }}
+          cleanup: {{ operation.status }}</strong
+        >
+        <p>
+          {{ operation.deleted_count }} deleted of
+          {{ operation.eligible_count }} eligible drafts;
+          {{ operation.protected_count }} protected drafts preserved. Releases
+          are preserved.
+        </p>
+        <p *ngIf="operation.release_committed">
+          Release committed. Do not tag again to repair cleanup.
+        </p>
+        <p *ngIf="operation.error">{{ operation.error }}</p>
+        <small
+          >Operation: <code>{{ operation.operation_id }}</code></small
+        >
+      </div>
+      <button
+        *ngIf="canManageDraftLifecycle && operation.status !== 'completed'"
+        mat-stroked-button
+        [disabled]="retryingCleanup.has(operation.operation_id)"
+        (click)="retryDraftCleanup(operation)">
+        {{
+          retryingCleanup.has(operation.operation_id)
+            ? 'Repairing cleanup'
+            : 'Retry cleanup'
+        }}
+      </button>
+    </article>
+  </section>
 
   <app-stix-page-tabs
     [detailsTemplate]="detailsTpl"
@@ -40,6 +100,7 @@
     [showHistory]="false"
     [showNotes]="false"
     [showMembership]="false"
+    (selectedIndexChange)="onSelectedTabChange($event)"
     [customTabs]="[
       { label: 'Releases', template: historyTpl },
       { label: 'Config', template: configTpl },
@@ -186,6 +247,12 @@
                 <div *ngIf="!virtualComponentTracks.length" class="empty-state">
                   No component tracks configured.
                 </div>
+                <p *ngIf="hasRetiredComponentTracks" role="alert">
+                  This configuration uses the retired members-only latest draft
+                  rule. Edit Config and explicitly choose Latest preview or
+                  Latest tagged for each retired rule before materializing
+                  again. Existing snapshots are unchanged.
+                </p>
 
                 <article
                   *ngFor="
@@ -412,6 +479,196 @@
 
     <ng-template #virtualDetailsTpl>
       <div class="virtual-track-layout">
+        <div class="labelled-box summary-frame">
+          <div
+            class="summary-overview content no-label"
+            aria-label="Virtual release track summary">
+            <section class="summary-description">
+              <div class="summary-section-header">
+                <h2>Description</h2>
+                <button
+                  *ngIf="!isEditingDescription"
+                  class="description-edit-button"
+                  mat-icon-button
+                  type="button"
+                  aria-label="Edit release track description"
+                  (click)="onEditDescription()">
+                  <mat-icon>edit</mat-icon>
+                </button>
+              </div>
+
+              <p
+                *ngIf="!isEditingDescription"
+                class="summary-description-text"
+                [ngClass]="{ empty: !releaseTrackDescription }">
+                {{ releaseTrackDescription || 'No description provided.' }}
+              </p>
+
+              <div *ngIf="isEditingDescription" class="description-editor">
+                <mat-form-field appearance="outline">
+                  <textarea
+                    matInput
+                    rows="3"
+                    placeholder="Describe this release track..."
+                    [(ngModel)]="descriptionDraft"></textarea>
+                </mat-form-field>
+                <div class="small-buttons description-actions">
+                  <button
+                    mat-stroked-button
+                    type="button"
+                    (click)="onCancelDescriptionEdit()">
+                    Cancel
+                  </button>
+                  <button
+                    mat-raised-button
+                    color="primary"
+                    type="button"
+                    [disabled]="isSavingDescription"
+                    (click)="onSaveDescription()">
+                    Save
+                  </button>
+                </div>
+              </div>
+            </section>
+
+            <div
+              class="summary-stats"
+              aria-label="Virtual release track object counts">
+              <div class="summary-metric candidates-summary">
+                <strong class="summary-count view-color">
+                  {{ virtualComponentTracks.length }}
+                </strong>
+                <div class="summary-copy">
+                  <strong class="summary-heading">Components</strong>
+                  <span class="text-deemphasis">standard tracks</span>
+                </div>
+              </div>
+
+              <div class="summary-metric staged-summary">
+                <strong class="summary-count promote-color">
+                  {{ members.length }}
+                </strong>
+                <div class="summary-copy">
+                  <strong class="summary-heading">Members</strong>
+                  <span class="text-deemphasis">resolved objects</span>
+                </div>
+              </div>
+
+              <div class="summary-metric members-summary">
+                <strong class="summary-count quarantine-color">
+                  {{ quarantineObjects.length }}
+                </strong>
+                <div class="summary-copy">
+                  <strong class="summary-heading">Quarantined</strong>
+                  <span class="text-deemphasis">resolution conflicts</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <section
+          class="labelled-box virtual-resolution-panel"
+          [class.collapsed]="!showCompositionResolution">
+          <div class="content no-label">
+            <div class="card-header member-list virtual-resolution-header">
+              <h3 class="view-color">
+                <button
+                  class="virtual-resolution-toggle"
+                  type="button"
+                  aria-controls="composition-resolution-table"
+                  [attr.aria-expanded]="showCompositionResolution"
+                  (click)="
+                    showCompositionResolution = !showCompositionResolution
+                  ">
+                  <mat-icon aria-hidden="true">{{
+                    showCompositionResolution ? 'expand_more' : 'chevron_right'
+                  }}</mat-icon>
+                  Composition Resolution
+                </button>
+              </h3>
+              <span *ngIf="virtualResolvedAt" class="text-deemphasis">
+                Resolved at:
+                {{ virtualResolvedAt | date: 'MMM d, y, h:mm:ss a' }}
+              </span>
+            </div>
+
+            <mat-divider *ngIf="showCompositionResolution"></mat-divider>
+
+            <div
+              id="composition-resolution-table"
+              class="virtual-resolution-table"
+              [hidden]="!showCompositionResolution">
+              <table>
+                <colgroup>
+                  <col class="virtual-resolution-component-col" />
+                  <col class="virtual-resolution-strategy-col" />
+                  <col class="virtual-resolution-version-col" />
+                  <col class="virtual-resolution-count-col" />
+                  <col class="virtual-resolution-count-col" />
+                  <col class="virtual-resolution-count-col" />
+                </colgroup>
+                <thead>
+                  <tr>
+                    <th>Component Track</th>
+                    <th>Strategy</th>
+                    <th>Resolved Version</th>
+                    <th>Candidates</th>
+                    <th>Staged</th>
+                    <th>Members</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr *ngIf="!virtualResolutionRows.length">
+                    <td colspan="6" class="virtual-empty-cell">
+                      No component tracks configured.
+                    </td>
+                  </tr>
+                  <tr
+                    *ngFor="
+                      let row of virtualResolutionRows;
+                      trackBy: trackByVirtualResolutionRow
+                    "
+                    class="virtual-resolution-row clickable-row"
+                    role="button"
+                    tabindex="0"
+                    (click)="onOpenComponentTrack(row)"
+                    (keydown.enter)="onOpenComponentTrack(row)"
+                    (keydown.space)="
+                      onOpenComponentTrack(row); $event.preventDefault()
+                    ">
+                    <td>
+                      <strong>{{ row.trackName }}</strong>
+                      <span class="component-track-id">{{ row.trackId }}</span>
+                    </td>
+                    <td>{{ formatConfigOption(row.strategy) }}</td>
+                    <td>
+                      <strong class="view-color">
+                        {{ getVirtualResolvedVersion(row) }}
+                      </strong>
+                    </td>
+                    <td>
+                      <strong>{{
+                        getVirtualTierCount(row.candidatesCount)
+                      }}</strong>
+                    </td>
+                    <td>
+                      <strong>{{
+                        getVirtualTierCount(row.stagedCount)
+                      }}</strong>
+                    </td>
+                    <td>
+                      <strong>{{
+                        getVirtualTierCount(row.membersCount)
+                      }}</strong>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
         <div class="virtual-object-panels">
           <section class="labelled-box virtual-object-panel">
             <div class="content no-label">
@@ -432,6 +689,10 @@
                   <div>
                     <h4>{{ getVirtualObjectTitle(item) }}</h4>
                     <p>{{ getVirtualObjectSubtitle(item) }}</p>
+                    <p *ngIf="item.object_modified">
+                      Revision:
+                      {{ item.object_modified | date: 'MMM d, y, h:mm:ss a' }}
+                    </p>
                   </div>
                   <button
                     mat-stroked-button
@@ -469,6 +730,16 @@
                   <div>
                     <h4>{{ getVirtualObjectTitle(item) }}</h4>
                     <p>{{ getVirtualObjectSubtitle(item) }}</p>
+                    <p *ngIf="item.source_track_name || item.source_track_id">
+                      Source:
+                      {{ item.source_track_name || item.source_track_id }}
+                      <ng-container *ngIf="item.source_snapshot_version">
+                        ({{ getVirtualSourceVersion(item) }})
+                      </ng-container>
+                    </p>
+                    <p *ngIf="item.conflict_reason">
+                      {{ item.conflict_reason }}
+                    </p>
                   </div>
                   <button
                     *ngIf="item.object_ref"
@@ -545,6 +816,23 @@
   <ng-template #historyTpl>
     <div class="history-tpl">
       <div
+        *ngIf="isVirtualReleaseTrack"
+        class="draft-lifecycle-controls history-controls">
+        <mat-form-field appearance="outline" subscriptSizing="dynamic">
+          <mat-label>History view</mat-label>
+          <mat-select
+            [value]="historyFilter"
+            (selectionChange)="onHistoryFilterChange($event.value)">
+            <mat-option value="drafts">Drafts only</mat-option>
+            <mat-option value="releases">Releases only</mat-option>
+            <mat-option value="all">All releases</mat-option>
+          </mat-select>
+        </mat-form-field>
+      </div>
+      <p *ngIf="historyMessage" class="draft-lifecycle-message" role="alert">
+        {{ historyMessage }}
+      </p>
+      <div
         *ngIf="isLoadingSnapshotHistory && !snapshotHistory.length"
         class="empty-state">
         Loading snapshots
@@ -553,20 +841,22 @@
       <div
         *ngIf="!isLoadingSnapshotHistory && !snapshotHistory.length"
         class="empty-state">
-        No tagged releases or current draft snapshot
+        {{
+          isVirtualReleaseTrack
+            ? 'No snapshots in this history view'
+            : 'No tagged releases or current draft snapshot'
+        }}
       </div>
 
-      <div *ngIf="snapshotHistory.length" class="snapshot-history-summary">
-        <span>Tagged releases: {{ taggedSnapshotCount }}</span>
-        <span
-          >Current draft:
-          {{ hasCurrentDraftSnapshot ? 'available' : 'none' }}</span
-        >
+      <div class="snapshot-history-summary">
+        <span>Tagged releases: {{ historyCounts.tagged }}</span>
+        <span>Drafts: {{ historyCounts.drafts }}</span>
+        <span>Total: {{ historyCounts.total }}</span>
       </div>
 
       <div *ngIf="snapshotHistory.length" class="snapshot-history-list">
         <article
-          *ngFor="let item of snapshotHistory"
+          *ngFor="let item of snapshotHistory; trackBy: trackSnapshotHistory"
           class="snapshot-history-entry">
           <div
             class="snapshot-history-marker"
@@ -870,7 +1160,13 @@
 
                     <dl class="snapshot-component-metrics">
                       <div>
-                        <dt>Source members</dt>
+                        <dt>
+                          {{
+                            row.strategy === ResolutionStrategy.LatestPreview
+                              ? 'Preview members'
+                              : 'Source members'
+                          }}
+                        </dt>
                         <dd>
                           {{ getVirtualTierCount(row.totalObjectsInSource) }}
                         </dd>
@@ -980,6 +1276,16 @@
         </article>
       </div>
     </div>
+    <mat-paginator
+      *ngIf="isVirtualReleaseTrack"
+      aria-label="Snapshot history pages"
+      [length]="historyTotal"
+      [pageIndex]="historyPageIndex"
+      [pageSize]="historyPageSize"
+      [hidePageSize]="true"
+      [showFirstLastButtons]="true"
+      (page)="onHistoryPageChange($event)">
+    </mat-paginator>
   </ng-template>
 
   <ng-template #unknownDate> Unknown </ng-template>
@@ -1007,7 +1313,8 @@
             color="primary"
             [disabled]="
               isSavingConfig ||
-              (isVirtualReleaseTrack && !isVirtualScheduleValid)
+              (isVirtualReleaseTrack &&
+                (!isVirtualScheduleValid || !isVirtualCompositionValid))
             "
             (click)="onSaveConfig()">
             Save Config
@@ -1067,7 +1374,13 @@
                 <div class="config-copy">
                   <div class="config-label">Component Tracks</div>
                   <p>
-                    Standard release tracks resolved into this virtual track.
+                    Latest tagged uses the newest published release. Latest
+                    preview uses the newest snapshot, draft or released. Draft
+                    previews include members plus staged objects under the
+                    source track's release conflict rules; released snapshots
+                    use their published members. Candidates are excluded.
+                    Revisions are frozen at materialization without tagging or
+                    changing the source track.
                   </p>
                 </div>
                 <span class="config-value">
@@ -1128,7 +1441,6 @@
                 <article
                   *ngFor="
                     let track of displayedVirtualConfigComponentTracks;
-                    let componentIndex = index;
                     trackBy: trackByComponentTrack
                   "
                   class="config-component-row"
@@ -1172,7 +1484,7 @@
                     </span>
                     <span class="config-value">
                       priority
-                      {{ getVirtualTrackPriority(track, componentIndex) }}
+                      {{ track.priority ?? 'not set' }}
                     </span>
                     <span
                       *ngIf="getComponentTrackFilters(track).length"
@@ -1180,6 +1492,78 @@
                       {{ getComponentTrackFilters(track).join(', ') }}
                     </span>
                   </div>
+                  <p *ngIf="isRetiredComponentTrack(track)" role="alert">
+                    Latest draft is retired and included members only.
+                    Explicitly choose Latest preview or Latest tagged before
+                    saving. Historical snapshots keep their original content.
+                  </p>
+
+                  <mat-form-field
+                    *ngIf="isEditingConfig"
+                    appearance="outline"
+                    class="config-component-filter">
+                    <mat-label>Priority</mat-label>
+                    <input
+                      matInput
+                      type="number"
+                      min="0"
+                      step="1"
+                      required
+                      [attr.aria-label]="
+                        'Priority for ' + getComponentTrackLabel(track)
+                      "
+                      [(ngModel)]="track.priority"
+                      [ngModelOptions]="{ standalone: true }"
+                      [errorStateMatcher]="componentPriorityErrorMatcher" />
+                    <mat-hint
+                      >Lower numbers have higher priority. Each value must be
+                      unique.</mat-hint
+                    >
+                    <mat-error>{{
+                      componentPriorityError(track.priority)
+                    }}</mat-error>
+                  </mat-form-field>
+
+                  <mat-form-field
+                    *ngIf="isEditingConfig"
+                    appearance="outline"
+                    class="config-component-filter">
+                    <mat-label>Resolve from</mat-label>
+                    <mat-select
+                      [value]="track.resolution_strategy"
+                      (selectionChange)="
+                        setVirtualComponentTrackResolution(track, $event.value)
+                      ">
+                      <mat-option [value]="ResolutionStrategy.LatestTagged">
+                        Latest tagged
+                      </mat-option>
+                      <mat-option [value]="ResolutionStrategy.LatestPreview">
+                        Latest preview
+                      </mat-option>
+                      <mat-option
+                        *ngIf="isRetiredComponentTrack(track)"
+                        value="latest_draft"
+                        disabled>
+                        Latest draft — retired, members only
+                      </mat-option>
+                      <mat-option
+                        *ngIf="
+                          track.resolution_strategy ===
+                          ResolutionStrategy.SpecificVersion
+                        "
+                        [value]="ResolutionStrategy.SpecificVersion">
+                        Specific version: {{ track.version }}
+                      </mat-option>
+                      <mat-option
+                        *ngIf="
+                          track.resolution_strategy ===
+                          ResolutionStrategy.SpecificSnapshot
+                        "
+                        [value]="ResolutionStrategy.SpecificSnapshot">
+                        Specific snapshot: {{ track.snapshot }}
+                      </mat-option>
+                    </mat-select>
+                  </mat-form-field>
 
                   <mat-form-field
                     *ngIf="isEditingConfig"
@@ -1484,6 +1868,60 @@
                     getVirtualScheduleValue('cron')
                   }}</code>
                 </ng-template>
+                <div class="recurring-retention">
+                  <h4>Recurring draft retention</h4>
+                  <p>
+                    Applies only after scheduled recurring snapshots. Counts all
+                    drafts across this track, regardless of how they were
+                    created. Older eligible drafts and their notes are
+                    permanently deleted; tagged releases and protected drafts
+                    are preserved. Protected drafts may exceed the limit. Saving
+                    the policy creates no snapshot and deletes nothing
+                    immediately.
+                  </p>
+                  <div
+                    *ngIf="
+                      isEditingConfig && canManageDraftLifecycle;
+                      else retentionValue
+                    "
+                    [formGroup]="retentionForm"
+                    class="draft-lifecycle-controls">
+                    <mat-slide-toggle formControlName="enabled">
+                      Limit retained drafts
+                    </mat-slide-toggle>
+                    <mat-form-field
+                      *ngIf="retentionForm.get('enabled')?.value"
+                      appearance="outline">
+                      <mat-label>Maximum retained drafts</mat-label>
+                      <input
+                        matInput
+                        type="number"
+                        min="1"
+                        step="1"
+                        formControlName="maxDrafts" />
+                      <mat-hint>Positive whole number; suggested: 10.</mat-hint>
+                    </mat-form-field>
+                    <p *ngIf="!isRetentionValid" role="alert">
+                      Enter a positive safe whole number.
+                    </p>
+                  </div>
+                  <ng-template #retentionValue>
+                    <p>
+                      {{
+                        (virtualSnapshotSchedule.draft_retention?.max_drafts ??
+                          null) === null
+                          ? 'Disabled (unlimited drafts)'
+                          : 'Keep newest ' +
+                            virtualSnapshotSchedule.draft_retention.max_drafts +
+                            ' drafts'
+                      }}
+                    </p>
+                    <p *ngIf="isEditingConfig && !canManageDraftLifecycle">
+                      Only application administrators can change draft
+                      retention.
+                    </p>
+                  </ng-template>
+                </div>
               </ng-container>
 
               <ng-container

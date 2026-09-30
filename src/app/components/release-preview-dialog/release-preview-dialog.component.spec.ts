@@ -2,6 +2,7 @@ import { CommonModule } from '@angular/common';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
+import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
@@ -65,6 +66,7 @@ describe('ReleasePreviewDialogComponent', () => {
         CommonModule,
         FormsModule,
         MatButtonModule,
+        MatCheckboxModule,
         MatFormFieldModule,
         MatIconModule,
         MatInputModule,
@@ -80,6 +82,58 @@ describe('ReleasePreviewDialogComponent', () => {
     fixture = TestBed.createComponent(ReleasePreviewDialogComponent);
     component = fixture.componentInstance;
     fixture.detectChanges();
+  });
+
+  it('requires fresh explicit admin consent before sending a virtual squash fingerprint', () => {
+    data.canSquashDrafts = true;
+    data.previewSummary = {
+      type: 'virtual',
+      draft_squash: {
+        lower_bound: '2026-09-01T00:00:00.000Z',
+        upper_bound: '2026-09-20T00:00:00.000Z',
+        eligible_count: 5,
+        protected_count: 2,
+        fingerprint: 'reviewed-interval',
+      },
+    };
+    fixture.detectChanges();
+    const checkbox: HTMLInputElement = fixture.nativeElement.querySelector(
+      '.release-draft-squash input'
+    );
+    expect(checkbox.checked).toBe(false);
+    component.tagVersion('minor');
+    expect(dialogRef.close).toHaveBeenLastCalledWith({
+      increment: 'minor',
+      description: '',
+    });
+
+    checkbox.click();
+    fixture.detectChanges();
+    component.exactVersion = '2.1';
+    component.tagExactVersion();
+    expect(dialogRef.close).toHaveBeenLastCalledWith({
+      version: '2.1',
+      description: '',
+      squash_drafts: true,
+      squash_fingerprint: 'reviewed-interval',
+    });
+
+    const reopened = new ReleasePreviewDialogComponent(dialogRef, data);
+    reopened.tagVersion('minor');
+    expect(dialogRef.close).toHaveBeenLastCalledWith({
+      increment: 'minor',
+      description: '',
+    });
+    data.canSquashDrafts = false;
+    component.tagVersion('minor');
+    expect(dialogRef.close).toHaveBeenLastCalledWith({
+      increment: 'minor',
+      description: '',
+    });
+    fixture.detectChanges();
+    expect(
+      fixture.nativeElement.querySelector('.release-draft-squash')
+    ).toBeNull();
   });
 
   it('should calculate the draft snapshot summary from track contents', () => {
