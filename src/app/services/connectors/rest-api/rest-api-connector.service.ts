@@ -1152,6 +1152,10 @@ export class RestApiConnectorService extends ApiConnector {
     return this.getStixObjectFactory<MarkingDefinition>('marking-definition');
   }
 
+  public get getRelationship() {
+    return this.getStixObjectFactory<Relationship>('relationship');
+  }
+
   /**
    * Factory to create a new STIX object creator (POST) function
    * @template T the type to create
