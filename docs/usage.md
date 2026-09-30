@@ -50,6 +50,57 @@ snapshot. Standard tracks retain their most recent rolling draft plus preserved
 release sources and drafts referenced by virtual provenance, so these labels
 describe surviving snapshots rather than every past action.
 
+Virtual release tracks open on **Releases**, not a Board. **Open Snapshot** on
+each card enters a read-only, URL-addressable contents view for that exact
+snapshot. Search by name, STIX ID, ATT&CK ID, or revision, combine **STIX type**
+and **Source track** filters, and inspect the selected revision's JSON. Each row
+shows its recorded component origins. A deduplicated revision contributed by
+multiple tracks appears once and matches any of its sources. **Source not
+recorded** identifies objects without captured origin metadata; current component
+membership is never substituted for snapshot provenance. Relationships and supporting objects
+are included; the generated collection projection is not a manifest member.
+**Back to Releases** returns to the snapshot cards. Standard tracks retain
+their Board workflow.
+
+The Releases history filter and pagination remain available for virtual tracks.
+Automatic history and cleanup refresh runs while Releases is visible, and pauses
+in Config, inside a snapshot, or while a dialog or edit is active. Virtual track
+descriptions can be edited from the Releases introduction.
+
+Every contents row offers **Preview**, **View in Object Library**, and JSON
+inspection when its payload is available. Preview opens the pinned snapshot
+revision read-only, including relationships, identities, and marking definitions.
+Closing it preserves the table's filters and position. If a manifest contains only
+an exact reference, Preview retrieves that revision and reports failures inline
+instead of substituting the latest object. Relationship previews use endpoint
+revisions from the same snapshot.
+
+**View in Object Library** opens the object's library page in a new tab; that
+page can show newer workspace content than the snapshot. Relationship library
+pages are read-only. Object previews fit their content width and remain within
+the viewport rather than inheriting the wider quarantine modal's dimensions.
+
+**View Quarantined Objects** appears inside a snapshot only when that snapshot's
+deduplication strategy is `quarantine` and its quarantine contains entries.
+The modal groups competing revisions by object and shows their component sources
+side by side on wider screens, stacked on narrow screens. Each revision's
+**View JSON** can remain open independently; **Compare JSON** opens all revisions
+in that group for comparison. JSON comes from the exact revision endpoint and
+retains the original STIX fields. **View details** opens that revision read-only
+without losing the comparison or selection. **View in Object Library**
+opens the ordinary object page in a new tab and is explicitly distinct from the
+historical revision views. Retrieval failures or mismatched revisions are shown
+inline with Retry; they never substitute the latest revision.
+An editor can select an exact revision in the latest untagged snapshot; resolving
+it creates a new draft rather than changing the viewed snapshot. Historical
+and tagged snapshots are review-only.
+
+The [isolated design preview](local-dev.md#virtual-snapshot-design-preview)
+demonstrates the complete manifest, including non-exported LinkById dependencies.
+The current production API does not expose those dependency records. Against
+that API, the contents view explicitly labels its exported-only coverage instead
+of claiming to list the complete manifest.
+
 For a virtual track's recurring schedule, use **Find a schedule** in the Config
 tab: typing `hou` suggests **Hourly — at minute 0**, and typing `every 15`
 suggests **Every 15 minutes**. Select a suggestion to apply it; unmatched text
@@ -154,7 +205,7 @@ while you are viewing it, the automatic history refresh lets you select a surviv
 
 The release preview offers minor and major relative tags as well as an exact `MAJOR.MINOR` version. Relative tags are calculated from the tagged snapshot immediately before the selected draft. When releasing an older draft, the exact version must also remain below the next tagged snapshot; the dialog shows these exclusive bounds. Optional release notes are stored on that snapshot and become the `x-mitre-collection` description in exported STIX bundles.
 
-The release-track page follows a draft-then-tag flow: the Board tab manages what the next draft contains (candidates, staged objects, and for virtual tracks the Create Draft action), and the Releases tab previews and tags a draft from its card. For virtual tracks, each snapshot card shows its own Composition Resolution provenance: the exact component track snapshot, tagged version, snapshot creation timestamp, resolution strategy and filters, and source/filter/contribution counts used for that materialization. Any snapshot can be exported from its card as a STIX 2.0 bundle, a STIX 2.1 bundle, or Workbench JSON. Historical snapshot exports can also copy a concise summary. Every snapshot seals its content when its members are written, so exports replay the exact members, relationships, and supporting objects in either STIX version; released snapshots also show their stable bundle identifier and SHA-256 hashes. Saving a relationship resets its source and target to work-in-progress in place without creating new revisions of those objects. A standard release preserves its exact pre-release draft, which remains hidden while the release exists. Administrators can convert the most recent tagged release back to a draft from the Releases tab by confirming its version. Standard tracks restore the preserved pre-release draft; virtual tracks retain the same snapshot and composition provenance while removing its tag and publication metadata. Conversion is blocked when any downstream virtual snapshot resolved that release. Tagged releases cannot be deleted directly. Editors can separately delete the current draft, provided it is not the track's only snapshot, a preserved source of a tagged release, or a resolved component of a downstream virtual snapshot. Administrators can also correct a tagged snapshot's version from its card when the replacement remains valid between adjacent releases. A track can carry an alias (a short lowercase slug set in the Config tab) that works in place of its ID in page URLs and API paths; the track list opens aliased tracks by their alias. Virtual-track schedules are configured in the Config tab as manual, recurring, or specific dates; recurring schedules use guided cadence/day/time controls that generate a five-field UTC cron expression, and specific dates use controlled future UTC date and time inputs. Scheduled drafts run only when the connected REST API has its global scheduler enabled. The dashboard's Data Quality page adds a domain consistency report: relationships whose objects share no domain (and objects with no domain) can never ship in the same bundle, so fix them at the source rather than expecting the bundle to pull in related objects. Only the most recent tagged release offers Convert to draft, and only the current draft offers Delete draft, a progress bar with a status message appears under the page header while a long operation runs, and deleting an entire track lives in the danger zone at the bottom of the Config tab.
+The release-track page follows a draft-then-tag flow: standard tracks use the Board to manage candidates and staged objects; virtual tracks use Releases to browse atomic snapshots, with Create Draft in the page header. The Releases tab previews and tags a draft from its card. For virtual tracks, each snapshot card has a collapsible Component provenance section: the exact component track snapshot, tagged version, snapshot creation timestamp, resolution strategy and filters, and source/filter/contribution counts used for that materialization. Any snapshot can be exported from its card as a STIX 2.0 bundle, a STIX 2.1 bundle, or Workbench JSON. Historical snapshot exports can also copy a concise summary. Every snapshot seals its content when its members are written, so exports replay the exact members, relationships, and supporting objects in either STIX version; released snapshots also show their stable bundle identifier and SHA-256 hashes. Saving a relationship resets its source and target to work-in-progress in place without creating new revisions of those objects. A standard release preserves its exact pre-release draft, which remains hidden while the release exists. Administrators can convert the most recent tagged release back to a draft from the Releases tab by confirming its version. Standard tracks restore the preserved pre-release draft; virtual tracks retain the same snapshot and composition provenance while removing its tag and publication metadata. Conversion is blocked when any downstream virtual snapshot resolved that release. Tagged releases cannot be deleted directly. Editors can separately delete the current draft, provided it is not the track's only snapshot, a preserved source of a tagged release, or a resolved component of a downstream virtual snapshot. Administrators can also correct a tagged snapshot's version from its card when the replacement remains valid between adjacent releases. A track can carry an alias (a short lowercase slug set in the Config tab) that works in place of its ID in page URLs and API paths; the track list opens aliased tracks by their alias. Virtual-track schedules are configured in the Config tab as manual, recurring, or specific dates; recurring schedules use guided cadence/day/time controls that generate a five-field UTC cron expression, and specific dates use controlled future UTC date and time inputs. Scheduled drafts run only when the connected REST API has its global scheduler enabled. The dashboard's Data Quality page adds a domain consistency report: relationships whose objects share no domain (and objects with no domain) can never ship in the same bundle, so fix them at the source rather than expecting the bundle to pull in related objects. Only the most recent tagged release offers Convert to draft, and only the current draft offers Delete draft, a progress bar with a status message appears under the page header while a long operation runs, and deleting an entire track lives in the danger zone at the bottom of the Config tab.
 
 On a virtual track's **Board**, **Composition Resolution** starts collapsed to
 leave more room for Members and Quarantine. Click its heading, or focus it and

@@ -20,7 +20,7 @@
       {{ releaseTrackName }}
     </h1>
     <div
-      *ngIf="isVirtualReleaseTrack"
+      *ngIf="isVirtualReleaseTrack && !selectedSnapshotModified"
       class="button-group release-track-actions">
       <button
         mat-raised-button
@@ -94,23 +94,36 @@
     </article>
   </section>
 
+  <app-virtual-snapshot-contents
+    *ngIf="isVirtualReleaseTrack && selectedSnapshotModified"
+    [trackId]="id"
+    [modified]="selectedSnapshotModified"
+    [title]="selectedSnapshot?.title || 'Snapshot'"
+    [isLatest]="selectedSnapshot?.isLatest || false"
+    [canResolve]="canEditReleaseTrack"
+    (back)="onBackToReleases()"
+    (resolved)="onQuarantineResolved()"></app-virtual-snapshot-contents>
+
   <app-stix-page-tabs
-    [detailsTemplate]="detailsTpl"
-    detailsLabel="Board"
+    *ngIf="releaseTrack && !(isVirtualReleaseTrack && selectedSnapshotModified)"
+    [detailsTemplate]="isVirtualReleaseTrack ? historyTpl : detailsTpl"
+    [detailsLabel]="isVirtualReleaseTrack ? 'Releases' : 'Board'"
     [showHistory]="false"
     [showNotes]="false"
     [showMembership]="false"
     (selectedIndexChange)="onSelectedTabChange($event)"
-    [customTabs]="[
-      { label: 'Releases', template: historyTpl },
-      { label: 'Config', template: configTpl },
-    ]"></app-stix-page-tabs>
+    [customTabs]="
+      isVirtualReleaseTrack
+        ? [{ label: 'Config', template: configTpl }]
+        : [
+            { label: 'Releases', template: historyTpl },
+            { label: 'Config', template: configTpl },
+          ]
+    "></app-stix-page-tabs>
 
   <ng-template #detailsTpl>
     <!-- stats summary -->
-    <div
-      class="release-track-board"
-      *ngIf="!isVirtualReleaseTrack; else virtualDetailsTpl">
+    <div class="release-track-board">
       <div class="labelled-box summary-frame">
         <div
           class="summary-overview content no-label"
@@ -164,210 +177,40 @@
           </section>
 
           <div class="summary-stats" aria-label="Release track object counts">
-            <ng-container *ngIf="isVirtualReleaseTrack; else standardSummary">
-              <div class="summary-metric candidates-summary">
-                <strong class="summary-count view-color">
-                  {{ virtualComponentTracks.length || 0 }}
-                </strong>
-                <div class="summary-copy">
-                  <strong class="summary-heading">Components</strong>
-                  <span class="text-deemphasis">standard tracks</span>
-                </div>
+            <div class="summary-metric candidates-summary">
+              <strong class="summary-count view-color">
+                {{ candidates.length || 0 }}
+              </strong>
+              <div class="summary-copy">
+                <strong class="summary-heading">Candidates</strong>
+                <span class="text-deemphasis">in this draft</span>
               </div>
+            </div>
 
-              <div class="summary-metric staged-summary">
-                <strong class="summary-count promote-color">
-                  {{ virtualResolvedObjectCount || 0 }}
-                </strong>
-                <div class="summary-copy">
-                  <strong class="summary-heading">Resolved Objects</strong>
-                  <span class="text-deemphasis">latest snapshot</span>
-                </div>
+            <div class="summary-metric staged-summary">
+              <strong class="summary-count promote-color">
+                {{ staged.length || 0 }}
+              </strong>
+              <div class="summary-copy">
+                <strong class="summary-heading">Staged</strong>
+                <span class="text-deemphasis">for next release</span>
               </div>
+            </div>
 
-              <div class="summary-metric members-summary">
-                <strong class="summary-count">
-                  {{ quarantineObjects.length || 0 }}
-                </strong>
-                <div class="summary-copy">
-                  <strong class="summary-heading">Quarantined</strong>
-                  <span class="text-deemphasis">needs review</span>
-                </div>
+            <div class="summary-metric members-summary">
+              <strong class="summary-count">
+                {{ members.length || 0 }}
+              </strong>
+              <div class="summary-copy">
+                <strong class="summary-heading">Released Members</strong>
+                <span class="text-deemphasis">published</span>
               </div>
-            </ng-container>
-
-            <ng-template #standardSummary>
-              <div class="summary-metric candidates-summary">
-                <strong class="summary-count view-color">
-                  {{ candidates.length || 0 }}
-                </strong>
-                <div class="summary-copy">
-                  <strong class="summary-heading">Candidates</strong>
-                  <span class="text-deemphasis">in this draft</span>
-                </div>
-              </div>
-
-              <div class="summary-metric staged-summary">
-                <strong class="summary-count promote-color">
-                  {{ staged.length || 0 }}
-                </strong>
-                <div class="summary-copy">
-                  <strong class="summary-heading">Staged</strong>
-                  <span class="text-deemphasis">for next release</span>
-                </div>
-              </div>
-
-              <div class="summary-metric members-summary">
-                <strong class="summary-count">
-                  {{ members.length || 0 }}
-                </strong>
-                <div class="summary-copy">
-                  <strong class="summary-heading">Released Members</strong>
-                  <span class="text-deemphasis">published</span>
-                </div>
-              </div>
-            </ng-template>
+            </div>
           </div>
         </div>
       </div>
 
-      <ng-container *ngIf="isVirtualReleaseTrack; else standardWorkspaceTpl">
-        <div class="virtual-track-workspace">
-          <section class="labelled-box virtual-track-card">
-            <div class="content no-label">
-              <div class="card-header member-list">
-                <h3 class="view-color">
-                  Component Tracks ({{ virtualComponentTracks.length }})
-                </h3>
-              </div>
-
-              <mat-divider></mat-divider>
-
-              <div class="virtual-card-body">
-                <div *ngIf="!virtualComponentTracks.length" class="empty-state">
-                  No component tracks configured.
-                </div>
-                <p *ngIf="hasRetiredComponentTracks" role="alert">
-                  This configuration uses the retired members-only latest draft
-                  rule. Edit Config and explicitly choose Latest preview or
-                  Latest tagged for each retired rule before materializing
-                  again. Existing snapshots are unchanged.
-                </p>
-
-                <article
-                  *ngFor="
-                    let track of virtualComponentTracks;
-                    trackBy: trackByComponentTrack
-                  "
-                  class="virtual-component-row clickable-row"
-                  role="button"
-                  tabindex="0"
-                  (click)="onOpenComponentTrack(track)"
-                  (keydown.enter)="onOpenComponentTrack(track)"
-                  (keydown.space)="
-                    onOpenComponentTrack(track); $event.preventDefault()
-                  ">
-                  <div>
-                    <h4>{{ getComponentTrackLabel(track) }}</h4>
-                    <p class="component-track-id">{{ track.track_id }}</p>
-                  </div>
-                  <div class="virtual-component-meta">
-                    <span class="config-value">
-                      {{ formatConfigOption(track.resolution_strategy) }}
-                    </span>
-                    <span class="config-value">
-                      priority {{ track.priority ?? 0 }}
-                    </span>
-                    <span
-                      *ngIf="getComponentTrackFilters(track).length"
-                      class="config-value">
-                      {{ getComponentTrackFilters(track).join(', ') }}
-                    </span>
-                  </div>
-                </article>
-              </div>
-            </div>
-          </section>
-
-          <section class="labelled-box virtual-track-card">
-            <div class="content no-label">
-              <div class="card-header member-list">
-                <h3 class="promote-color">Latest Resolution</h3>
-              </div>
-
-              <mat-divider></mat-divider>
-
-              <div class="virtual-card-body">
-                <div
-                  *ngIf="!resolvedComponentSnapshots.length"
-                  class="empty-state">
-                  No resolved snapshot yet. Create a draft snapshot to resolve
-                  component contents.
-                </div>
-
-                <article
-                  *ngFor="
-                    let component of resolvedComponentSnapshots;
-                    trackBy: trackByResolvedComponent
-                  "
-                  class="virtual-component-row">
-                  <div>
-                    <h4>
-                      {{
-                        component.track_name ||
-                          component.track_id ||
-                          'Component track'
-                      }}
-                    </h4>
-                    <p>
-                      {{ getResolvedComponentLabel(component) }}
-                    </p>
-                  </div>
-                  <div class="virtual-component-meta">
-                    <span class="config-value">
-                      {{ component.objects_contributed || 0 }} contributed
-                    </span>
-                    <span class="config-value">
-                      {{ component.objects_after_filter || 0 }} after filters
-                    </span>
-                  </div>
-                </article>
-              </div>
-            </div>
-          </section>
-
-          <section class="labelled-box virtual-track-card">
-            <div class="content no-label">
-              <div class="card-header member-list">
-                <h3>Resolution Details</h3>
-              </div>
-
-              <mat-divider></mat-divider>
-
-              <div class="virtual-card-body virtual-resolution-stats">
-                <div class="virtual-stat">
-                  <strong>{{ virtualResolvedObjectCount || 0 }}</strong>
-                  <span>Total Objects</span>
-                </div>
-                <div class="virtual-stat">
-                  <strong>{{ virtualDuplicateCount || 0 }}</strong>
-                  <span>Duplicates</span>
-                </div>
-                <div class="virtual-stat">
-                  <strong>{{ virtualConflictCount || 0 }}</strong>
-                  <span>Conflicts</span>
-                </div>
-                <div class="virtual-stat">
-                  <strong>{{ quarantineObjects.length || 0 }}</strong>
-                  <span>Quarantined</span>
-                </div>
-              </div>
-            </div>
-          </section>
-        </div>
-      </ng-container>
-
-      <ng-template #standardWorkspaceTpl>
+      <ng-container>
         <div class="release-columns">
           <div
             class="release-column"
@@ -474,288 +317,8 @@
             </div>
           </div>
         </div>
-      </ng-template>
+      </ng-container>
     </div>
-
-    <ng-template #virtualDetailsTpl>
-      <div class="virtual-track-layout">
-        <div class="labelled-box summary-frame">
-          <div
-            class="summary-overview content no-label"
-            aria-label="Virtual release track summary">
-            <section class="summary-description">
-              <div class="summary-section-header">
-                <h2>Description</h2>
-                <button
-                  *ngIf="!isEditingDescription"
-                  class="description-edit-button"
-                  mat-icon-button
-                  type="button"
-                  aria-label="Edit release track description"
-                  (click)="onEditDescription()">
-                  <mat-icon>edit</mat-icon>
-                </button>
-              </div>
-
-              <p
-                *ngIf="!isEditingDescription"
-                class="summary-description-text"
-                [ngClass]="{ empty: !releaseTrackDescription }">
-                {{ releaseTrackDescription || 'No description provided.' }}
-              </p>
-
-              <div *ngIf="isEditingDescription" class="description-editor">
-                <mat-form-field appearance="outline">
-                  <textarea
-                    matInput
-                    rows="3"
-                    placeholder="Describe this release track..."
-                    [(ngModel)]="descriptionDraft"></textarea>
-                </mat-form-field>
-                <div class="small-buttons description-actions">
-                  <button
-                    mat-stroked-button
-                    type="button"
-                    (click)="onCancelDescriptionEdit()">
-                    Cancel
-                  </button>
-                  <button
-                    mat-raised-button
-                    color="primary"
-                    type="button"
-                    [disabled]="isSavingDescription"
-                    (click)="onSaveDescription()">
-                    Save
-                  </button>
-                </div>
-              </div>
-            </section>
-
-            <div
-              class="summary-stats"
-              aria-label="Virtual release track object counts">
-              <div class="summary-metric candidates-summary">
-                <strong class="summary-count view-color">
-                  {{ virtualComponentTracks.length }}
-                </strong>
-                <div class="summary-copy">
-                  <strong class="summary-heading">Components</strong>
-                  <span class="text-deemphasis">standard tracks</span>
-                </div>
-              </div>
-
-              <div class="summary-metric staged-summary">
-                <strong class="summary-count promote-color">
-                  {{ members.length }}
-                </strong>
-                <div class="summary-copy">
-                  <strong class="summary-heading">Members</strong>
-                  <span class="text-deemphasis">resolved objects</span>
-                </div>
-              </div>
-
-              <div class="summary-metric members-summary">
-                <strong class="summary-count quarantine-color">
-                  {{ quarantineObjects.length }}
-                </strong>
-                <div class="summary-copy">
-                  <strong class="summary-heading">Quarantined</strong>
-                  <span class="text-deemphasis">resolution conflicts</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <section
-          class="labelled-box virtual-resolution-panel"
-          [class.collapsed]="!showCompositionResolution">
-          <div class="content no-label">
-            <div class="card-header member-list virtual-resolution-header">
-              <h3 class="view-color">
-                <button
-                  class="virtual-resolution-toggle"
-                  type="button"
-                  aria-controls="composition-resolution-table"
-                  [attr.aria-expanded]="showCompositionResolution"
-                  (click)="
-                    showCompositionResolution = !showCompositionResolution
-                  ">
-                  <mat-icon aria-hidden="true">{{
-                    showCompositionResolution ? 'expand_more' : 'chevron_right'
-                  }}</mat-icon>
-                  Composition Resolution
-                </button>
-              </h3>
-              <span *ngIf="virtualResolvedAt" class="text-deemphasis">
-                Resolved at:
-                {{ virtualResolvedAt | date: 'MMM d, y, h:mm:ss a' }}
-              </span>
-            </div>
-
-            <mat-divider *ngIf="showCompositionResolution"></mat-divider>
-
-            <div
-              id="composition-resolution-table"
-              class="virtual-resolution-table"
-              [hidden]="!showCompositionResolution">
-              <table>
-                <colgroup>
-                  <col class="virtual-resolution-component-col" />
-                  <col class="virtual-resolution-strategy-col" />
-                  <col class="virtual-resolution-version-col" />
-                  <col class="virtual-resolution-count-col" />
-                  <col class="virtual-resolution-count-col" />
-                  <col class="virtual-resolution-count-col" />
-                </colgroup>
-                <thead>
-                  <tr>
-                    <th>Component Track</th>
-                    <th>Strategy</th>
-                    <th>Resolved Version</th>
-                    <th>Candidates</th>
-                    <th>Staged</th>
-                    <th>Members</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr *ngIf="!virtualResolutionRows.length">
-                    <td colspan="6" class="virtual-empty-cell">
-                      No component tracks configured.
-                    </td>
-                  </tr>
-                  <tr
-                    *ngFor="
-                      let row of virtualResolutionRows;
-                      trackBy: trackByVirtualResolutionRow
-                    "
-                    class="virtual-resolution-row clickable-row"
-                    role="button"
-                    tabindex="0"
-                    (click)="onOpenComponentTrack(row)"
-                    (keydown.enter)="onOpenComponentTrack(row)"
-                    (keydown.space)="
-                      onOpenComponentTrack(row); $event.preventDefault()
-                    ">
-                    <td>
-                      <strong>{{ row.trackName }}</strong>
-                      <span class="component-track-id">{{ row.trackId }}</span>
-                    </td>
-                    <td>{{ formatConfigOption(row.strategy) }}</td>
-                    <td>
-                      <strong class="view-color">
-                        {{ getVirtualResolvedVersion(row) }}
-                      </strong>
-                    </td>
-                    <td>
-                      <strong>{{
-                        getVirtualTierCount(row.candidatesCount)
-                      }}</strong>
-                    </td>
-                    <td>
-                      <strong>{{
-                        getVirtualTierCount(row.stagedCount)
-                      }}</strong>
-                    </td>
-                    <td>
-                      <strong>{{
-                        getVirtualTierCount(row.membersCount)
-                      }}</strong>
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </section>
-
-        <div class="virtual-object-panels">
-          <section class="labelled-box virtual-object-panel">
-            <div class="content no-label">
-              <div class="card-header member-list">
-                <h3>Members ({{ members.length || 0 }})</h3>
-              </div>
-
-              <mat-divider></mat-divider>
-
-              <div class="virtual-object-list">
-                <div *ngIf="!members.length" class="empty-state">
-                  No member objects.
-                </div>
-
-                <article
-                  *ngFor="let item of members; trackBy: trackByObjectRef"
-                  class="virtual-object-row">
-                  <div>
-                    <h4>{{ getVirtualObjectTitle(item) }}</h4>
-                    <p>{{ getVirtualObjectSubtitle(item) }}</p>
-                    <p *ngIf="item.object_modified">
-                      Revision:
-                      {{ item.object_modified | date: 'MMM d, y, h:mm:ss a' }}
-                    </p>
-                  </div>
-                  <button
-                    mat-stroked-button
-                    type="button"
-                    (click)="onView(item.object_ref)">
-                    View
-                    <mat-icon>open_in_new</mat-icon>
-                  </button>
-                </article>
-              </div>
-            </div>
-          </section>
-
-          <section class="labelled-box virtual-object-panel">
-            <div class="content no-label">
-              <div class="card-header member-list">
-                <h3 class="quarantine-color">
-                  Quarantine ({{ quarantineObjects.length || 0 }})
-                </h3>
-              </div>
-
-              <mat-divider></mat-divider>
-
-              <div class="virtual-object-list">
-                <div *ngIf="!quarantineObjects.length" class="empty-state">
-                  No quarantined objects.
-                </div>
-
-                <article
-                  *ngFor="
-                    let item of quarantineObjects;
-                    trackBy: trackByObjectRef
-                  "
-                  class="virtual-object-row">
-                  <div>
-                    <h4>{{ getVirtualObjectTitle(item) }}</h4>
-                    <p>{{ getVirtualObjectSubtitle(item) }}</p>
-                    <p *ngIf="item.source_track_name || item.source_track_id">
-                      Source:
-                      {{ item.source_track_name || item.source_track_id }}
-                      <ng-container *ngIf="item.source_snapshot_version">
-                        ({{ getVirtualSourceVersion(item) }})
-                      </ng-container>
-                    </p>
-                    <p *ngIf="item.conflict_reason">
-                      {{ item.conflict_reason }}
-                    </p>
-                  </div>
-                  <button
-                    *ngIf="item.object_ref"
-                    mat-stroked-button
-                    type="button"
-                    (click)="onView(item.object_ref)">
-                    View
-                    <mat-icon>open_in_new</mat-icon>
-                  </button>
-                </article>
-              </div>
-            </div>
-          </section>
-        </div>
-      </div>
-    </ng-template>
   </ng-template>
 
   <ng-template #memberTpl let-item let-lane="lane">
@@ -815,6 +378,64 @@
 
   <ng-template #historyTpl>
     <div class="history-tpl">
+      <section *ngIf="isVirtualReleaseTrack" class="virtual-releases-intro">
+        <div class="virtual-releases-heading">
+          <mat-icon aria-hidden="true">layers</mat-icon>
+          <div>
+            <h2>Virtual snapshots</h2>
+            <p *ngIf="!isEditingDescription">
+              {{
+                releaseTrackDescription ||
+                  'A release track composed from component snapshots.'
+              }}
+            </p>
+            <button
+              *ngIf="canEditReleaseTrack && !isEditingDescription"
+              mat-button
+              type="button"
+              (click)="onEditDescription()">
+              <mat-icon>edit</mat-icon>
+              Edit description
+            </button>
+            <div *ngIf="isEditingDescription" class="description-editor">
+              <mat-form-field appearance="outline">
+                <textarea
+                  matInput
+                  rows="3"
+                  aria-label="Release track description"
+                  [(ngModel)]="descriptionDraft"></textarea>
+              </mat-form-field>
+              <div class="small-buttons description-actions">
+                <button
+                  mat-stroked-button
+                  type="button"
+                  (click)="onCancelDescriptionEdit()">
+                  Cancel
+                </button>
+                <button
+                  mat-raised-button
+                  color="primary"
+                  type="button"
+                  [disabled]="isSavingDescription"
+                  (click)="onSaveDescription()">
+                  Save
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+        <p class="text-deemphasis">
+          Open a snapshot to explore its complete graph: objects, relationships,
+          and supporting content. Each snapshot preserves its own graph
+          selection.
+        </p>
+        <p *ngIf="hasRetiredComponentTracks" role="alert">
+          This configuration uses the retired members-only latest draft rule.
+          Edit Config and explicitly choose Latest preview or Latest tagged for
+          each retired rule before materializing again. Existing snapshots are
+          unchanged.
+        </p>
+      </section>
       <div
         *ngIf="isVirtualReleaseTrack"
         class="draft-lifecycle-controls history-controls">
@@ -951,6 +572,15 @@
 
               <div class="snapshot-history-actions small-buttons">
                 <button
+                  *ngIf="isVirtualReleaseTrack"
+                  mat-flat-button
+                  color="primary"
+                  [disabled]="!item.modified"
+                  (click)="onOpenSnapshot(item)">
+                  <mat-icon>folder_open</mat-icon>
+                  Open Snapshot
+                </button>
+                <button
                   *ngIf="canEditReleaseTrack && !item.isTagged"
                   mat-stroked-button
                   [disabled]="
@@ -1062,7 +692,7 @@
               </div>
             </div>
 
-            <div class="snapshot-history-stats">
+            <div *ngIf="!isVirtualReleaseTrack" class="snapshot-history-stats">
               <div
                 *ngFor="let stat of item.stats"
                 class="snapshot-history-stat">
@@ -1075,119 +705,126 @@
               </div>
             </div>
 
-            <section
+            <details
               *ngIf="item.snapshot.type === 'virtual'"
-              class="snapshot-composition-resolution"
-              aria-label="Composition resolution provenance">
-              <div class="snapshot-composition-header">
-                <div class="snapshot-composition-title">
-                  <mat-icon aria-hidden="true">account_tree</mat-icon>
-                  <span>Composition Resolution</span>
-                </div>
-                <span
-                  *ngIf="item.compositionResolvedAt"
-                  class="snapshot-composition-resolved-at">
-                  Resolved:
-                  {{ item.compositionResolvedAt | date: 'MMM d, y, h:mm:ss a' }}
-                </span>
-              </div>
-
-              <div
-                *ngIf="!item.hasCompositionResolution"
-                class="snapshot-composition-empty">
-                This snapshot has not been materialized, so it has no component
-                snapshot provenance yet.
-              </div>
-
-              <div
-                *ngIf="item.hasCompositionResolution"
-                class="snapshot-composition-components">
-                <div
-                  *ngIf="!item.compositionResolutionRows.length"
-                  class="snapshot-composition-empty">
-                  No component snapshots were recorded.
-                </div>
-
-                <article
-                  *ngFor="
-                    let row of item.compositionResolutionRows;
-                    trackBy: trackByVirtualResolutionRow
-                  "
-                  class="snapshot-component-provenance">
-                  <header class="snapshot-component-identity">
-                    <button
-                      type="button"
-                      class="snapshot-component-track"
-                      (click)="onOpenComponentTrack(row)">
-                      <strong>{{ row.trackName }}</strong>
-                      <code>{{ row.trackId }}</code>
-                    </button>
-                    <span class="snapshot-component-version">
-                      {{ getVirtualResolvedVersion(row) }}
-                    </span>
-                  </header>
-
-                  <div class="snapshot-component-body">
-                    <dl class="snapshot-component-details">
-                      <div>
-                        <dt>Snapshot created</dt>
-                        <dd>
-                          <strong
-                            *ngIf="row.resolvedSnapshotId; else noSnapshot">
-                            {{
-                              row.resolvedSnapshotId
-                                | date: 'MMM d, y, h:mm:ss a'
-                            }}
-                          </strong>
-                          <ng-template #noSnapshot>-</ng-template>
-                          <code *ngIf="row.resolvedSnapshotId">
-                            {{ row.resolvedSnapshotId }}
-                          </code>
-                        </dd>
-                      </div>
-                      <div>
-                        <dt>Resolution strategy</dt>
-                        <dd>
-                          <strong>{{
-                            formatConfigOption(row.strategy)
-                          }}</strong>
-                          <span *ngIf="row.filters?.length">
-                            Filters: {{ row.filters?.join(', ') }}
-                          </span>
-                        </dd>
-                      </div>
-                    </dl>
-
-                    <dl class="snapshot-component-metrics">
-                      <div>
-                        <dt>
-                          {{
-                            row.strategy === ResolutionStrategy.LatestPreview
-                              ? 'Preview members'
-                              : 'Source members'
-                          }}
-                        </dt>
-                        <dd>
-                          {{ getVirtualTierCount(row.totalObjectsInSource) }}
-                        </dd>
-                      </div>
-                      <div>
-                        <dt>After filters</dt>
-                        <dd>
-                          {{ getVirtualTierCount(row.objectsAfterFilter) }}
-                        </dd>
-                      </div>
-                      <div>
-                        <dt>Contributed</dt>
-                        <dd>
-                          {{ getVirtualTierCount(row.objectsContributed) }}
-                        </dd>
-                      </div>
-                    </dl>
+              class="snapshot-provenance-disclosure">
+              <summary>Component provenance</summary>
+              <section
+                *ngIf="item.snapshot.type === 'virtual'"
+                class="snapshot-composition-resolution"
+                aria-label="Composition resolution provenance">
+                <div class="snapshot-composition-header">
+                  <div class="snapshot-composition-title">
+                    <mat-icon aria-hidden="true">account_tree</mat-icon>
+                    <span>Composition Resolution</span>
                   </div>
-                </article>
-              </div>
-            </section>
+                  <span
+                    *ngIf="item.compositionResolvedAt"
+                    class="snapshot-composition-resolved-at">
+                    Resolved:
+                    {{
+                      item.compositionResolvedAt | date: 'MMM d, y, h:mm:ss a'
+                    }}
+                  </span>
+                </div>
+
+                <div
+                  *ngIf="!item.hasCompositionResolution"
+                  class="snapshot-composition-empty">
+                  This snapshot has not been materialized, so it has no
+                  component snapshot provenance yet.
+                </div>
+
+                <div
+                  *ngIf="item.hasCompositionResolution"
+                  class="snapshot-composition-components">
+                  <div
+                    *ngIf="!item.compositionResolutionRows.length"
+                    class="snapshot-composition-empty">
+                    No component snapshots were recorded.
+                  </div>
+
+                  <article
+                    *ngFor="
+                      let row of item.compositionResolutionRows;
+                      trackBy: trackByVirtualResolutionRow
+                    "
+                    class="snapshot-component-provenance">
+                    <header class="snapshot-component-identity">
+                      <button
+                        type="button"
+                        class="snapshot-component-track"
+                        (click)="onOpenComponentTrack(row)">
+                        <strong>{{ row.trackName }}</strong>
+                        <code>{{ row.trackId }}</code>
+                      </button>
+                      <span class="snapshot-component-version">
+                        {{ getVirtualResolvedVersion(row) }}
+                      </span>
+                    </header>
+
+                    <div class="snapshot-component-body">
+                      <dl class="snapshot-component-details">
+                        <div>
+                          <dt>Snapshot created</dt>
+                          <dd>
+                            <strong
+                              *ngIf="row.resolvedSnapshotId; else noSnapshot">
+                              {{
+                                row.resolvedSnapshotId
+                                  | date: 'MMM d, y, h:mm:ss a'
+                              }}
+                            </strong>
+                            <ng-template #noSnapshot>-</ng-template>
+                            <code *ngIf="row.resolvedSnapshotId">
+                              {{ row.resolvedSnapshotId }}
+                            </code>
+                          </dd>
+                        </div>
+                        <div>
+                          <dt>Resolution strategy</dt>
+                          <dd>
+                            <strong>{{
+                              formatConfigOption(row.strategy)
+                            }}</strong>
+                            <span *ngIf="row.filters?.length">
+                              Filters: {{ row.filters?.join(', ') }}
+                            </span>
+                          </dd>
+                        </div>
+                      </dl>
+
+                      <dl class="snapshot-component-metrics">
+                        <div>
+                          <dt>
+                            {{
+                              row.strategy === ResolutionStrategy.LatestPreview
+                                ? 'Preview members'
+                                : 'Source members'
+                            }}
+                          </dt>
+                          <dd>
+                            {{ getVirtualTierCount(row.totalObjectsInSource) }}
+                          </dd>
+                        </div>
+                        <div>
+                          <dt>After filters</dt>
+                          <dd>
+                            {{ getVirtualTierCount(row.objectsAfterFilter) }}
+                          </dd>
+                        </div>
+                        <div>
+                          <dt>Contributed</dt>
+                          <dd>
+                            {{ getVirtualTierCount(row.objectsContributed) }}
+                          </dd>
+                        </div>
+                      </dl>
+                    </div>
+                  </article>
+                </div>
+              </section>
+            </details>
 
             <section
               *ngIf="item.contentStats.length"
