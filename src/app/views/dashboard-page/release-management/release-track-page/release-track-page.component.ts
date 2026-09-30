@@ -13,7 +13,7 @@ import { ErrorStateMatcher } from '@angular/material/core';
 import { MatDialog } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { PageEvent } from '@angular/material/paginator';
-import { ActivatedRoute, Router } from '@angular/router';
+import { ActivatedRoute, NavigationEnd, Router } from '@angular/router';
 import {
   forkJoin,
   fromEvent,
@@ -202,12 +202,7 @@ interface VirtualReleaseTrackConfigFormValue {
 }
 
 type VirtualCronCadence =
-  | 'interval'
-  | 'hourly'
-  | 'daily'
-  | 'weekly'
-  | 'monthly'
-  | 'yearly';
+  'interval' | 'hourly' | 'daily' | 'weekly' | 'monthly' | 'yearly';
 
 interface SchedulePreset {
   label: string;
@@ -300,7 +295,6 @@ export class ReleaseTrackPageComponent implements OnInit, OnDestroy {
   public id = '';
   public releaseTrack: ReleaseTrackSnapshot | null = null;
   public showReleasedMembers = false;
-  public showCompositionResolution = false;
   public descriptionDraft = '';
   public isEditingDescription = false;
   public isSavingDescription = false;
@@ -346,6 +340,7 @@ export class ReleaseTrackPageComponent implements OnInit, OnDestroy {
   private announcedCleanup = new Set<string>();
   @ViewChild('cleanupNotification', { static: true })
   public cleanupNotification!: TemplateRef<unknown>;
+  public selectedSnapshotModified: string | null = null;
   public configForm: FormGroup;
   private virtualComponentTrackSummaries = new Map<
     string,
@@ -522,12 +517,24 @@ export class ReleaseTrackPageComponent implements OnInit, OnDestroy {
   }
 
   ngOnInit(): void {
+    this.route.queryParams.pipe(takeUntil(this.destroy$)).subscribe(params => {
+      this.selectedSnapshotModified = params.snapshot || null;
+      if (!this.selectedSnapshotModified) this.selectedTabIndex = 0;
+    });
+    this.router.events.pipe(takeUntil(this.destroy$)).subscribe(event => {
+      if (event instanceof NavigationEnd && this.releaseTrack) {
+        this.breadcrumbService.changeBreadcrumb(
+          this.route.snapshot,
+          this.releaseTrackName
+        );
+      }
+    });
     this.route.params.pipe(takeUntil(this.destroy$)).subscribe(params => {
       if (this.id !== params.id) {
         this.cancelRequests$.next();
         this.cancelHistory$.next();
         this.showReleasedMembers = false;
-        this.showCompositionResolution = false;
+        this.selectedTabIndex = 0;
         this.historyFilter = 'all';
         this.historyPageIndex = 0;
         this.historyTotal = 0;
@@ -584,9 +591,40 @@ export class ReleaseTrackPageComponent implements OnInit, OnDestroy {
     this.snackbar.dismiss();
   }
 
+  public get selectedSnapshot(): SnapshotHistoryViewModel | undefined {
+    return this.snapshotHistory.find(
+      item => item.modified === this.selectedSnapshotModified
+    );
+  }
+
+  public onOpenSnapshot(item: SnapshotHistoryViewModel): void {
+    if (!this.isVirtualReleaseTrack || !item.modified) return;
+    this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: { snapshot: item.modified },
+      queryParamsHandling: 'merge',
+    });
+  }
+
+  public onBackToReleases(): void {
+    this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: { snapshot: null },
+      queryParamsHandling: 'merge',
+    });
+  }
+
+  public onQuarantineResolved(): void {
+    this.onBackToReleases();
+    this.getReleaseTrack();
+    this.snackbar.open('Resolution saved in a new draft snapshot.', 'Close', {
+      duration: 5000,
+    });
+  }
+
   public onSelectedTabChange(index: number): void {
     this.selectedTabIndex = index;
-    if (index === 1) this.refreshVisibleHistory();
+    this.refreshVisibleHistory();
   }
 
   private get automaticHistoryRefreshPaused(): boolean {
@@ -594,7 +632,8 @@ export class ReleaseTrackPageComponent implements OnInit, OnDestroy {
       this.destroyed ||
       !this.id ||
       !this.releaseTrack ||
-      this.selectedTabIndex !== 1 ||
+      this.selectedTabIndex !== (this.isVirtualReleaseTrack ? 0 : 1) ||
+      (this.isVirtualReleaseTrack && !!this.selectedSnapshotModified) ||
       document.visibilityState !== 'visible' ||
       this.isEditingConfig ||
       this.isEditingDescription ||

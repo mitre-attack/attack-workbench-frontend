@@ -78,6 +78,7 @@ import { ReferenceEditDialogComponent } from './components/reference-edit-dialog
 import { ReleasePreviewDialogComponent } from './components/release-preview-dialog/release-preview-dialog.component';
 import { ReleaseVersionDialogComponent } from './components/release-version-dialog/release-version-dialog.component';
 import { SnapshotDescriptionDialogComponent } from './components/snapshot-description-dialog/snapshot-description-dialog.component';
+import { VirtualSnapshotContentsComponent } from './components/virtual-snapshot-contents/virtual-snapshot-contents.component';
 import { HistoryTimelineComponent } from './components/stix/stix-page-tabs/history-timeline/history-timeline.component';
 import { MembershipSectionComponent } from './components/stix/stix-page-tabs/membership-section/membership-section.component';
 import { ReferenceSidebarComponent } from './components/resources-drawer/reference-sidebar/reference-sidebar.component';
@@ -447,6 +448,7 @@ export function initConfig(appConfigService: AppConfigService) {
   ],
   bootstrap: [AppComponent],
   imports: [
+    VirtualSnapshotContentsComponent,
     MarkdownModule.forRoot({
       loader: HttpClient,
     }),

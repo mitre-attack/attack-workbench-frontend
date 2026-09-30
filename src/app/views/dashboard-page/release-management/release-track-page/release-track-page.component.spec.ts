@@ -174,6 +174,7 @@ describe('ReleaseTrackPageComponent', () => {
     };
     mockRouter = {
       navigate: vi.fn(),
+      events: of(),
     };
     mockAuthenticationService = {
       canEdit: vi.fn(() => true),
@@ -348,9 +349,7 @@ describe('ReleaseTrackPageComponent', () => {
         component.onHistoryFilterChange(filter);
         fixture.detectChanges();
         const tabs = fixture.debugElement.query(By.css('app-stix-page-tabs'));
-        const view = tabs.properties[
-          'customTabs'
-        ][0].template.createEmbeddedView({});
+        const view = tabs.properties['detailsTemplate'].createEmbeddedView({});
         try {
           view.detectChanges();
           const root = view.rootNodes.find(
@@ -391,7 +390,7 @@ describe('ReleaseTrackPageComponent', () => {
       mockReleaseTrackApiConnector.listSnapshots.mockReturnValue(
         of(historyResponse([release]))
       );
-      component.onSelectedTabChange(1);
+      component.onSelectedTabChange(0);
       expect(component.snapshotHistory[0].isLatestRelease).toBe(true);
       mockReleaseTrackApiConnector.listSnapshots.mockReturnValue(
         of(historyResponse([draft, release]))
@@ -449,10 +448,11 @@ describe('ReleaseTrackPageComponent', () => {
     });
 
     it('refreshes on visible tab entry and focus, and pauses for hidden documents and other tabs', () => {
+      component.onSelectedTabChange(1);
       vi.advanceTimersByTime(30_000);
       window.dispatchEvent(new Event('focus'));
       expect(mockReleaseTrackApiConnector.listSnapshots).not.toHaveBeenCalled();
-      component.onSelectedTabChange(1);
+      component.onSelectedTabChange(0);
       window.dispatchEvent(new Event('focus'));
       expect(mockReleaseTrackApiConnector.listSnapshots).toHaveBeenCalledTimes(
         2
@@ -468,7 +468,7 @@ describe('ReleaseTrackPageComponent', () => {
       expect(mockReleaseTrackApiConnector.listSnapshots).toHaveBeenCalledTimes(
         3
       );
-      component.onSelectedTabChange(2);
+      component.onSelectedTabChange(1);
       vi.advanceTimersByTime(30_000);
       expect(mockReleaseTrackApiConnector.listSnapshots).toHaveBeenCalledTimes(
         3
@@ -476,7 +476,7 @@ describe('ReleaseTrackPageComponent', () => {
     });
 
     it('pauses edits, dialogs and mutations and resumes without overlapping history or cleanup requests', () => {
-      component.onSelectedTabChange(1);
+      component.onSelectedTabChange(0);
       mockReleaseTrackApiConnector.listSnapshots.mockClear();
       for (const field of [
         'isEditingConfig',
@@ -529,7 +529,7 @@ describe('ReleaseTrackPageComponent', () => {
       mockReleaseTrackApiConnector.listSnapshots.mockReturnValue(
         of(historyResponse([draft, release]))
       );
-      component.onSelectedTabChange(1);
+      component.onSelectedTabChange(0);
       mockDialog.open.mockReturnValue({ afterClosed: () => of(true) });
       mockReleaseTrackApiConnector.deleteSnapshotByModified.mockReturnValue(
         deletion
@@ -566,7 +566,7 @@ describe('ReleaseTrackPageComponent', () => {
       mockReleaseTrackApiConnector.listSnapshots.mockReturnValue(
         of(historyResponse([release]))
       );
-      component.onSelectedTabChange(1);
+      component.onSelectedTabChange(0);
       const pending = new Subject<SnapshotHistoryResponse>();
       mockReleaseTrackApiConnector.listSnapshots.mockReturnValueOnce(pending);
       vi.advanceTimersByTime(30_000);
@@ -595,16 +595,14 @@ describe('ReleaseTrackPageComponent', () => {
       component.onHistoryPageChange({ pageIndex: 2, pageSize: 25, length: 80 });
       fixture.detectChanges();
       const tabs = fixture.debugElement.query(By.css('app-stix-page-tabs'));
-      const view = tabs.properties['customTabs'][0].template.createEmbeddedView(
-        {}
-      );
+      const view = tabs.properties['detailsTemplate'].createEmbeddedView({});
       try {
         view.detectChanges();
         const root = view.rootNodes.find(
           (node: Node) => node instanceof HTMLElement
         );
         const card = root.querySelector('.snapshot-history-entry');
-        component.onSelectedTabChange(1);
+        component.onSelectedTabChange(0);
         vi.advanceTimersByTime(30_000);
         view.detectChanges();
         expect(root.querySelector('.snapshot-history-entry')).toBe(card);
@@ -641,7 +639,7 @@ describe('ReleaseTrackPageComponent', () => {
     it('cancels stale filters, routes and destroyed requests and removes timer and focus listeners', () => {
       const stale = new Subject<SnapshotHistoryResponse>();
       mockReleaseTrackApiConnector.listSnapshots.mockReturnValueOnce(stale);
-      component.onSelectedTabChange(1);
+      component.onSelectedTabChange(0);
       const filtered = new Subject<SnapshotHistoryResponse>();
       mockReleaseTrackApiConnector.listSnapshots.mockReturnValueOnce(filtered);
       component.onHistoryFilterChange('releases');
@@ -681,7 +679,7 @@ describe('ReleaseTrackPageComponent', () => {
       expect(component.snapshotHistory).toEqual([]);
       const pending = new Subject<SnapshotHistoryResponse>();
       mockReleaseTrackApiConnector.listSnapshots.mockReturnValueOnce(pending);
-      component.onSelectedTabChange(1);
+      component.onSelectedTabChange(0);
       fixture.destroy();
       const calls =
         mockReleaseTrackApiConnector.listSnapshots.mock.calls.length;
@@ -708,7 +706,7 @@ describe('ReleaseTrackPageComponent', () => {
       mockReleaseTrackApiConnector.listDraftCleanup.mockReturnValue(
         of({ data: [completed] })
       );
-      component.onSelectedTabChange(1);
+      component.onSelectedTabChange(0);
       component.dismissCleanupNotification();
       vi.advanceTimersByTime(60_000);
       expect(mockSnackbar.openFromTemplate).toHaveBeenCalledTimes(1);
@@ -1195,6 +1193,10 @@ describe('ReleaseTrackPageComponent', () => {
     check: (header: HTMLElement) => void
   ) {
     component.id = 'release-track--header';
+    component.releaseTrack = new ReleaseTrackSnapshot({
+      id: component.id,
+      ...snapshot,
+    });
     mockReleaseTrackApiConnector.listSnapshots.mockReturnValue(
       of(historyResponse([snapshot]))
     );
@@ -1213,36 +1215,6 @@ describe('ReleaseTrackPageComponent', () => {
       view.destroy();
     }
   }
-
-  it('keeps Latest beside the title, controls below metadata, and only real draft notes', () => {
-    withSnapshotHeader(
-      {
-        modified: '2026-09-09T23:08:38.000Z',
-        version: null,
-        snapshot_description: 'Review these candidates before tagging.',
-      },
-      header => {
-        expect(header.textContent).not.toContain('Draft release snapshot');
-        expect(
-          header.querySelector(
-            '.snapshot-history-title-row > app-workbench-chip'
-          )?.textContent
-        ).toContain('Latest');
-        expect(
-          header.querySelector('.snapshot-history-chips')?.textContent
-        ).toContain('Draft Release');
-        expect(
-          header.querySelector('.snapshot-history-description')?.textContent
-        ).toContain('Review these candidates before tagging.');
-        expect(header.querySelector('.snapshot-history-dates')).toBeNull();
-        expect(
-          header.lastElementChild?.classList.contains(
-            'snapshot-history-actions'
-          )
-        ).toBe(true);
-      }
-    );
-  });
 
   it('renders snapshot and tagging timestamps as distinct metadata pills', () => {
     const modified = '2026-09-09T23:08:38.000Z';
@@ -2219,9 +2191,7 @@ describe('ReleaseTrackPageComponent', () => {
     ).toBe('latest_draft');
     fixture.detectChanges();
     const tabs = fixture.debugElement.query(By.css('app-stix-page-tabs'));
-    const view = tabs.properties['customTabs'][0].template.createEmbeddedView(
-      {}
-    );
+    const view = tabs.properties['detailsTemplate'].createEmbeddedView({});
     try {
       view.detectChanges();
       const root: HTMLElement = view.rootNodes.find(
@@ -2289,9 +2259,7 @@ describe('ReleaseTrackPageComponent', () => {
       component.getSnapshotHistory();
       fixture.detectChanges();
       const tabs = fixture.debugElement.query(By.css('app-stix-page-tabs'));
-      const view = tabs.properties['customTabs'][0].template.createEmbeddedView(
-        {}
-      );
+      const view = tabs.properties['detailsTemplate'].createEmbeddedView({});
       try {
         view.detectChanges();
         const root: HTMLElement = view.rootNodes.find(
