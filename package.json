@@ -51,7 +51,7 @@
     "diff-match-patch-ts": "^0.8.0",
     "jdenticon": "^3.2.0",
     "marked": "^15.0.11",
-    "moment": "^2.29.4",
+    "moment": "^2.31.0",
     "ngx-autosize": "^2.0.4",
     "ngx-jdenticon": "^2.0.0",
     "ngx-logger": "^5.0.12",
