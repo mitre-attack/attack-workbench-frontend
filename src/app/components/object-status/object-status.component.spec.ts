@@ -12,7 +12,10 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 import { BrowserAnimationsModule } from '@angular/platform-browser/animations';
 import { ActivatedRoute, Router } from '@angular/router';
 import { MtxPopoverModule } from '@ng-matero/extensions/popover';
-import { of } from 'rxjs';
+import { of, Subject } from 'rxjs';
+import { vi } from 'vitest';
+import { Technique } from 'src/app/classes/stix/technique';
+import { DeprecationService } from 'src/app/services/helpers/deprecation.service';
 
 import { ObjectStatusComponent } from './object-status.component';
 import { RestApiConnectorService } from 'src/app/services/connectors/rest-api/rest-api-connector.service';
@@ -75,7 +78,22 @@ describe('ObjectStatusComponent', () => {
     fixture.detectChanges();
   });
 
-  it('should create', () => {
-    expect(component).toBeTruthy();
+  it('uses authoritative deprecation without changing local status early', () => {
+    const pending = new Subject<boolean>();
+    const lifecycle = TestBed.inject(DeprecationService);
+    vi.spyOn(lifecycle, 'deprecate').mockReturnValue(pending);
+    component.object = new Technique();
+    component.objects = [component.object];
+    component.loaded = true;
+    component.editorService.editing = false;
+
+    component.toggleDeprecated();
+    expect(component.object.deprecated).toBe(false);
+    expect(component.deprecateDisabled).toBe(true);
+
+    pending.next(false);
+    pending.complete();
+    expect(component.deprecated).toBe(false);
+    expect(component.lifecyclePending).toBe(false);
   });
 });

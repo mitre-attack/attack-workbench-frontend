@@ -6,8 +6,9 @@ import { StixObject } from 'src/app/classes/stix/stix-object';
 import { RestApiConnectorService } from 'src/app/services/connectors/rest-api/rest-api-connector.service';
 import { EditorService } from 'src/app/services/editor/editor.service';
 import { AddDialogComponent } from '../add-dialog/add-dialog.component';
-import { ConfirmationDialogComponent } from '../confirmation-dialog/confirmation-dialog.component';
-import { forkJoin } from 'rxjs';
+import { of } from 'rxjs';
+import { finalize, map, switchMap } from 'rxjs/operators';
+import { DeprecationService } from 'src/app/services/helpers/deprecation.service';
 import { WorkflowStatusMap } from 'src/app/utils/types';
 
 @Component({
@@ -25,10 +26,13 @@ export class ObjectStatusComponent implements OnInit {
   public relationships = [];
   public revoked = false;
   public deprecated = false;
+  public lifecyclePending = false;
 
   public get disabled(): boolean {
     return (
-      this.editorService.editing || this.editorService.type == 'collection'
+      this.lifecyclePending ||
+      this.editorService.editing ||
+      this.editorService.type == 'collection'
     );
   }
 
@@ -53,7 +57,8 @@ export class ObjectStatusComponent implements OnInit {
   constructor(
     public editorService: EditorService,
     private restAPIService: RestApiConnectorService,
-    private dialog: MatDialog
+    private dialog: MatDialog,
+    private deprecationService: DeprecationService
   ) {}
 
   ngOnInit(): void {
@@ -115,21 +120,6 @@ export class ObjectStatusComponent implements OnInit {
         },
       });
 
-      if (this.editorService.type == 'data-source') {
-        // retrieve related data components & their relationships
-        data$ = this.restAPIService.getAllRelatedToDataSource(
-          this.editorService.stixId
-        );
-        const dataSubscription = data$.subscribe({
-          next: results => {
-            this.relationships = this.relationships.concat(results);
-          },
-          complete: () => {
-            dataSubscription.unsubscribe();
-          },
-        });
-      }
-
       // retrieve relationships with the object
       data$ = this.restAPIService.getRelatedTo({
         sourceOrTargetRef: this.editorService.stixId,
@@ -145,15 +135,6 @@ export class ObjectStatusComponent implements OnInit {
         },
       });
     }
-  }
-
-  private save() {
-    const saveSubscription = this.object.save(this.restAPIService).subscribe({
-      complete: () => {
-        this.editorService.onReload.emit();
-        saveSubscription.unsubscribe();
-      },
-    });
   }
 
   public revoke() {
@@ -176,7 +157,11 @@ export class ObjectStatusComponent implements OnInit {
       this.select = new SelectionModel<string>();
       const revokeDialogData = {
         selectableObjects: this.objects.filter(object => {
-          return object.stixID !== this.editorService.stixId;
+          return (
+            object.stixID !== this.editorService.stixId &&
+            !object.revoked &&
+            !object.deprecated
+          );
         }),
         type: this.editorService.type,
         select: this.select,
@@ -207,29 +192,63 @@ export class ObjectStatusComponent implements OnInit {
       });
     } else {
       // unrevoke object, deprecate the 'revoked-by' relationship
-      // this is the only case in which a 'revoked-by' relationship is deprecated
       const revokedRelationship = this.relationships.find(
         r =>
           r.relationship_type == 'revoked-by' &&
           r.source_ref == this.object.stixID
       );
-      if (revokedRelationship) {
-        revokedRelationship.deprecated = true;
-        revokedRelationship.save(this.restAPIService);
-      }
-      this.revoked = false;
-      this.object.revoked = false;
-      this.save();
+      this.lifecyclePending = true;
+      const retire = revokedRelationship
+        ? this.deprecationService.deprecate(revokedRelationship)
+        : of(true);
+      retire
+        .pipe(
+          switchMap(retired => {
+            if (!retired) return of(false);
+            this.object.revoked = false;
+            return this.object.save(this.restAPIService).pipe(map(() => true));
+          }),
+          finalize(() => (this.lifecyclePending = false))
+        )
+        .subscribe({
+          next: saved => {
+            this.revoked = !saved;
+            if (saved) this.editorService.onReload.emit();
+          },
+          error: error => {
+            this.revoked = true;
+            this.object.revoked = true;
+            this.deprecationService.showError(error);
+          },
+        });
     }
   }
 
   private setDeprecated(deprecated: boolean) {
-    this.deprecated = deprecated;
+    this.lifecyclePending = true;
     if (deprecated) {
-      this.deprecateObjects(false);
+      this.deprecationService
+        .deprecate(this.object)
+        .pipe(finalize(() => (this.lifecyclePending = false)))
+        .subscribe(saved => {
+          this.deprecated = this.object.deprecated;
+          if (saved) this.editorService.onReload.emit();
+        });
     } else {
       this.object.deprecated = false;
-      this.save();
+      this.object
+        .save(this.restAPIService)
+        .pipe(finalize(() => (this.lifecyclePending = false)))
+        .subscribe({
+          complete: () => {
+            this.deprecated = false;
+            this.editorService.onReload.emit();
+          },
+          error: error => {
+            this.object.deprecated = true;
+            this.deprecationService.showError(error);
+          },
+        });
     }
   }
 
@@ -266,76 +285,9 @@ export class ObjectStatusComponent implements OnInit {
         this.editorService.onReload.emit();
         revokeSubscription.unsubscribe();
       },
-      error: () => {
+      error: error => {
+        this.deprecationService.showError(error);
         this.revoked = false;
-      },
-    });
-  }
-
-  /**
-   * Deprecates or revokes the object and deprecates all relationships with this object,
-   * with the exception of 'subtechnique-of' relationships
-   */
-  private deprecateObjects(revoked: boolean, revoked_by_id?: string) {
-    const saves = [];
-
-    // inform users of relationship changes
-    const confirmationPrompt = this.dialog.open(ConfirmationDialogComponent, {
-      maxWidth: '35em',
-      data: {
-        message:
-          'All relationships with this object will be deprecated. Do you want to continue?',
-      },
-      autoFocus: false, // prevents auto focus on toolbar buttons
-    });
-
-    const confirmationSub = confirmationPrompt.afterClosed().subscribe({
-      next: result => {
-        if (!result) {
-          // user cancelled
-          if (revoked) this.revoked = false;
-          else this.deprecated = false;
-          return;
-        }
-
-        // deprecate or revoke object
-        if (revoked) this.object.revoked = true;
-        else this.object.deprecated = true;
-        saves.push(this.object.save(this.restAPIService));
-
-        // update relationships with the object
-        for (const relationship of this.relationships) {
-          // do not deprecate 'subtechnique-of' or 'revoked-by' relationships
-          if (
-            !relationship.deprecated &&
-            !['subtechnique-of', 'revoked-by'].includes(
-              relationship.relationship_type
-            )
-          ) {
-            relationship.deprecated = true;
-            saves.push(relationship.save(this.restAPIService));
-          }
-        }
-
-        if (revoked_by_id) {
-          // create a new 'revoked-by' relationship
-          const revokedRelationship = new Relationship();
-          revokedRelationship.relationship_type = 'revoked-by';
-          revokedRelationship.source_ref = this.object.stixID;
-          revokedRelationship.target_ref = revoked_by_id;
-          saves.push(revokedRelationship.save(this.restAPIService));
-        }
-
-        // complete save calls
-        const saveSubscription = forkJoin(saves).subscribe({
-          complete: () => {
-            this.editorService.onReload.emit();
-            saveSubscription.unsubscribe();
-          },
-        });
-      },
-      complete: () => {
-        confirmationSub.unsubscribe();
       },
     });
   }

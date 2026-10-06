@@ -2,12 +2,17 @@ import { TestBed, ComponentFixture } from '@angular/core/testing';
 import { of } from 'rxjs';
 import { DataQualityComponent } from './data-quality.component';
 import { RestApiConnectorService } from 'src/app/services/connectors/rest-api/rest-api-connector.service';
+import { MatDialog } from '@angular/material/dialog';
+import { vi } from 'vitest';
+import { Relationship } from 'src/app/classes/stix/relationship';
+import { DeprecationService } from 'src/app/services/helpers/deprecation.service';
 
 describe('DataQualityComponent', () => {
   let component: DataQualityComponent;
   let fixture: ComponentFixture<DataQualityComponent>;
 
   const mockReportService = {
+    getRelationship: vi.fn(),
     getMissingLinkById: () => of([]),
     getParallelRelationships: () => of({}),
     getDomainConsistencyReport: () =>
@@ -56,22 +61,23 @@ describe('DataQualityComponent', () => {
         },
       }),
   };
+  const lifecycle = { deprecate: vi.fn(), showError: vi.fn() };
+  const dialog = { open: () => ({ afterClosed: () => of(true) }) };
 
   beforeEach(async () => {
+    vi.clearAllMocks();
     await TestBed.configureTestingModule({
       declarations: [DataQualityComponent],
       providers: [
         { provide: RestApiConnectorService, useValue: mockReportService },
+        { provide: DeprecationService, useValue: lifecycle },
+        { provide: MatDialog, useValue: dialog },
       ],
     }).compileComponents();
 
     fixture = TestBed.createComponent(DataQualityComponent);
     component = fixture.componentInstance;
     fixture.detectChanges();
-  });
-
-  it('should create', () => {
-    expect(component).toBeTruthy();
   });
 
   it('should render the domain consistency report rows', () => {
@@ -99,4 +105,28 @@ describe('DataQualityComponent', () => {
       }),
     ]);
   });
+
+  for (const relationshipType of ['subtechnique-of', 'revoked-by']) {
+    it(`explicitly retires duplicate ${relationshipType} SROs and stops on failure`, () => {
+      const relationship = new Relationship();
+      relationship.relationship_type = relationshipType;
+      mockReportService.getRelationship.mockReturnValue(of([relationship]));
+      lifecycle.deprecate.mockReturnValue(of(false));
+      const group = {
+        key: 'duplicates',
+        sourceRef: 'attack-pattern--source',
+        targetRef: 'attack-pattern--target',
+        relationshipType,
+        count: 3,
+        relationships: [],
+        selectedRelationship: 'relationship--keep',
+        toDeprecate: [relationship.stixID, 'relationship--second'],
+      };
+      component.deprecateOthers(group);
+      expect(lifecycle.deprecate).toHaveBeenCalledWith(relationship, true);
+      expect(mockReportService.getRelationship).toHaveBeenCalledTimes(1);
+      expect(group.toDeprecate).toHaveLength(2);
+      expect(component.loadingParallel).toBe(false);
+    });
+  }
 });

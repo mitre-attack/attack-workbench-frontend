@@ -65,6 +65,27 @@ export interface Paginated<T> {
   };
 }
 
+export interface DeprecationBlockers {
+  sros: {
+    stix_id: string;
+    modified: string;
+    relationship_type: string;
+    direction: 'inbound' | 'outbound';
+  }[];
+  embedded: {
+    source_ref: string;
+    target_ref: string;
+    path: string;
+    direction: 'inbound' | 'outbound';
+  }[];
+}
+
+export interface DeprecationCheck {
+  stix_id: string;
+  can_deprecate: boolean;
+  blockers: DeprecationBlockers;
+}
+
 export interface Namespace {
   prefix: string;
   range_start: string;
@@ -141,6 +162,13 @@ export class RestApiConnectorService extends ApiConnector {
     private collectionStreamService: CollectionStreamService
   ) {
     super(snackbar);
+  }
+
+  /** Check authoritative latest references; never substitute cached workspace data. */
+  public getDeprecationCheck(stixId: string): Observable<DeprecationCheck> {
+    return this.http.get<DeprecationCheck>(
+      `${this.apiUrl}/attack-objects/${encodeURIComponent(stixId)}/deprecation-check`
+    );
   }
 
   /**
