@@ -6,8 +6,9 @@ import { StixListConfig } from 'src/app/components/stix/stix-list/stix-list.comp
 import { StixTypeToAttackType } from 'src/app/utils/type-mappings';
 import { StixListComponent } from 'src/app/components/stix/stix-list/stix-list.component';
 import { SelectionModel } from '@angular/cdk/collections';
-import { forkJoin } from 'rxjs';
-import { Relationship } from 'src/app/classes/stix/relationship';
+import { from, of } from 'rxjs';
+import { concatMap, finalize, takeWhile, toArray } from 'rxjs/operators';
+import { DeprecationService } from 'src/app/services/helpers/deprecation.service';
 import { ConfirmationDialogComponent } from 'src/app/components/confirmation-dialog/confirmation-dialog.component';
 
 export interface CrossDomainRelationshipRow {
@@ -46,7 +47,8 @@ interface ParallelRelationshipGroup {
 export class DataQualityComponent implements OnInit {
   constructor(
     private reportService: RestApiConnectorService,
-    private dialog: MatDialog
+    private dialog: MatDialog,
+    private deprecationService: DeprecationService
   ) {}
 
   missingLinks: any[] = [];
@@ -322,7 +324,7 @@ export class DataQualityComponent implements OnInit {
 
   // Deprecate non-selected relationships for a group
   deprecateOthers(group: ParallelRelationshipGroup): void {
-    if (!group || !group.toDeprecate?.length) return;
+    if (this.loadingParallel || !group || !group.toDeprecate?.length) return;
 
     const confirmationPrompt = this.dialog.open(ConfirmationDialogComponent, {
       maxWidth: '35em',
@@ -333,41 +335,48 @@ export class DataQualityComponent implements OnInit {
       autoFocus: false, // prevents auto focus on toolbar buttons
     });
 
-    const confirmationSub = confirmationPrompt.afterClosed().subscribe({
+    confirmationPrompt.afterClosed().subscribe({
       next: result => {
         if (!result) return; // user cancelled
 
-        const tasks = group.relationships
-          .filter(
-            r =>
-              r.stix.id !== group.selectedRelationship &&
-              !r?.x_mitre_deprecated &&
-              !['subtechnique-of', 'revoked-by'].includes(
-                r.stix?.relationship_type
+        const ids = [...group.toDeprecate];
+        this.loadingParallel = true;
+        from(ids)
+          .pipe(
+            concatMap(id =>
+              this.reportService.getRelationship(id).pipe(
+                concatMap(versions => {
+                  const relationship = versions[0];
+                  if (!relationship)
+                    throw new Error(`Could not load relationship ${id}.`);
+                  if (relationship.deprecated) return of(true);
+                  return this.deprecationService.deprecate(relationship, true);
+                })
               )
+            ),
+            takeWhile(saved => saved, true),
+            toArray(),
+            finalize(() => (this.loadingParallel = false))
           )
-          .map(r => {
-            const rel = new Relationship(r);
-            rel.deprecated = true;
-            return this.reportService.putRelationship(rel);
+          .subscribe({
+            next: results => {
+              if (
+                results.length !== ids.length ||
+                results.some(saved => !saved)
+              )
+                return;
+              group.relationships = group.relationships.filter(
+                r => r.stix?.id === group.selectedRelationship
+              );
+              group.toDeprecate = [];
+              group.stixObjects = this.buildStixObjectsForGroup(group);
+              window.location.reload();
+            },
+            error: err => {
+              this.deprecationService.showError(err, true);
+            },
           });
-
-        const sub = forkJoin(tasks).subscribe({
-          next: () => {
-            group.relationships = group.relationships.filter(
-              r => r.stix?.id === group.selectedRelationship
-            );
-            group.toDeprecate = [];
-            group.stixObjects = this.buildStixObjectsForGroup(group);
-            window.location.reload();
-          },
-          error: err => {
-            console.error(err);
-          },
-          complete: () => sub.unsubscribe(),
-        });
       },
-      complete: () => confirmationSub.unsubscribe(),
     });
   }
 }
