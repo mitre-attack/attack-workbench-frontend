@@ -13,6 +13,45 @@
     </div>
   </div>
 
+  <p role="alert" *ngIf="apiError">
+    {{ apiError }}
+    <button mat-button (click)="loadRules()">Reload rules</button>
+  </p>
+  <section aria-label="Policy reconciliation">
+    <ng-container *ngIf="reconciliation as status">
+      <p>
+        Policy revision {{ status.policy_revision }} · Reconciliation:
+        {{ status.status }}
+      </p>
+      <p *ngIf="status.status === 'pending' || status.status === 'running'">
+        Current rules apply immediately. Background reevaluation is updating
+        earlier ADM diagnostics.
+      </p>
+      <p>
+        {{ status.progress.processed }} revisions processed<span
+          *ngIf="status.progress.total !== null">
+          of approximately {{ status.progress.total }}</span
+        >.
+      </p>
+      <p role="alert" *ngIf="status.status === 'failed'">
+        {{ reconciliationError }}
+        <button
+          mat-button
+          [disabled]="retrying"
+          (click)="retryReconciliation()">
+          Retry reevaluation
+        </button>
+      </p>
+      <p *ngIf="status.status === 'superseded'">
+        Newer policy work has replaced this scan.
+      </p>
+    </ng-container>
+    <p role="alert" *ngIf="statusError">
+      {{ statusError }}
+      <button mat-button (click)="refreshStatus()">Refresh status</button>
+    </p>
+  </section>
+
   <div class="table-container">
     <div class="controls">
       <div class="input-group">
@@ -30,6 +69,46 @@
         *ngIf="dataSource.data.length > 0; else nothingHere"
         [dataSource]="dataSource"
         aria-label="validation bypass rules table">
+        <ng-container matColumnDef="name"
+          ><th mat-header-cell mat-sort-header *matHeaderCellDef>Name</th>
+          <td mat-cell *matCellDef="let rule">
+            {{ rule.name || 'Error bypass' }}
+          </td></ng-container
+        >
+        <ng-container matColumnDef="kind"
+          ><th mat-header-cell mat-sort-header *matHeaderCellDef>Kind</th>
+          <td mat-cell *matCellDef="let rule">
+            {{
+              rule.kind === 'object-exemption'
+                ? 'Object exemption'
+                : 'Error bypass'
+            }}
+          </td></ng-container
+        >
+        <ng-container matColumnDef="category"
+          ><th mat-header-cell mat-sort-header *matHeaderCellDef>Category</th>
+          <td mat-cell *matCellDef="let rule">
+            {{ rule.retirementStatus || '-' }}
+          </td></ng-container
+        >
+        <ng-container matColumnDef="scope"
+          ><th mat-header-cell mat-sort-header *matHeaderCellDef>Scope</th>
+          <td mat-cell *matCellDef="let rule">
+            {{ scope(rule) }}
+          </td></ng-container
+        >
+        <ng-container matColumnDef="enabled"
+          ><th mat-header-cell mat-sort-header *matHeaderCellDef>Enabled</th>
+          <td mat-cell *matCellDef="let rule">
+            {{
+              rule.kind === 'object-exemption'
+                ? rule.enabled
+                  ? 'Yes'
+                  : 'No'
+                : '-'
+            }}
+          </td></ng-container
+        >
         <ng-container matColumnDef="fieldPath">
           <th scope="col" mat-header-cell mat-sort-header *matHeaderCellDef>
             Field Path

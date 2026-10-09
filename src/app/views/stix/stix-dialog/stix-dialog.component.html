@@ -157,6 +157,9 @@
           }
         </div>
       </div>
+      <app-adm-validation-details
+        *ngIf="!validating"
+        [report]="saveReport"></app-adm-validation-details>
       <div class="validation page-padding grid spacing-20" *ngIf="validating">
         <div class="row">
           <div class="column validation">

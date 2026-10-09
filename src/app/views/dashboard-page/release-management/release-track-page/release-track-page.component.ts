@@ -1,3 +1,4 @@
+import { ExemptionReport } from 'src/app/classes/validation-policy';
 import { Clipboard } from '@angular/cdk/clipboard';
 import { HttpErrorResponse } from '@angular/common/http';
 import { SelectionModel } from '@angular/cdk/collections';
@@ -23,7 +24,15 @@ import {
   of,
   Subject,
 } from 'rxjs';
-import { finalize, map, switchMap, take, takeUntil, tap } from 'rxjs/operators';
+import {
+  catchError,
+  finalize,
+  map,
+  switchMap,
+  take,
+  takeUntil,
+  tap,
+} from 'rxjs/operators';
 import {
   ComponentTrack,
   Composition,
@@ -292,6 +301,9 @@ const VIRTUAL_MONTH_OPTIONS = [
   styleUrls: ['./release-track-page.component.scss'],
 })
 export class ReleaseTrackPageComponent implements OnInit, OnDestroy {
+  public exemptionReports: ExemptionReport[] = [];
+  public publicationReport?: ExemptionReport;
+  public previewReport?: ExemptionReport;
   public id = '';
   public releaseTrack: ReleaseTrackSnapshot | null = null;
   public showReleasedMembers = false;
@@ -542,6 +554,9 @@ export class ReleaseTrackPageComponent implements OnInit, OnDestroy {
         this.latestSnapshotModified = null;
         this.latestTaggedSnapshotModified = null;
         this.releaseTrack = null;
+        this.previewReport = undefined;
+        this.publicationReport = undefined;
+        this.exemptionReports = [];
         this.snapshotHistory = [];
         this.draftCleanupResults = [];
         this.announcedCleanup.clear();
@@ -2617,6 +2632,7 @@ export class ReleaseTrackPageComponent implements OnInit, OnDestroy {
   private previewRelease(item: SnapshotHistoryViewModel): void {
     if (!this.id || !item.modified || this.isReleasing) return;
 
+    this.previewReport = undefined;
     this.isReleasing = true;
     this.previewingSnapshotModified = item.modified;
     const selection: ReleasePayload = { increment: 'minor' };
@@ -2664,6 +2680,7 @@ export class ReleaseTrackPageComponent implements OnInit, OnDestroy {
           );
         },
         error: err => {
+          this.previewReport = err.error?.exemptionReport;
           this.showSnapshotError(
             err,
             'Unable to load the release preview. Try again after history refreshes.'
@@ -2987,6 +3004,7 @@ export class ReleaseTrackPageComponent implements OnInit, OnDestroy {
   private applyReviewResult(result?: ReleaseReviewDialogResult): void {
     if (!this.id || !result) return;
 
+    this.exemptionReports = [];
     const requests: Observable<unknown>[] = [];
     const approvedRefs = result.approved
       .map(item => this.getReviewObjectRef(item))
@@ -3013,28 +3031,54 @@ export class ReleaseTrackPageComponent implements OnInit, OnDestroy {
     if (!requests.length) return;
 
     ++this.boardMutations;
-    forkJoin(requests)
+    forkJoin(
+      requests.map(request =>
+        request.pipe(
+          tap((result: { exemptionReport?: ExemptionReport }) =>
+            this.captureReviewReport(result?.exemptionReport)
+          ),
+          map(() => ({ error: undefined })),
+          catchError(error => {
+            this.captureReviewReport(error.error?.exemptionReport);
+            return of({ error });
+          })
+        )
+      )
+    )
       .pipe(
         take(1),
         takeUntil(this.cancelRequests$),
         finalize(() => --this.boardMutations)
       )
       .subscribe({
-        next: () => {
-          this.snackbar.open('Review updates saved.', undefined, {
-            duration: 3000,
-          });
-          this.getReleaseTrack();
-        },
-        error: err => {
-          console.error('Failed to save release track review', err);
-          this.snackbar.open('Unable to save all review updates.', undefined, {
-            duration: 5000,
-            panelClass: 'error',
-          });
+        next: results => {
+          const failures = results.filter(result => result.error);
+          if (failures.length) {
+            for (const failure of failures)
+              console.error(
+                'Failed to save release track review',
+                failure.error
+              );
+            this.snackbar.open(
+              'Unable to save all review updates.',
+              undefined,
+              {
+                duration: 5000,
+                panelClass: 'error',
+              }
+            );
+          } else {
+            this.snackbar.open('Review updates saved.', undefined, {
+              duration: 3000,
+            });
+          }
           this.getReleaseTrack();
         },
       });
+  }
+
+  private captureReviewReport(report?: ExemptionReport): void {
+    if (report) this.exemptionReports = [...this.exemptionReports, report];
   }
 
   private getReviewObjectRef(item: any): StixObjectRef | null {
@@ -4068,6 +4112,7 @@ export class ReleaseTrackPageComponent implements OnInit, OnDestroy {
   ): void {
     if (!this.id || !item.modified) return;
 
+    this.publicationReport = undefined;
     this.isReleasing = true;
     this.connector
       .releaseSnapshot(this.id, item.modified, selection)
@@ -4080,10 +4125,12 @@ export class ReleaseTrackPageComponent implements OnInit, OnDestroy {
       )
       .subscribe({
         next: result => {
+          this.publicationReport = result?.exemptionReport;
           this.captureDraftCleanup(result?.draft_cleanup);
           this.getReleaseTrack();
         },
         error: err => {
+          this.publicationReport = err.error?.exemptionReport;
           const details = { ...err?.error?.details, ...err?.error };
           this.captureDraftCleanup(details.draft_cleanup);
           if (details.release_committed || details.operation_id) {

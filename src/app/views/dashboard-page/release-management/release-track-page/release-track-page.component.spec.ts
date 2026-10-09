@@ -671,7 +671,13 @@ describe('ReleaseTrackPageComponent', () => {
       mockReleaseTrackApiConnector.listSnapshots.mockReturnValue(
         of(historyResponse([]))
       );
+      component.previewReport = { reportId: 'previous-track' };
+      component.publicationReport = { reportId: 'previous-publication' };
+      component.exemptionReports = [{ reportId: 'previous-review' }];
       routeParams.next({ id: 'release-track--next' });
+      expect(component.previewReport).toBeUndefined();
+      expect(component.publicationReport).toBeUndefined();
+      expect(component.exemptionReports).toEqual([]);
       previousRoute.next(historyResponse([draft]));
       expect(previousRoute.observed).toBe(false);
       expect(cleanup.observed).toBe(false);
@@ -4369,4 +4375,134 @@ describe('ReleaseTrackPageComponent', () => {
     ).not.toHaveBeenCalled();
     expect(mockRestApiConnector.postNote).not.toHaveBeenCalled();
   });
+  it('retains actual publication evidence on success independently of earlier preview/review reports', () => {
+    component.id = 'release-track--actual';
+    const actual = {
+      reportId: 'actual-publication',
+      policyRevision: 2,
+      state: 'completed',
+    };
+    const review = { reportId: 'earlier-review' };
+    component.exemptionReports = [review];
+    component.publicationReport = { reportId: 'earlier-publication' };
+    mockReleaseTrackApiConnector.releaseSnapshot.mockReturnValue(
+      of({ exemptionReport: actual })
+    );
+    const refresh = vi
+      .spyOn(component, 'getReleaseTrack')
+      .mockImplementation(() => undefined);
+    const previewCount =
+      mockReleaseTrackApiConnector.previewRelease.mock.calls.length;
+    (component as any).releaseSnapshot(
+      { increment: 'minor' },
+      { modified: '2026-10-08T01:00:00.000Z' }
+    );
+    expect(component.publicationReport).toBe(actual);
+    expect(component.exemptionReports).toEqual([review]);
+    expect(component.isReleasing).toBe(false);
+    expect(refresh).toHaveBeenCalledOnce();
+    expect(mockReleaseTrackApiConnector.previewRelease.mock.calls.length).toBe(
+      previewCount
+    );
+  });
+  it('retains actual partial publication evidence while preserving committed-repair handling', () => {
+    component.id = 'release-track--actual';
+    const actual = {
+      reportId: 'failed-publication',
+      policyRevision: 3,
+      state: 'partial',
+    };
+    component.publicationReport = { reportId: 'earlier-publication' };
+    mockReleaseTrackApiConnector.releaseSnapshot.mockReturnValue(
+      throwError(() => ({
+        status: 500,
+        error: {
+          release_committed: true,
+          operation_id: 'repair-op',
+          exemptionReport: actual,
+        },
+      }))
+    );
+    const refresh = vi
+      .spyOn(component, 'getReleaseTrack')
+      .mockImplementation(() => undefined);
+    (component as any).releaseSnapshot(
+      { increment: 'minor' },
+      { modified: '2026-10-08T01:00:00.000Z' }
+    );
+    expect(component.publicationReport).toBe(actual);
+    expect(component.isReleasing).toBe(false);
+    expect(component.cleanupMessage).toContain('Do not tag again');
+    expect(refresh).toHaveBeenCalledOnce();
+    expect(mockReleaseTrackApiConnector.releaseSnapshot).toHaveBeenCalledOnce();
+  });
+  it('retains failed preview evidence on the page and clears it for the next preview', () => {
+    const partial = { reportId: 'failed-preview', state: 'partial' };
+    component.id = 'release-track--123';
+    mockReleaseTrackApiConnector.previewRelease.mockReturnValue(
+      throwError(() => ({
+        status: 400,
+        error: { message: 'ADM failed', exemptionReport: partial },
+      }))
+    );
+    const item = {
+      modified: '2026-07-30T14:00:00.000Z',
+      isTagged: false,
+      snapshot: {},
+    } as any;
+    component.onTagSnapshot(item);
+    expect(component.previewReport).toBe(partial);
+    expect(mockDialog.open).not.toHaveBeenCalled();
+    fixture.detectChanges();
+    const details = fixture.debugElement.queryAll(
+      By.css('app-adm-validation-details')
+    );
+    expect(
+      details.some(element => element.properties['report'] === partial)
+    ).toBe(true);
+    mockReleaseTrackApiConnector.previewRelease.mockReturnValue(new Subject());
+    component.onTagSnapshot(item);
+    expect(component.previewReport).toBeUndefined();
+  });
+
+  it.each(['approval-first', 'note-first'])(
+    'retains approval evidence when a note fails (%s)',
+    order => {
+      vi.spyOn(console, 'error').mockImplementation(() => undefined);
+      vi.spyOn(component, 'getReleaseTrack').mockImplementation(
+        () => undefined
+      );
+      component.id = 'release-track--123';
+      const approval = new Subject<any>();
+      const note = new Subject<any>();
+      const completed = { reportId: 'committed-approval' };
+      const partial = { reportId: 'failed-note' };
+      mockReleaseTrackApiConnector.reviewCandidates.mockReturnValue(approval);
+      mockRestApiConnector.postNote.mockReturnValue(note);
+      (component as any).applyReviewResult({
+        approved: [{ object_ref: 'attack-pattern--123' }],
+        updateRequests: [
+          {
+            item: { object_ref: 'attack-pattern--other', name: 'Other' },
+            note: 'Please update',
+          },
+        ],
+      });
+      const finishApproval = () => {
+        approval.next({ exemptionReport: completed });
+        approval.complete();
+      };
+      if (order === 'approval-first') {
+        finishApproval();
+        note.error({ error: { exemptionReport: partial } });
+        expect(component.exemptionReports).toEqual([completed, partial]);
+      } else {
+        note.error({ error: { exemptionReport: partial } });
+        expect(component.boardMutations).toBe(1);
+        finishApproval();
+        expect(component.exemptionReports).toEqual([partial, completed]);
+      }
+      expect(component.boardMutations).toBe(0);
+    }
+  );
 });

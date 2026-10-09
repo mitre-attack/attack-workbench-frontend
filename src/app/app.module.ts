@@ -1,3 +1,4 @@
+import { AdmValidationDetailsComponent } from './components/adm-validation-details/adm-validation-details.component';
 import { LoggerModule } from 'ngx-logger';
 import { environment } from 'src/environments/environment';
 
@@ -282,6 +283,7 @@ export function initConfig(appConfigService: AppConfigService) {
     SnapshotDescriptionDialogComponent,
     MultipleChoiceDialogComponent,
     ValidationResultsComponent,
+    AdmValidationDetailsComponent,
     AddRelationshipButtonComponent,
     CollectionUpdateDialogComponent,
     StixListComponent,

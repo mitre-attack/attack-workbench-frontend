@@ -14,6 +14,8 @@ import { MatInputModule } from '@angular/material/input';
 import { MatRadioModule } from '@angular/material/radio';
 import { NoopAnimationsModule } from '@angular/platform-browser/animations';
 import { vi } from 'vitest';
+import { Subject } from 'rxjs';
+import { ValidationData } from 'src/app/classes/serializable';
 
 import { VersionNumber } from 'src/app/classes/version-number';
 import { ReleaseTracksConnectorService } from 'src/app/services/connectors/rest-api/release-tracks.service';
@@ -252,4 +254,42 @@ describe('SaveDialogComponent', () => {
     expect(component.validationStatus).toBe('error');
     expect(component.validationStatusLabel).toBe('Error');
   });
+
+  it('replaces completed preview evidence with the actual failed save report', () => {
+    const saved = new Subject<any>();
+    const preview = { reportId: 'preview', policyRevision: 1 };
+    const actual = {
+      reportId: 'failed-save',
+      policyRevision: 2,
+      state: 'partial' as const,
+    };
+    component.validation = new ValidationData();
+    component.validation.exemptionReports = [preview];
+    mockObject.save.mockReturnValue(saved);
+    component.onConfirmSave();
+    expect(component.validation.exemptionReports).toEqual([]);
+    saved.error({ status: 400, error: { exemptionReport: actual } });
+    expect(component.validation.exemptionReports).toEqual([actual]);
+    expect(component.dialogRef.close).not.toHaveBeenCalled();
+  });
+
+  it('captures actual save evidence before track enrollment and keeps normal completion', fakeAsync(() => {
+    const saved = new Subject<any>();
+    const enrollment = new Subject<any>();
+    const actual = { reportId: 'actual-save', state: 'completed' as const };
+    component.validation = new ValidationData();
+    component.validation.exemptionReports = [{ reportId: 'preview' }];
+    mockObject.save.mockReturnValue(saved);
+    mockReleaseTracksService.addCandidates.mockReturnValue(enrollment);
+    component.onConfirmSave();
+    saved.next({ exemptionReport: actual });
+    saved.complete();
+    expect(component.validation.exemptionReports).toEqual([actual]);
+    expect(mockObject.exemptionReport).toEqual(actual);
+    expect(component.dialogRef.close).not.toHaveBeenCalled();
+    enrollment.next({});
+    enrollment.complete();
+    flush();
+    expect(component.dialogRef.close).toHaveBeenCalledWith(true);
+  }));
 });

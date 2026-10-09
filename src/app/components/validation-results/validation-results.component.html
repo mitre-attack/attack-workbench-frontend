@@ -38,3 +38,7 @@
     <div matListItemLine>{{ info.message }}</div>
   </mat-list-item>
 </mat-list>
+
+<app-adm-validation-details
+  *ngFor="let report of validation.exemptionReports"
+  [report]="report"></app-adm-validation-details>

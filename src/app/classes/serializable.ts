@@ -1,3 +1,4 @@
+import { ExemptionReport } from './validation-policy';
 import { Observable } from 'rxjs';
 import { RestApiConnectorService } from '../services/connectors/rest-api/rest-api-connector.service';
 import { WorkflowStatusType } from '../utils/types';
@@ -34,12 +35,24 @@ export abstract class Serializable {
 }
 
 export class ValidationData {
+  public exemptionReports: ExemptionReport[] = [];
   public successes: ValidationFieldData[] = [];
   public warnings: ValidationFieldData[] = [];
   public errors: ValidationFieldData[] = [];
   public info: ValidationFieldData[] = [];
 
   public merge(that: ValidationData) {
+    this.exemptionReports = [
+      ...this.exemptionReports,
+      ...that.exemptionReports,
+    ].filter(
+      (report, index, reports) =>
+        reports.findIndex(other =>
+          report.reportId
+            ? other.reportId === report.reportId
+            : other === report
+        ) === index
+    );
     this.successes = this.successes.concat(that.successes);
     this.warnings = this.warnings.concat(that.warnings);
     this.errors = this.errors.concat(that.errors);

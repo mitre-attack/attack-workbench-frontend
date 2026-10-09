@@ -343,12 +343,14 @@ export class ReleaseTracksConnectorService extends ApiConnector {
     const params = this.buildHttpParams({
       format: ReleasePreviewFormat.Summary,
       ...options,
+      exemptionReport: 'details',
     });
     const snapshotPath = modified
       ? `snapshots/${encodeURIComponent(modified)}`
       : 'snapshots/latest';
     const url = `${this.apiUrl}/release-tracks/${id}/${snapshotPath}/release/preview`;
     return this.http.get(url, { params }).pipe(
+      map(result => this.unwrapReportedObject(result)),
       tap(result =>
         logger.log(`generated release preview for track ${id}`, result)
       ),
@@ -366,13 +368,18 @@ export class ReleaseTracksConnectorService extends ApiConnector {
    */
   public releaseLatest(id: string, body: ReleasePayload): Observable<any> {
     const url = `${this.apiUrl}/release-tracks/${id}/snapshots/latest/release`;
-    return this.http.post(url, body).pipe(
-      tap(result =>
-        logger.log(`released latest snapshot for track ${id}`, result)
-      ),
-      catchError(this.handleError_raise()),
-      share()
-    );
+    return this.http
+      .post(url, body, {
+        params: new HttpParams().set('exemptionReport', 'details'),
+      })
+      .pipe(
+        map(result => this.unwrapReportedObject(result)),
+        tap(result =>
+          logger.log(`released latest snapshot for track ${id}`, result)
+        ),
+        catchError(this.handleError_raise()),
+        share()
+      );
   }
 
   /**
@@ -471,11 +478,16 @@ export class ReleaseTracksConnectorService extends ApiConnector {
     body: ReleasePayload
   ): Observable<any> {
     const url = `${this.apiUrl}/release-tracks/${id}/snapshots/${encodeURIComponent(modified)}/release`;
-    return this.http.post(url, body).pipe(
-      tap(result => logger.log(`released snapshot ${modified}`, result)),
-      catchError(this.handleError_raise(false)),
-      share()
-    );
+    return this.http
+      .post(url, body, {
+        params: new HttpParams().set('exemptionReport', 'details'),
+      })
+      .pipe(
+        map(result => this.unwrapReportedObject(result)),
+        tap(result => logger.log(`released snapshot ${modified}`, result)),
+        catchError(this.handleError_raise(false)),
+        share()
+      );
   }
 
   /**
@@ -707,11 +719,18 @@ export class ReleaseTracksConnectorService extends ApiConnector {
   ): Observable<any> {
     const url = `${this.apiUrl}/release-tracks/${id}/candidates/review`;
     const payload = userAccountId ? { ...body, userAccountId } : body;
-    return this.http.post(url, payload).pipe(
-      tap(result => logger.log(`reviewed candidates for track ${id}`, result)),
-      catchError(this.handleError_raise()),
-      share()
-    );
+    return this.http
+      .post(url, payload, {
+        params: new HttpParams().set('exemptionReport', 'details'),
+      })
+      .pipe(
+        map(result => this.unwrapReportedObject(result)),
+        tap(result =>
+          logger.log(`reviewed candidates for track ${id}`, result)
+        ),
+        catchError(this.handleError_raise()),
+        share()
+      );
   }
 
   /**

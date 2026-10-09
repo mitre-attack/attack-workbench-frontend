@@ -1,3 +1,5 @@
+import { HttpErrorResponse } from '@angular/common/http';
+import { ExemptionReport } from 'src/app/classes/validation-policy';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { Observable, of, throwError } from 'rxjs';
 import { logger } from '../../utils/logger';
@@ -27,12 +29,46 @@ export abstract class ApiConnector {
       this.snack('Unknown error, check javascript console for details', 'warn');
   }
 
+  /** Preserve an object result when optional report delivery wraps it. */
+  protected unwrapReportedObject<T>(response: T): T {
+    const envelope = response as {
+      result?: unknown;
+      exemptionReport?: ExemptionReport;
+    };
+    if (
+      !envelope?.exemptionReport ||
+      !envelope.result ||
+      typeof envelope.result !== 'object' ||
+      Array.isArray(envelope.result)
+    )
+      return response;
+    return {
+      ...envelope.result,
+      exemptionReport: envelope.exemptionReport,
+    } as T;
+  }
+
+  protected unwrapReportedError(error: any): any {
+    const body = this.unwrapReportedObject(error?.error);
+    if (body === error?.error) return error;
+    return error instanceof HttpErrorResponse
+      ? new HttpErrorResponse({
+          error: body,
+          headers: error.headers,
+          status: error.status,
+          statusText: error.statusText,
+          url: error.url,
+        })
+      : { ...error, error: body };
+  }
+
   /**
    * Log the error and then raise it to the next level
    * @param {boolean} showSnack if true, show the error snackbar
    */
   protected handleError_raise<T>(showSnack = true) {
     return (error: any): Observable<T> => {
+      error = this.unwrapReportedError(error);
       logger.error(error);
       if (showSnack) this.errorSnack(error);
       return throwError(error);

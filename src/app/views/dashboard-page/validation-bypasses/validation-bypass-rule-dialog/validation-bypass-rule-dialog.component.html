@@ -5,7 +5,45 @@
   [formGroup]="form"
   (ngSubmit)="confirm()">
   <mat-dialog-content>
-    <div class="form-grid">
+    <mat-form-field appearance="outline">
+      <mat-label>Rule kind</mat-label>
+      <mat-select formControlName="kind">
+        <mat-option value="error-bypass">Error bypass</mat-option>
+        <mat-option value="object-exemption">Object exemption</mat-option>
+      </mat-select>
+    </mat-form-field>
+    <div *ngIf="isExemption" class="form-grid">
+      <p class="full-width">
+        Enabled matching rules skip ADM validation for each retired revision.
+        Other checks still apply. Exemption does not establish schema
+        conformance. A disabled rule does not override another enabled match.
+      </p>
+      <mat-form-field appearance="outline"
+        ><mat-label>Rule name</mat-label
+        ><input matInput formControlName="name" /><mat-error
+          >A readable name is required (up to 200 characters).</mat-error
+        ></mat-form-field
+      >
+      <mat-slide-toggle formControlName="enabled">Enabled</mat-slide-toggle>
+      <mat-form-field appearance="outline"
+        ><mat-label>Retirement category</mat-label
+        ><mat-select formControlName="retirementStatus"
+          ><mat-option value="revoked">Revoked</mat-option
+          ><mat-option value="deprecated">Deprecated</mat-option></mat-select
+        ></mat-form-field
+      >
+      <mat-form-field appearance="outline"
+        ><mat-label>Object types</mat-label
+        ><mat-select formControlName="stixTypes" multiple
+          ><mat-option value="all">All types</mat-option
+          ><mat-option *ngFor="let type of objectTypes" [value]="type.value">{{
+            type.label
+          }}</mat-option></mat-select
+        ><mat-hint>All types includes every supported object type.</mat-hint
+        ><mat-error>Select at least one type.</mat-error></mat-form-field
+      >
+    </div>
+    <div class="form-grid" *ngIf="!isExemption">
       <mat-form-field appearance="outline" class="full-width">
         <mat-label>field path</mat-label>
         <input matInput formControlName="fieldPath" />

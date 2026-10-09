@@ -1,3 +1,4 @@
+import { ExemptionReport } from '../validation-policy';
 import {
   createAttackIdSchema,
   StixTypesWithAttackIds,
@@ -68,6 +69,7 @@ export abstract class StixObject extends Serializable {
     created_by_user_account?: string;
   };
   public workspace?: any;
+  public exemptionReport?: ExemptionReport;
 
   public deprecated = false; //is object deprecated?
   public revoked = false; //is object revoked?
@@ -151,6 +153,7 @@ export abstract class StixObject extends Serializable {
    * @param {*} raw the raw object to parse
    */
   public base_deserialize(raw: any) {
+    this.exemptionReport = raw.exemptionReport;
     if ('stix' in raw) {
       const sdo = raw.stix;
 
@@ -428,6 +431,8 @@ export abstract class StixObject extends Serializable {
 
     return validator(this).pipe(
       switchMap(validatorResult => {
+        if (validatorResult.exemptionReport)
+          result.exemptionReports.push(validatorResult.exemptionReport);
         // Process validation errors from API (backend now handles error-to-warning conversion)
         (validatorResult.errors || []).forEach((err: any) => {
           const errorMessage = `${err.path.join('.')}: ${err.message}`;

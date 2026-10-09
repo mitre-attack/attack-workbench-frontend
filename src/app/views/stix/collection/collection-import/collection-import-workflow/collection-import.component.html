@@ -148,3 +148,7 @@
     </mat-step>
   </mat-stepper>
 </div>
+
+<app-adm-validation-details
+  *ngFor="let report of exemptionReports"
+  [report]="report"></app-adm-validation-details>

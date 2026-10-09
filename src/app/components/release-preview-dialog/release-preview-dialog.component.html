@@ -288,6 +288,10 @@
     </mat-tab>
   </mat-tab-group>
 
+  <app-adm-validation-details
+    [report]="
+      data.previewSummary?.exemptionReport
+    "></app-adm-validation-details>
   <footer class="release-preview-footer">
     <p
       *ngIf="hasInvalidVersionBumps"

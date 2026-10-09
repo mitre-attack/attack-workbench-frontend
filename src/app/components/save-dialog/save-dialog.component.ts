@@ -1,7 +1,8 @@
+import { ExemptionReport } from 'src/app/classes/validation-policy';
 import { Component, Inject, OnInit, ViewEncapsulation } from '@angular/core';
 import { MatDialogRef, MAT_DIALOG_DATA } from '@angular/material/dialog';
 import { forkJoin, Observable, of } from 'rxjs';
-import { catchError, map, switchMap } from 'rxjs/operators';
+import { catchError, map, switchMap, tap } from 'rxjs/operators';
 import { ExportFormat, SnapshotTier } from 'src/app/classes/release-tracks';
 import type {
   ReleaseTrackObjectTier,
@@ -343,14 +344,29 @@ export class SaveDialogComponent implements OnInit {
       return;
     }
     this.applyWorkflowState();
+    this.validation.exemptionReports = [];
+    this.config.object.exemptionReport = undefined;
     const sub = this.saveObject()
-      .pipe(switchMap(() => this.syncTracks()))
+      .pipe(
+        tap(result => this.captureSaveReport(result?.exemptionReport)),
+        switchMap(() => this.syncTracks())
+      )
       .subscribe({
         next: () => {
           this.dialogRef.close(true);
         },
+        error: error => {
+          this.captureSaveReport(error.error?.exemptionReport);
+          this.stage = 0;
+          logger.error(error);
+        },
         complete: () => sub.unsubscribe(),
       });
+  }
+
+  private captureSaveReport(report?: ExemptionReport): void {
+    this.config.object.exemptionReport = report;
+    this.validation.exemptionReports = report ? [report] : [];
   }
 
   private loadTrackRows(): void {

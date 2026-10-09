@@ -1,3 +1,4 @@
+import { ExemptionReport } from 'src/app/classes/validation-policy';
 import { SelectionModel } from '@angular/cdk/collections';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import {
@@ -60,6 +61,7 @@ export class CollectionImportComponent implements OnInit {
   public changed_ids: string[] = [];
   // ids of objects which have not changed (object-version not already in knowledge base)
   public unchanged_ids: string[] = [];
+  public exemptionReports: ExemptionReport[] = [];
   public errorObjects: any[] = []; // list of objects that did not have enough required fields to be imported
   public import_errors: any;
   public save_errors: string[] = [];
@@ -552,6 +554,7 @@ export class CollectionImportComponent implements OnInit {
       .previewCollectionBundle(collectionBundle)
       .subscribe({
         next: preview_results => {
+          this.exemptionReports = preview_results.exemptionReports || [];
           if (preview_results.error) {
             // errors occurred when fetching collection preview
             this.import_errors = preview_results.error;
@@ -826,6 +829,7 @@ export class CollectionImportComponent implements OnInit {
             newBundle.objects = objects;
             const force = this.import_errors ? true : false; // force import if the collection bundle has errors
 
+            this.exemptionReports = [];
             // Use streaming import for progress updates
             this.importProgress = 0;
             // Initialize multi-phase progress tracking
@@ -890,6 +894,9 @@ export class CollectionImportComponent implements OnInit {
                       phasePercentage
                     );
                   } else if (event.type === 'complete') {
+                    this.exemptionReports = event.data.exemptionReport
+                      ? [event.data.exemptionReport]
+                      : [];
                     // Import complete - mark all phases as 100%
                     this.phaseProgress.forEach(p => {
                       p.progress = 100;
@@ -905,6 +912,9 @@ export class CollectionImportComponent implements OnInit {
                   }
                 },
                 error: error => {
+                  this.exemptionReports = error.exemptionReport
+                    ? [error.exemptionReport]
+                    : [];
                   // Check if it's a timeout error (504 Gateway Timeout or network timeout)
                   if (error.status === 504 || error.status === 0) {
                     logger.warn(
@@ -1056,6 +1066,7 @@ export class CollectionImportComponent implements OnInit {
    * Cancel the collection import and revert to previous step
    */
   public cancelImport(): void {
+    this.exemptionReports = [];
     this.import_errors = undefined;
     this.stepper.reset();
     this.loadingStep1 = false;

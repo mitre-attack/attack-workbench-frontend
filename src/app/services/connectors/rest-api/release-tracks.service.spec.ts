@@ -1,4 +1,5 @@
-import { firstValueFrom, of } from 'rxjs';
+import { HttpErrorResponse, HttpHeaders } from '@angular/common/http';
+import { firstValueFrom, of, throwError } from 'rxjs';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ReleaseTracksConnectorService } from './release-tracks.service';
@@ -270,7 +271,11 @@ describe('ReleaseTracksConnectorService', () => {
 
     expect(http.post).toHaveBeenCalledWith(
       `${environment.integrations.rest_api.url}/release-tracks/release-track--standard/snapshots/latest/release`,
-      { increment: 'minor', description: 'Analyst release context' }
+      { increment: 'minor', description: 'Analyst release context' },
+      { params: expect.anything() }
+    );
+    expect(http.post.mock.lastCall[2].params.get('exemptionReport')).toBe(
+      'details'
     );
   });
 
@@ -283,7 +288,11 @@ describe('ReleaseTracksConnectorService', () => {
 
     expect(http.post).toHaveBeenCalledWith(
       `${environment.integrations.rest_api.url}/release-tracks/release-track--standard/snapshots/2026-07-23T13%3A37%3A28.000Z/release`,
-      { version: '14.1' }
+      { version: '14.1' },
+      { params: expect.anything() }
+    );
+    expect(http.post.mock.lastCall[2].params.get('exemptionReport')).toBe(
+      'details'
     );
   });
 
@@ -350,5 +359,91 @@ describe('ReleaseTracksConnectorService', () => {
       `${environment.integrations.rest_api.url}/release-tracks/release-track--standard/snapshots/2026-07-23T13%3A37%3A28.000Z/description`,
       { description: 'Updated analyst context' }
     );
+  });
+  it('keeps actual publication success and failure evidence on original latest/selected requests', async () => {
+    const actual = {
+      availability: 'retained',
+      reportId: 'actual-publication',
+      state: 'completed',
+    };
+    http.post.mockReturnValue(of({ version: '1.0', exemptionReport: actual }));
+    const result = await firstValueFrom(
+      service.releaseLatest('track', { increment: 'minor' })
+    );
+    expect(result.exemptionReport).toEqual(actual);
+    expect(http.post.mock.lastCall[2].params.get('exemptionReport')).toBe(
+      'details'
+    );
+    const failure = {
+      status: 500,
+      error: {
+        release_committed: true,
+        exemptionReport: { ...actual, state: 'partial' },
+      },
+    };
+    http.post.mockReturnValue(throwError(() => failure));
+    await expect(
+      firstValueFrom(
+        service.releaseSnapshot('track', 'modified', { increment: 'minor' })
+      )
+    ).rejects.toBe(failure);
+    expect(http.post.mock.lastCall[2].params.get('exemptionReport')).toBe(
+      'details'
+    );
+    expect(http.get).not.toHaveBeenCalled();
+  });
+
+  it('preserves committed release repair metadata inside a reporting fallback', async () => {
+    const unavailable = { availability: 'unavailable' };
+    const original = {
+      release_committed: true,
+      operation_id: 'repair-op',
+      draft_cleanup: { operation_id: 'repair-op' },
+    };
+    const failure = new HttpErrorResponse({
+      status: 500,
+      statusText: 'Repair required',
+      url: 'http://localhost/api/release',
+      headers: new HttpHeaders({ 'X-Request-Id': 'request-id' }),
+      error: { result: original, exemptionReport: unavailable },
+    });
+    http.post.mockReturnValue(throwError(() => failure));
+    await expect(
+      firstValueFrom(
+        service.releaseSnapshot('track', 'modified', { increment: 'minor' })
+      )
+    ).rejects.toMatchObject({
+      status: 500,
+      statusText: 'Repair required',
+      url: failure.url,
+      headers: failure.headers,
+      error: { ...original, exemptionReport: unavailable },
+    });
+  });
+
+  it('preserves successful release and preview payloads inside reporting fallbacks', async () => {
+    const unavailable = { availability: 'unavailable' };
+    const original = {
+      version: '1.0',
+      draft_cleanup: { operation_id: 'cleanup-op' },
+    };
+    http.post.mockReturnValue(
+      of({ result: original, exemptionReport: unavailable })
+    );
+    for (const request of [
+      service.releaseLatest('track', { increment: 'minor' }),
+      service.releaseSnapshot('track', 'modified', { increment: 'minor' }),
+    ])
+      expect(await firstValueFrom(request)).toEqual({
+        ...original,
+        exemptionReport: unavailable,
+      });
+    http.get.mockReturnValue(
+      of({ result: { members: [] }, exemptionReport: unavailable })
+    );
+    expect(await firstValueFrom(service.previewRelease('track'))).toEqual({
+      members: [],
+      exemptionReport: unavailable,
+    });
   });
 });

@@ -1,3 +1,4 @@
+import { ExemptionReport } from 'src/app/classes/validation-policy';
 import { Component, OnInit } from '@angular/core';
 import { forkJoin } from 'rxjs';
 import { Identity } from 'src/app/classes/stix/identity';
@@ -16,6 +17,8 @@ const MITRE_IDENTITY_STIX_ID = 'identity--c78cb6e5-0c4b-4611-8297-d1b8b55e40b5';
   standalone: false,
 })
 export class OrgSettingsPageComponent implements OnInit {
+  public identityReport?: ExemptionReport;
+  public namespaceReport?: ExemptionReport;
   public organizationIdentity: Identity;
   public organizationIdentities: Identity[];
   public selectedOrganizationIdentityId: string;
@@ -130,8 +133,13 @@ export class OrgSettingsPageComponent implements OnInit {
     const subscription = this.restAPIConnector
       .setOrganizationIdentityRef(this.selectedOrganizationIdentityId)
       .subscribe({
-        next: () =>
-          (this.organizationIdentity = this.selectedOrganizationIdentity),
+        next: result => {
+          this.organizationIdentity = this.selectedOrganizationIdentity;
+          this.identityReport = result?.exemptionReport;
+        },
+        error: error => {
+          this.identityReport = error.error?.exemptionReport;
+        },
         complete: () => subscription.unsubscribe(),
       });
   }
@@ -140,7 +148,13 @@ export class OrgSettingsPageComponent implements OnInit {
     const subscription = this.restAPIConnector
       .setOrganizationNamespace(this.organizationNamespace)
       .subscribe({
-        next: namespace => (this.organizationNamespace = namespace),
+        next: namespace => {
+          this.organizationNamespace = namespace;
+          this.namespaceReport = namespace.exemptionReport;
+        },
+        error: error => {
+          this.namespaceReport = error.error?.exemptionReport;
+        },
         complete: () => subscription.unsubscribe(),
       });
   }

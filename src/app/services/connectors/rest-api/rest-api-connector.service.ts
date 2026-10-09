@@ -1,6 +1,14 @@
 import {
+  ExemptionReport,
+  ExemptionReportQuery,
+  ReconciliationStatus,
+  ValidationBypassRule,
+  ValidationPreviewResult,
+} from 'src/app/classes/validation-policy';
+import {
   HttpClient,
   HttpHeaders,
+  HttpResponse,
   HttpParameterCodec,
   HttpParams,
 } from '@angular/common/http';
@@ -87,23 +95,12 @@ export interface DeprecationCheck {
 }
 
 export interface Namespace {
+  exemptionReport?: ExemptionReport;
   prefix: string;
   range_start: string;
 }
 
-export interface ValidationBypassRule {
-  _id?: string;
-  id?: string;
-  fieldPath: string[];
-  errorCode: string;
-  stixType: string;
-  suppressError: boolean;
-  autoCreated?: boolean;
-  autoCreatedReason?: string | null;
-  triggerEvent?: string | null;
-  warningMessage?: string | null;
-  __v?: number;
-}
+export { ValidationBypassRule } from 'src/app/classes/validation-policy';
 
 export interface AllowedValueOption {
   value: string;
@@ -1195,7 +1192,7 @@ export class RestApiConnectorService extends ApiConnector {
     const plural = AttackTypeToPlural[attackType];
     return function <P extends T>(object: P): Observable<P> {
       const url = `${this.apiUrl}/${plural}`;
-      let params = new HttpParams();
+      let params = new HttpParams().set('exemptionReport', 'details');
 
       // add parentTechniqueId for sub-techniques
       if (attackType == 'technique') {
@@ -1215,7 +1212,7 @@ export class RestApiConnectorService extends ApiConnector {
         .pipe(
           tap(this.handleSuccess(`${this.getObjectName(object)} saved`)),
           map(result => {
-            const x = result as any;
+            const x = this.unwrapReportedObject(result) as any;
             if (x.stix.type == 'malware' || x.stix.type == 'tool')
               return new Software(x.stix.type, x);
             else return new attackClass(x);
@@ -1237,10 +1234,12 @@ export class RestApiConnectorService extends ApiConnector {
    * @returns validator function
    */
   public validateStixObject<T extends StixObject>() {
-    return <P extends T>(object: P): Observable<any> => {
+    return <P extends T>(object: P): Observable<ValidationPreviewResult> => {
       const plural = AttackTypeToPlural[object.attackType];
       const url = `${this.apiUrl}/${plural}`;
-      let params = new HttpParams().set('dryRun', 'true');
+      let params = new HttpParams()
+        .set('dryRun', 'true')
+        .set('exemptionReport', 'details');
 
       // add parentTechniqueId for sub-techniques
       if (object.attackType == 'technique') {
@@ -1255,16 +1254,24 @@ export class RestApiConnectorService extends ApiConnector {
 
       return this.http.post(url, object.serialize(), { params }).pipe(
         // Success (200): validation passed, extract warnings only
-        map(result => ({
-          errors: [],
-          warnings: (result as any).warnings || [],
-        })),
+        map(result => {
+          const preview = this.unwrapReportedObject(
+            result
+          ) as ValidationPreviewResult;
+          return {
+            errors: [],
+            warnings: preview.warnings || [],
+            exemptionReport: preview.exemptionReport,
+          };
+        }),
         catchError((error: any) => {
+          error = this.unwrapReportedError(error);
           // Validation failure (400): normalize errors and warnings into expected shape
           if (error.status === 400 && error.error?.details) {
             return of({
               errors: error.error.details,
               warnings: error.error.warnings || [],
+              exemptionReport: error.error.exemptionReport,
             });
           }
           if (error.status === 400) {
@@ -1275,10 +1282,13 @@ export class RestApiConnectorService extends ApiConnector {
                   message:
                     typeof error.error === 'string'
                       ? error.error
-                      : error.error?.message || 'Validation failed.',
+                      : typeof error.error?.result === 'string'
+                        ? error.error.result
+                        : error.error?.message || 'Validation failed.',
                 },
               ],
               warnings: [],
+              exemptionReport: error.error?.exemptionReport,
             });
           }
           // Non-validation errors: re-raise
@@ -1438,17 +1448,22 @@ export class RestApiConnectorService extends ApiConnector {
       if (!modified) modified = object.modified; //infer modified from STIX object modified date
       const url = `${this.apiUrl}/${plural}/${object.stixID}/modified/${modified.toISOString()}`;
       const rep = object.serialize(modified.toISOString());
-      return this.http.put(url, rep, { headers: this.headers }).pipe(
-        tap(this.handleSuccess(`${this.getObjectName(object)} saved`)),
-        map(result => {
-          const x = result as any;
-          if (x.stix.type == 'malware' || x.stix.type == 'tool')
-            return new Software(x.stix.type, x);
-          else return new attackClass(x);
-        }),
-        catchError(this.handleError_raise()),
-        share() // multicast so that multiple subscribers don't trigger the call twice. THIS MUST BE THE LAST LINE OF THE PIPE
-      );
+      return this.http
+        .put(url, rep, {
+          headers: this.headers,
+          params: new HttpParams().set('exemptionReport', 'details'),
+        })
+        .pipe(
+          tap(this.handleSuccess(`${this.getObjectName(object)} saved`)),
+          map(result => {
+            const x = this.unwrapReportedObject(result) as any;
+            if (x.stix.type == 'malware' || x.stix.type == 'tool')
+              return new Software(x.stix.type, x);
+            else return new attackClass(x);
+          }),
+          catchError(this.handleError_raise()),
+          share() // multicast so that multiple subscribers don't trigger the call twice. THIS MUST BE THE LAST LINE OF THE PIPE
+        );
     };
   }
 
@@ -2233,7 +2248,7 @@ export class RestApiConnectorService extends ApiConnector {
     suppressErrors = false
   ): Observable<Collection> {
     // add query params for preview
-    let query = new HttpParams();
+    let query = new HttpParams().set('exemptionReport', 'details');
     if (preview) query = query.set('previewOnly', 'true');
     if (force) query = query.set('forceImport', 'all');
     // perform the request
@@ -2247,7 +2262,7 @@ export class RestApiConnectorService extends ApiConnector {
           else this.handleSuccess('imported collection')(result);
         }),
         map(result => {
-          return new Collection(result);
+          return new Collection(this.unwrapReportedObject(result));
         }),
         catchError(this.handleError_raise<Collection>(!suppressErrors)),
         share()
@@ -2266,7 +2281,8 @@ export class RestApiConnectorService extends ApiConnector {
   ): Observable<{ type: string; data: any }> {
     return new Observable(observer => {
       let query = new HttpParams();
-      query = query.set('stream', 'true');
+      query = query.set('stream', 'true').set('exemptionReport', 'details');
+      const abort = new AbortController();
       if (force) query = query.set('forceImport', 'all');
 
       const url = `${this.apiUrl}/collection-bundles?${query.toString()}`;
@@ -2275,6 +2291,7 @@ export class RestApiConnectorService extends ApiConnector {
       // with SSE streaming instead
       fetch(url, {
         method: 'POST',
+        signal: abort.signal,
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'text/event-stream',
@@ -2344,7 +2361,7 @@ export class RestApiConnectorService extends ApiConnector {
 
       // Cleanup
       return () => {
-        // EventSource cleanup if needed
+        abort.abort();
       };
     });
   }
@@ -2361,12 +2378,24 @@ export class RestApiConnectorService extends ApiConnector {
     // perform preview request
     return this.postCollectionBundle(collectionBundle, true, false, true).pipe(
       map(result => {
-        return { error: undefined, preview: result };
+        return {
+          error: undefined,
+          preview: result,
+          exemptionReports: result.exemptionReport
+            ? [result.exemptionReport]
+            : [],
+        };
       }),
       catchError(err => {
         // check if import can be forced
         if (this.cannotForceImport(err)) {
-          return of({ error: err.error, preview: undefined });
+          return of({
+            error: err.error,
+            preview: undefined,
+            exemptionReports: err.error?.exemptionReport
+              ? [err.error.exemptionReport]
+              : [],
+          });
         }
         // force request
         return this.postCollectionBundle(
@@ -2376,9 +2405,25 @@ export class RestApiConnectorService extends ApiConnector {
           true
         ).pipe(
           map(force_result => {
-            return { error: err.error, preview: force_result };
+            return {
+              error: err.error,
+              preview: force_result,
+              exemptionReports: [
+                err.error?.exemptionReport,
+                force_result.exemptionReport,
+              ].filter(Boolean),
+            };
           }),
-          catchError(this.handleError_raise<Collection>())
+          catchError(fallbackError =>
+            of({
+              error: fallbackError.error ?? fallbackError,
+              preview: undefined,
+              exemptionReports: [
+                err.error?.exemptionReport,
+                fallbackError.error?.exemptionReport,
+              ].filter(Boolean),
+            })
+          )
         );
       }),
       share()
@@ -2690,13 +2735,22 @@ export class RestApiConnectorService extends ApiConnector {
         logger.log(result);
         // set the organization identity to be this identity's ID after it was created/updated
         return this.http
-          .post(`${this.apiUrl}/config/organization-identity`, {
-            id: result.stixID,
-          })
+          .post(
+            `${this.apiUrl}/config/organization-identity`,
+            {
+              id: result.stixID,
+            },
+            {
+              observe: 'response',
+              params: new HttpParams().set('exemptionReport', 'details'),
+            }
+          )
           .pipe(
             tap(this.handleSuccess('Organization Identity Updated')),
-            map(_ => {
-              return new Identity(result);
+            map(response => {
+              const identity = new Identity(result);
+              identity.exemptionReport = this.configReport(response);
+              return identity;
             }),
             catchError(this.handleError_raise<Identity>()),
             share() // multicast so that multiple subscribers don't trigger the call twice. THIS MUST BE THE LAST LINE OF THE PIPE
@@ -2712,9 +2766,17 @@ export class RestApiConnectorService extends ApiConnector {
    */
   public setOrganizationIdentityRef(identityId: string): Observable<any> {
     return this.http
-      .post(`${this.apiUrl}/config/organization-identity`, { id: identityId })
+      .post(
+        `${this.apiUrl}/config/organization-identity`,
+        { id: identityId },
+        {
+          observe: 'response',
+          params: new HttpParams().set('exemptionReport', 'details'),
+        }
+      )
       .pipe(
         tap(this.handleSuccess('Organization Identity Updated')),
+        map(response => ({ exemptionReport: this.configReport(response) })),
         catchError(this.handleError_raise<any>()),
         share()
       );
@@ -2748,15 +2810,25 @@ export class RestApiConnectorService extends ApiConnector {
       ? Number(namespaceSettings.range_start)
       : 0;
     return this.http
-      .post(`${this.apiUrl}/config/organization-namespace`, {
-        ...namespaceSettings,
-        range_start: range,
-      })
+      .post(
+        `${this.apiUrl}/config/organization-namespace`,
+        {
+          prefix: namespaceSettings.prefix,
+          range_start: range,
+        },
+        {
+          observe: 'response',
+          params: new HttpParams().set('exemptionReport', 'details'),
+        }
+      )
       .pipe(
         // set the organization identity to be this identity's ID after it was created/updated
         tap(this.handleSuccess('Organization Namespace Updated')),
-        map(_ => {
-          return namespaceSettings;
+        map(response => {
+          return {
+            ...namespaceSettings,
+            exemptionReport: this.configReport(response),
+          };
         }),
         catchError(this.handleError_raise<any>()),
         share() // multicast so that multiple subscribers don't trigger the call twice. THIS MUST BE THE LAST LINE OF THE PIPE
@@ -2794,6 +2866,58 @@ export class RestApiConnectorService extends ApiConnector {
       );
   }
 
+  private configReport(
+    response: HttpResponse<unknown>
+  ): ExemptionReport | undefined {
+    const headers = response.headers;
+    const availability = headers.get('X-Validation-Report-Availability');
+    if (!availability) return undefined;
+    const count = (name: string) =>
+      headers.has(name) ? Number(headers.get(name)) : undefined;
+    return {
+      availability: availability as ExemptionReport['availability'],
+      reportId: headers.get('X-Validation-Report-Id'),
+      state: headers.get(
+        'X-Validation-Report-State'
+      ) as ExemptionReport['state'],
+      policyRevision: count('X-Validation-Report-Policy-Revision'),
+      reportedExemptRevisions: count('X-Validation-Report-Exempt-Revisions'),
+      ruleApplications: count('X-Validation-Report-Rule-Applications'),
+    };
+  }
+
+  public getValidationReport(
+    reportId: string,
+    query: ExemptionReportQuery = {}
+  ): Observable<ExemptionReport> {
+    let params = new HttpParams().set(
+      'exemptionLimit',
+      String(query.limit || 50)
+    );
+    if (query.statuses?.length)
+      params = params.set('exemptionStatuses', query.statuses.join(','));
+    if (query.ruleIds?.length)
+      params = params.set('exemptionRuleIds', query.ruleIds.join(','));
+    if (query.cursor) params = params.set('exemptionCursor', query.cursor);
+    return this.http.get<ExemptionReport>(
+      `${this.apiUrl}/validation-reports/${encodeURIComponent(reportId)}`,
+      { params }
+    );
+  }
+
+  public getValidationReconciliation(): Observable<ReconciliationStatus> {
+    return this.http.get<ReconciliationStatus>(
+      `${this.apiUrl}/config/validation-bypasses/reconciliation`
+    );
+  }
+
+  public retryValidationReconciliation(): Observable<ReconciliationStatus> {
+    return this.http.post<ReconciliationStatus>(
+      `${this.apiUrl}/config/validation-bypasses/reconciliation/retry`,
+      {}
+    );
+  }
+
   /**
    * Get all ADM validation bypass rules.
    * @returns {Observable<ValidationBypassRule[]>} validation bypass rules
@@ -2803,7 +2927,7 @@ export class RestApiConnectorService extends ApiConnector {
       .get<ValidationBypassRule[]>(`${this.apiUrl}/config/validation-bypasses`)
       .pipe(
         tap(() => logger.log('retrieved validation bypass rules')),
-        catchError(this.handleError_continue<ValidationBypassRule[]>([])),
+        catchError(this.handleError_raise<ValidationBypassRule[]>(false)),
         share()
       );
   }

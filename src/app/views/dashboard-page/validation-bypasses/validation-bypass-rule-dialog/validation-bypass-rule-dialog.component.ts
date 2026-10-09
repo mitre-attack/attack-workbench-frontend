@@ -52,6 +52,12 @@ function fieldPathValidator(control: AbstractControl): ValidationErrors | null {
 export class ValidationBypassRuleDialogComponent {
   public form: FormGroup;
   public stixTypes = ['all', ...Object.keys(StixTypeToAttackType).sort()];
+  public objectTypes = Object.entries(StixTypeToAttackType)
+    .filter(([value]) => value !== 'note')
+    .map(([value, label]) => ({
+      value,
+      label: label === 'software' ? `software (${value})` : label,
+    }));
   public errorCodes = [
     'custom',
     'invalid_type',
@@ -77,6 +83,15 @@ export class ValidationBypassRuleDialogComponent {
   ) {
     const rule = data?.rule;
     this.form = this.formBuilder.group({
+      kind: [rule?.kind || 'error-bypass'],
+      name: [rule?.name || ''],
+      enabled: [rule?.enabled ?? true],
+      retirementStatus: [rule?.retirementStatus || 'revoked'],
+      stixTypes: [
+        rule?.stixTypes === 'all' || !rule?.stixTypes
+          ? ['all']
+          : rule.stixTypes,
+      ],
       fieldPath: [
         this.fieldPathToString(rule?.fieldPath),
         [Validators.required, fieldPathValidator],
@@ -86,6 +101,44 @@ export class ValidationBypassRuleDialogComponent {
       suppressError: [rule?.suppressError ?? true],
       warningMessage: [rule?.warningMessage || ''],
     });
+    if (rule) this.form.get('kind').disable();
+    this.configureValidators();
+    this.form
+      .get('kind')
+      .valueChanges.subscribe(() => this.configureValidators());
+  }
+
+  public get isExemption(): boolean {
+    return this.form.get('kind').value === 'object-exemption';
+  }
+
+  private configureValidators(): void {
+    for (const name of ['fieldPath', 'errorCode', 'stixType']) {
+      const control = this.form.get(name);
+      control.setValidators(
+        this.isExemption
+          ? []
+          : name === 'fieldPath'
+            ? [Validators.required, fieldPathValidator]
+            : [Validators.required]
+      );
+      control.updateValueAndValidity();
+    }
+    for (const name of ['name', 'retirementStatus', 'stixTypes']) {
+      const control = this.form.get(name);
+      control.setValidators(
+        this.isExemption
+          ? name === 'name'
+            ? [
+                Validators.required,
+                Validators.pattern(/\S/),
+                Validators.maxLength(200),
+              ]
+            : [Validators.required]
+          : []
+      );
+      control.updateValueAndValidity();
+    }
   }
 
   public hasError(controlName: string, errorName: string): boolean {
@@ -98,7 +151,17 @@ export class ValidationBypassRuleDialogComponent {
       return;
     }
 
-    const value = this.form.value;
+    const value = this.form.getRawValue();
+    if (this.isExemption) {
+      this.dialogRef.close({
+        kind: 'object-exemption',
+        name: value.name.trim(),
+        enabled: value.enabled,
+        retirementStatus: value.retirementStatus,
+        stixTypes: value.stixTypes.includes('all') ? 'all' : value.stixTypes,
+      } satisfies ValidationBypassRule);
+      return;
+    }
     const warningMessage = value.warningMessage?.trim();
     const result: ValidationBypassRule = {
       fieldPath: parseFieldPath(value.fieldPath),

@@ -1,0 +1,81 @@
+<mat-expansion-panel
+  *ngIf="report"
+  (opened)="open()"
+  (closed)="expanded = false">
+  <mat-expansion-panel-header
+    ><mat-panel-title
+      >ADM validation details</mat-panel-title
+    ></mat-expansion-panel-header
+  >
+  <p>
+    Matching retirement rules skip ADM validation. Report filters only change
+    the evidence shown. No selected matches does not establish ADM conformance.
+  </p>
+  <p *ngIf="displayed?.policyRevision !== undefined">
+    Policy revision {{ displayed.policyRevision }} · Operation
+    {{ displayed.state }}
+  </p>
+  <p *ngIf="displayed?.state === 'partial'">
+    This operation failed. Evidence covers only revisions visited before failure
+    and does not establish rollback.
+  </p>
+  <p *ngIf="report.availability === 'unavailable'">
+    {{ report.availabilityMessage || 'Retained details are unavailable.' }}
+    Available inline evidence is shown below.
+  </p>
+  <p *ngIf="report.truncated && !report.reportId">
+    Only part of the evidence is available. Filtered totals cannot be determined
+    from this page.
+  </p>
+  <mat-form-field
+    ><mat-label>Retirement categories</mat-label
+    ><mat-select multiple [(value)]="statuses" (selectionChange)="filter()"
+      ><mat-option value="revoked">Revoked</mat-option
+      ><mat-option value="deprecated">Deprecated</mat-option></mat-select
+    ></mat-form-field
+  >
+  <mat-form-field
+    ><mat-label>Matching rules</mat-label
+    ><mat-select multiple [(value)]="ruleIds" (selectionChange)="filter()"
+      ><mat-option *ngFor="let rule of rules" [value]="rule.ruleId"
+        >{{ rule.ruleName }} ({{ rule.retirementStatus }})</mat-option
+      ></mat-select
+    ></mat-form-field
+  >
+  <p *ngIf="loading" role="status">Loading report…</p>
+  <p *ngIf="error" role="alert">
+    {{ error }} <button mat-button (click)="load()">Retry</button>
+  </p>
+  <ng-container *ngIf="!loading && !error">
+    <p *ngIf="displayed?.reportedExemptRevisions !== undefined">
+      {{ displayed.reportedExemptRevisions }} selected exempt revisions ·
+      {{ displayed.ruleApplications }} rule applications.
+    </p>
+    <p *ngIf="displayed?.reportedExemptRevisions === 0">
+      No matches for this selection.
+    </p>
+    <p *ngIf="displayed?.reportedExemptRevisions === undefined">
+      Counts unavailable.
+    </p>
+    <p *ngFor="let rule of displayed?.byRule">
+      {{ rule.ruleName }} · {{ rule.retirementStatus }}:
+      {{ rule.count }} applications
+    </p>
+    <ul>
+      <li *ngFor="let row of displayed?.details">
+        {{ row.object_ref }} · {{ row.object_modified || 'Unversioned' }} ·
+        {{ row.ruleName }} · {{ row.retirementStatus }} · {{ row.phase }}
+      </li>
+    </ul>
+    <button mat-button [disabled]="page === 0" (click)="previous()">
+      Previous
+    </button>
+    <span>Page {{ page + 1 }}</span>
+    <button mat-button [disabled]="!displayed?.nextCursor" (click)="next()">
+      Next
+    </button>
+    <p *ngIf="displayed?.hasMore && !displayed?.nextCursor">
+      Further details are unavailable.
+    </p>
+  </ng-container>
+</mat-expansion-panel>

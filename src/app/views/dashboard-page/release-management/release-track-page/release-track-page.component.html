@@ -2108,3 +2108,13 @@
     </div>
   </ng-template>
 </div>
+
+<app-adm-validation-details
+  *ngFor="let report of exemptionReports"
+  [report]="report"></app-adm-validation-details>
+
+<app-adm-validation-details
+  [report]="publicationReport"></app-adm-validation-details>
+
+<app-adm-validation-details
+  [report]="previewReport"></app-adm-validation-details>

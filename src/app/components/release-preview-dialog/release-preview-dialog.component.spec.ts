@@ -1,3 +1,6 @@
+import { Component, Input } from '@angular/core';
+import { By } from '@angular/platform-browser';
+import { ExemptionReport } from 'src/app/classes/validation-policy';
 import { CommonModule } from '@angular/common';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { FormsModule } from '@angular/forms';
@@ -15,6 +18,15 @@ import {
   ReleasePreviewDialogComponent,
   ReleasePreviewDialogData,
 } from './release-preview-dialog.component';
+
+@Component({
+  selector: 'app-adm-validation-details',
+  template: '',
+  standalone: false,
+})
+class AdmDetailsStubComponent {
+  @Input() report?: ExemptionReport;
+}
 
 describe('ReleasePreviewDialogComponent', () => {
   let component: ReleasePreviewDialogComponent;
@@ -61,7 +73,7 @@ describe('ReleasePreviewDialogComponent', () => {
     };
 
     await TestBed.configureTestingModule({
-      declarations: [ReleasePreviewDialogComponent],
+      declarations: [ReleasePreviewDialogComponent, AdmDetailsStubComponent],
       imports: [
         CommonModule,
         FormsModule,
@@ -335,5 +347,20 @@ describe('ReleasePreviewDialogComponent', () => {
     expect(invalidRow).toBeTruthy();
     expect(minorButton?.disabled).toBe(true);
     expect(majorButton?.disabled).toBe(true);
+  });
+  it('passes the original preview report to the collapsed details surface', () => {
+    const report: ExemptionReport = {
+      availability: 'retained',
+      reportId: 'preview-original',
+      state: 'completed',
+      reportedExemptRevisions: 0,
+    };
+    component.data.previewSummary = { exemptionReport: report };
+    fixture.detectChanges();
+    expect(
+      fixture.debugElement.query(By.directive(AdmDetailsStubComponent))
+        .componentInstance.report
+    ).toBe(report);
+    expect(component.isReleaseBlocked).toBe(false);
   });
 });

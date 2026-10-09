@@ -1,3 +1,4 @@
+import { ExemptionReport } from 'src/app/classes/validation-policy';
 import { Component, Inject, OnInit, ViewEncapsulation } from '@angular/core';
 import {
   MatDialog,
@@ -117,6 +118,7 @@ export class StixDialogComponent implements OnInit {
   public deletable = false;
   public validating = false;
   public validation: ValidationData = null;
+  public saveReport?: ExemptionReport;
   public dirty = false;
   public startEditing() {
     this.dialogRef.disableClose = true;
@@ -147,14 +149,14 @@ export class StixDialogComponent implements OnInit {
     const object = Array.isArray(this.config.object)
       ? this.config.object[0]
       : this.config.object;
-    const save: Observable<void> =
+    this.captureSaveReport(object, undefined);
+    const save: Observable<StixObject> =
       object instanceof Relationship
-        ? object
-            .save(this.restApiService, this.releaseTracksService)
-            .pipe(map(() => undefined))
-        : object.save(this.restApiService).pipe(map(() => undefined));
+        ? object.save(this.restApiService, this.releaseTracksService)
+        : object.save(this.restApiService);
     const subscription = save.subscribe({
       next: result => {
+        this.captureSaveReport(object, result.exemptionReport);
         this.editorService.onEditingStopped.emit();
         this._config.is_new = false;
         if (object instanceof Relationship)
@@ -166,11 +168,22 @@ export class StixDialogComponent implements OnInit {
           this.editing = false;
         } else this.dialogRef.close(this.dirty);
       },
+      error: error =>
+        this.captureSaveReport(object, error.error?.exemptionReport),
       complete: () => {
         this.reload();
         subscription.unsubscribe();
       },
     });
+  }
+  private captureSaveReport(
+    object: StixObject,
+    report?: ExemptionReport
+  ): void {
+    this.saveReport = report;
+    object.exemptionReport = report;
+    if (this.validation)
+      this.validation.exemptionReports = report ? [report] : [];
   }
   public cancelValidation() {
     this.validating = false;
