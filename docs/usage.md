@@ -698,12 +698,20 @@ Saving a relationship creates a new relationship revision and returns its connec
 
 ### Revoking and Deprecating Objects
 
-All objects within the knowledge base can be _revoked_ or _deprecated_. These functionalities allow you to remove irrelevant or outdated objects without deleting them outright since deletions cannot be propagated to data consumers subscribed to your collections. Revoked and deprecated objects are hidden from UIs unless the user explicitly chooses to display them.
+Objects can be retired without deleting their history. Deprecation marks an object as no longer used; supported object types can instead be revoked in favor of an existing replacement. Retired objects are hidden from default lists unless explicitly included.
 
 - _Revoked_ objects are objects that are replaced by others within the knowledge base. Revoke an object by clicking the gear icon in the toolbar while on an object page and then clicking "revoke." You will then be prompted to select the revoking (replacing) object. Relationships cannot be revoked, only deprecated.
 - _Deprecated_ objects are objects that you want to remove without indicating a replacement. Deprecate an object by clicking the gear icon in the toolbar while on an object page and then clicking "deprecate." We also recommend prepending a paragraph to the object description explaining the reason for the deprecation, although this is optional.
 
-When an object is revoked or deprecated, all relationships attached to the object in question will themselves be deprecated.
+Before deprecation, Workbench checks the latest authoritative inbound and outbound domain references. If embedded references remain, a dialog lists their source, target, field, and direction. Remove or replace those references on their source objects first. No relationships or dependent objects are automatically changed by a blocked attempt.
+
+If only blocking formal relationships remain, confirmation retires those SROs first, then checks again and deprecates the object. Existing active `subtechnique-of` and `revoked-by` relationships are **preserved unchanged in both directions**: they neither block SDO deprecation nor receive new revisions. Ordinary relationship retirement creates a new revision with `x_mitre_deprecated: true`; it does not delete history. A failure stops the final object save, although earlier relationship retirements may already have completed. Data-source deprecation no longer automatically deprecates its components.
+
+The type exemptions apply only when deprecating an SDO, not when explicitly retiring a relationship itself. The relationship controls and data-quality duplicate-relationship bulk action can still retire `subtechnique-of` or `revoked-by` SROs, including when an endpoint is inactive. The frontend consistently excludes these types from cascade confirmation, retirement, and final blocker checks even against older API responses; an older server may still reject the final SDO save, which is reported without retiring the preserved links. These exemptions do not change revocation.
+
+When revoking with relationship preservation enabled, supported revocations also transfer embedded references through new source/replacement revisions. Analytic log-source names and channels are preserved. Conflicting single-reference fields and inactive referring objects block the operation rather than silently losing references. Without preservation, existing embedded references are not detached.
+
+Authoring new embedded references or active SROs to revoked/deprecated objects is rejected, except for `revoked-by` SROs. Preserving an existing `subtechnique-of` link does not permit authoring a new one with inactive endpoints. Unchanged legacy embedded references and source-faithful collection imports have separate retention semantics. Historical revisions, retired SROs, attribution, markings, and release inventory do not block deprecation checks.
 
 ### Deleting Objects
 
