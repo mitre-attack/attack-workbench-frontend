@@ -30,4 +30,29 @@ describe('ListViewComponent', () => {
   it('should create', () => {
     expect(component).toBeTruthy();
   });
+
+  it('should return an empty list for missing list fields', () => {
+    component.config = {
+      mode: 'view',
+      object: {} as any,
+      field: 'domains',
+      label: 'Domain',
+    };
+
+    expect(component.values).toEqual([]);
+    expect(component.tooltip).toBe('');
+  });
+
+  it('should not mutate list fields when sorting values', () => {
+    const object = { domains: ['mobile', 'enterprise'] };
+    component.config = {
+      mode: 'view',
+      object: object as any,
+      field: 'domains',
+      label: 'Domain',
+    };
+
+    expect(component.values).toEqual(['enterprise', 'mobile']);
+    expect(object.domains).toEqual(['mobile', 'enterprise']);
+  });
 });

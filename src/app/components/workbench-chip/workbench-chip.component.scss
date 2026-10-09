@@ -1,0 +1,138 @@
+@use 'sass:color';
+@use '../../../style/colors' as colors;
+
+$standard-light: colors.color(primary-dark);
+$standard-dark: colors.color(mitre-light-blue);
+$virtual-base: #8c5bd6;
+$virtual-light: #6f3db8;
+$virtual-dark: #c3a0f4;
+$tagged-light: colors.color(success);
+$tagged-dark: color.mix(white, colors.color(success), 30%);
+$draft-light: colors.on-color-deemphasis(light);
+$draft-dark: colors.on-color-deemphasis(dark);
+$latest-light: colors.color(primary-dark);
+$latest-dark: colors.color(mitre-light-blue);
+$awaiting-review: color.mix(
+  colors.color(warn),
+  colors.color(spark-yellow),
+  70%
+);
+
+:host {
+  display: inline-flex;
+}
+
+.workbench-chip {
+  display: inline-flex;
+  box-sizing: border-box;
+  min-height: 22px;
+  align-items: center;
+  justify-content: center;
+  padding: 0 10px;
+  border: 1px solid;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 20px;
+  letter-spacing: 0;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.workbench-chip--standard {
+  border-color: rgba($standard-light, 0.48);
+  background: rgba($standard-light, 0.1);
+  color: $standard-light;
+}
+
+.workbench-chip--virtual {
+  border-color: rgba($virtual-light, 0.8);
+  background: rgba($virtual-base, 0.14);
+  color: $virtual-light;
+}
+
+.workbench-chip--tagged {
+  border-color: rgba($tagged-light, 0.55);
+  background: rgba($tagged-light, 0.14);
+  color: color.mix($tagged-light, colors.on-color(light), 82%);
+}
+
+.workbench-chip--draft {
+  border-color: rgba($draft-light, 0.45);
+  background: rgba($draft-light, 0.12);
+  color: $draft-light;
+}
+
+.workbench-chip--latest {
+  border-color: rgba($latest-light, 0.52);
+  background: rgba($latest-light, 0.12);
+  color: $latest-light;
+}
+
+.workbench-chip--work-in-progress {
+  border-color: rgba($draft-light, 0.45);
+  background: rgba($draft-light, 0.12);
+  color: $draft-light;
+}
+
+.workbench-chip--awaiting-review {
+  border-color: rgba($awaiting-review, 0.6);
+  background: rgba($awaiting-review, 0.14);
+  color: color.mix($awaiting-review, colors.on-color(light), 82%);
+}
+
+.workbench-chip--reviewed {
+  border-color: rgba($tagged-light, 0.55);
+  background: rgba($tagged-light, 0.14);
+  color: color.mix($tagged-light, colors.on-color(light), 82%);
+}
+
+:host-context(.dark) {
+  .workbench-chip--standard {
+    border-color: rgba($standard-dark, 0.65);
+    background: rgba($standard-dark, 0.12);
+    color: $standard-dark;
+  }
+
+  .workbench-chip--virtual {
+    border-color: rgba($virtual-dark, 0.9);
+    background: rgba($virtual-base, 0.26);
+    color: $virtual-dark;
+  }
+
+  .workbench-chip--tagged {
+    border-color: rgba($tagged-dark, 0.65);
+    background: rgba($tagged-dark, 0.12);
+    color: $tagged-dark;
+  }
+
+  .workbench-chip--draft {
+    border-color: rgba($draft-dark, 0.42);
+    background: rgba($draft-dark, 0.1);
+    color: $draft-dark;
+  }
+
+  .workbench-chip--latest {
+    border-color: rgba($latest-dark, 0.65);
+    background: rgba($latest-dark, 0.14);
+    color: $latest-dark;
+  }
+
+  .workbench-chip--work-in-progress {
+    border-color: rgba($draft-dark, 0.42);
+    background: rgba($draft-dark, 0.1);
+    color: $draft-dark;
+  }
+
+  .workbench-chip--awaiting-review {
+    border-color: rgba($awaiting-review, 0.68);
+    background: rgba($awaiting-review, 0.14);
+    color: $awaiting-review;
+  }
+
+  .workbench-chip--reviewed {
+    border-color: rgba($tagged-dark, 0.65);
+    background: rgba($tagged-dark, 0.12);
+    color: $tagged-dark;
+  }
+}

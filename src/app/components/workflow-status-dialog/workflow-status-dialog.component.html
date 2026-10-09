@@ -1,0 +1,127 @@
+<div class="workflow-status-dialog">
+  <header class="workflow-status-header">
+    <div class="workflow-status-title-group">
+      <span class="workflow-status-icon-badge" aria-hidden="true">
+        <mat-icon>assignment_ind</mat-icon>
+      </span>
+      <div>
+        <h2 id="workflow-status-dialog-title">{{ dialogTitle }}</h2>
+        <p>{{ config.object.stixID }}</p>
+      </div>
+    </div>
+
+    <button
+      mat-icon-button
+      type="button"
+      class="workflow-status-close"
+      aria-label="Close"
+      (click)="onCancel()">
+      <mat-icon>close</mat-icon>
+    </button>
+  </header>
+
+  <section class="active-object-banner" aria-label="Selected object">
+    <span>Object</span>
+    <strong>{{ objectDisplayName }}</strong>
+  </section>
+
+  <section class="workflow-status-section validation-section">
+    <div class="workflow-status-section-header">
+      <h3>
+        <mat-icon>verified_user</mat-icon>
+        Validation
+      </h3>
+      <span
+        *ngIf="validation"
+        class="validation-status"
+        [ngClass]="'validation-status-' + validationStatus">
+        {{ validationStatusLabel }}
+      </span>
+    </div>
+
+    <div class="validation-context">
+      Validating against
+      <strong>{{ targetStatusLabel }}</strong>
+      requirements.
+    </div>
+
+    <div *ngIf="validation; else validating">
+      <app-validation-results
+        [validation]="validation"></app-validation-results>
+    </div>
+    <ng-template #validating>
+      <app-loading-overlay></app-loading-overlay>
+    </ng-template>
+  </section>
+
+  <section class="workflow-status-section track-section">
+    <div class="workflow-status-section-header">
+      <h4>Release Track to Update</h4>
+      <span *ngIf="loadingTracks" class="track-loading">
+        Loading tracks...
+      </span>
+    </div>
+
+    <div *ngIf="trackStatus as row; else noTracks">
+      <div class="track-card-grid">
+        <div class="track-card">
+          <span class="track-card-copy">
+            <strong>{{ row.name }}</strong>
+            <span *ngIf="row.description; else noDescription">
+              {{ row.description }}
+            </span>
+            <ng-template #noDescription>
+              <span>No description provided.</span>
+            </ng-template>
+          </span>
+          <app-status-chip
+            class="track-status-chip"
+            [status]="row.status"></app-status-chip>
+        </div>
+      </div>
+    </div>
+
+    <ng-template #noTracks>
+      <div class="track-empty">
+        <strong>
+          {{
+            loadingTracks
+              ? 'Loading release tracks'
+              : 'No release tracks to update'
+          }}
+        </strong>
+        <span>
+          {{
+            loadingTracks
+              ? 'Checking standard release tracks for this object.'
+              : 'This object is not currently enrolled in a standard release track that needs this status change.'
+          }}
+        </span>
+      </div>
+    </ng-template>
+  </section>
+
+  <footer class="workflow-status-footer">
+    <div class="workflow-status-footer-summary">
+      <mat-icon>sync_alt</mat-icon>
+      Updates
+      <strong>{{ trackStatus?.name || 'release track' }}</strong>
+      to
+      <strong>{{ targetStatusLabel }}</strong>
+    </div>
+    <div class="workflow-status-footer-actions">
+      <button mat-stroked-button type="button" (click)="onCancel()">
+        Cancel
+      </button>
+      <button
+        *ngIf="hasTrack"
+        mat-raised-button
+        color="primary"
+        type="button"
+        [disabled]="!saveEnabled"
+        (click)="onConfirm()">
+        {{ primaryActionLabel }}
+      </button>
+    </div>
+  </footer>
+</div>

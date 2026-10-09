@@ -1,0 +1,82 @@
+<div
+  class="list-card"
+  [ngClass]="{
+    'card-standard': type === 'standard',
+    'card-virtual': type === 'virtual',
+  }"
+  role="button"
+  tabindex="0"
+  (click)="onViewTrack()"
+  (keydown.enter)="onViewTrack()"
+  (keydown.space)="onViewTrack()">
+  <div class="card-top">
+    <span class="subheading">{{ track.name }}</span>
+    <app-workbench-chip
+      class="release-track-type-chip"
+      [variant]="chipVariant"></app-workbench-chip>
+  </div>
+
+  <div class="card-body">
+    <ng-container *ngIf="track.description">
+      <span
+        class="description-text card-desc"
+        [matTooltip]="track.description"
+        matTooltipPosition="below"
+        [matTooltipShowDelay]="600">
+        {{ track.description }}
+      </span>
+    </ng-container>
+
+    <div class="card-middle">
+      <div class="card-stats">
+        <ng-container *ngIf="type === 'standard'">
+          <div class="stat">
+            <div class="stat-label">CANDIDATES</div>
+            <div class="stat-value candidates-stat-value">
+              {{ track.stats?.candidates ?? 0 }}
+            </div>
+          </div>
+          <div class="stat">
+            <div class="stat-label">STAGED</div>
+            <div class="stat-value staged-stat-value">
+              {{ track.stats?.staged ?? 0 }}
+            </div>
+          </div>
+          <div class="stat">
+            <div class="stat-label">MEMBERS</div>
+            <div class="stat-value">
+              {{ track.stats?.members ?? 0 }}
+            </div>
+          </div>
+        </ng-container>
+
+        <ng-container *ngIf="type === 'virtual'">
+          <div class="stat">
+            <div class="stat-label">COMPONENTS</div>
+            <div class="stat-value">
+              {{ track.stats?.components ?? 0 }}
+            </div>
+          </div>
+          <div class="stat">
+            <div class="stat-label">QUARANTINED</div>
+            <div class="stat-value">{{ track.stats?.quarantined ?? 0 }}</div>
+          </div>
+          <div class="stat">
+            <div class="stat-label">MEMBERS</div>
+            <div class="stat-value">{{ track.stats?.members ?? 0 }}</div>
+          </div>
+        </ng-container>
+      </div>
+
+      <mat-divider class="card-sep"></mat-divider>
+    </div>
+  </div>
+
+  <div class="card-footer">
+    <div class="version">
+      <mat-icon class="tiny-icon">sell</mat-icon>
+      {{ track.latestVersion }}
+    </div>
+    <div class="date">{{ track.latestModified | date: 'shortDate' }}</div>
+  </div>
+</div>

@@ -6,9 +6,23 @@ import { StixListConfig } from 'src/app/components/stix/stix-list/stix-list.comp
 import { StixTypeToAttackType } from 'src/app/utils/type-mappings';
 import { StixListComponent } from 'src/app/components/stix/stix-list/stix-list.component';
 import { SelectionModel } from '@angular/cdk/collections';
-import { forkJoin } from 'rxjs';
-import { Relationship } from 'src/app/classes/stix/relationship';
+import { from, of } from 'rxjs';
+import { concatMap, finalize, takeWhile, toArray } from 'rxjs/operators';
+import { DeprecationService } from 'src/app/services/helpers/deprecation.service';
 import { ConfirmationDialogComponent } from 'src/app/components/confirmation-dialog/confirmation-dialog.component';
+
+export interface CrossDomainRelationshipRow {
+  stixId: string;
+  relationshipType: string;
+  source: any;
+  target: any;
+  sourceId: string;
+  targetId: string;
+  sourceName: string;
+  targetName: string;
+  sourceDomains: string[];
+  targetDomains: string[];
+}
 
 interface ParallelRelationshipGroup {
   key: string;
@@ -33,7 +47,8 @@ interface ParallelRelationshipGroup {
 export class DataQualityComponent implements OnInit {
   constructor(
     private reportService: RestApiConnectorService,
-    private dialog: MatDialog
+    private dialog: MatDialog,
+    private deprecationService: DeprecationService
   ) {}
 
   missingLinks: any[] = [];
@@ -44,6 +59,11 @@ export class DataQualityComponent implements OnInit {
   parallelRelationships: ParallelRelationshipGroup[] = [];
   loadingParallel = false;
   parallelError?: string;
+
+  crossDomainRelationships: CrossDomainRelationshipRow[] = [];
+  objectsWithoutDomains: any[] = [];
+  loadingDomainConsistency = false;
+  domainConsistencyError?: string;
 
   stixRelationshipConfig: StixListConfig = {
     type: 'relationship',
@@ -59,6 +79,76 @@ export class DataQualityComponent implements OnInit {
   ngOnInit(): void {
     this.loadParallelRelationships();
     this.loadMissingLinks();
+    this.loadDomainConsistency();
+  }
+
+  /**
+   * Release-track bundles only ship a relationship when both endpoints are
+   * members of the same track, so endpoints that share no domain can never be
+   * published together.
+   */
+  loadDomainConsistency(): void {
+    this.loadingDomainConsistency = true;
+    this.reportService.getDomainConsistencyReport().subscribe({
+      next: report => {
+        this.crossDomainRelationships = (
+          report?.cross_domain_relationships ?? []
+        ).map((entry: any) => this.mapCrossDomainRelationship(entry));
+        this.objectsWithoutDomains = report?.objects_without_domains ?? [];
+        this.loadingDomainConsistency = false;
+        this.domainConsistencyError = undefined;
+      },
+      error: err => {
+        this.domainConsistencyError =
+          'Failed to load domain consistency report';
+        this.loadingDomainConsistency = false;
+        console.error(err);
+      },
+    });
+  }
+
+  private mapCrossDomainRelationship(entry: any): CrossDomainRelationshipRow {
+    const source = entry?.source_object;
+    const target = entry?.target_object;
+    const attackId = (object: any) =>
+      object?.workspace?.attack_id ||
+      object?.stix?.external_references?.[0]?.external_id ||
+      object?.stix?.id ||
+      '';
+    return {
+      stixId: entry?.stix?.id,
+      relationshipType: entry?.stix?.relationship_type,
+      source,
+      target,
+      sourceId: attackId(source),
+      targetId: attackId(target),
+      sourceName: source?.stix?.name || '',
+      targetName: target?.stix?.name || '',
+      sourceDomains: entry?.source_domains ?? [],
+      targetDomains: entry?.target_domains ?? [],
+    };
+  }
+
+  // Use stix-list for objects without domains with id and name columns
+  stixConfigForObjectsWithoutDomains(): StixListConfig {
+    return {
+      type: 'relationship', // use relationship so stix-list table styling matches
+      stixObjects: (this.objectsWithoutDomains || []).map(item => {
+        const s = item?.stix || item;
+        return {
+          stixID: s.id,
+          attackType: StixTypeToAttackType[s.type],
+          type: s.type,
+          attackID: item?.workspace?.attack_id || '',
+          name: s.name || s.id,
+        } as any;
+      }),
+      columnsPreset: 'id-name',
+      showControls: false,
+      showFilters: false,
+      showDeprecatedFilter: false,
+      clickBehavior: 'linkToObjectPage',
+    };
   }
 
   private transformParallelRelationships(
@@ -234,7 +324,7 @@ export class DataQualityComponent implements OnInit {
 
   // Deprecate non-selected relationships for a group
   deprecateOthers(group: ParallelRelationshipGroup): void {
-    if (!group || !group.toDeprecate?.length) return;
+    if (this.loadingParallel || !group || !group.toDeprecate?.length) return;
 
     const confirmationPrompt = this.dialog.open(ConfirmationDialogComponent, {
       maxWidth: '35em',
@@ -245,41 +335,48 @@ export class DataQualityComponent implements OnInit {
       autoFocus: false, // prevents auto focus on toolbar buttons
     });
 
-    const confirmationSub = confirmationPrompt.afterClosed().subscribe({
+    confirmationPrompt.afterClosed().subscribe({
       next: result => {
         if (!result) return; // user cancelled
 
-        const tasks = group.relationships
-          .filter(
-            r =>
-              r.stix.id !== group.selectedRelationship &&
-              !r?.x_mitre_deprecated &&
-              !['subtechnique-of', 'revoked-by'].includes(
-                r.stix?.relationship_type
+        const ids = [...group.toDeprecate];
+        this.loadingParallel = true;
+        from(ids)
+          .pipe(
+            concatMap(id =>
+              this.reportService.getRelationship(id).pipe(
+                concatMap(versions => {
+                  const relationship = versions[0];
+                  if (!relationship)
+                    throw new Error(`Could not load relationship ${id}.`);
+                  if (relationship.deprecated) return of(true);
+                  return this.deprecationService.deprecate(relationship, true);
+                })
               )
+            ),
+            takeWhile(saved => saved, true),
+            toArray(),
+            finalize(() => (this.loadingParallel = false))
           )
-          .map(r => {
-            const rel = new Relationship(r);
-            rel.deprecated = true;
-            return this.reportService.putRelationship(rel);
+          .subscribe({
+            next: results => {
+              if (
+                results.length !== ids.length ||
+                results.some(saved => !saved)
+              )
+                return;
+              group.relationships = group.relationships.filter(
+                r => r.stix?.id === group.selectedRelationship
+              );
+              group.toDeprecate = [];
+              group.stixObjects = this.buildStixObjectsForGroup(group);
+              window.location.reload();
+            },
+            error: err => {
+              this.deprecationService.showError(err, true);
+            },
           });
-
-        const sub = forkJoin(tasks).subscribe({
-          next: () => {
-            group.relationships = group.relationships.filter(
-              r => r.stix?.id === group.selectedRelationship
-            );
-            group.toDeprecate = [];
-            group.stixObjects = this.buildStixObjectsForGroup(group);
-            window.location.reload();
-          },
-          error: err => {
-            console.error(err);
-          },
-          complete: () => sub.unsubscribe(),
-        });
       },
-      complete: () => confirmationSub.unsubscribe(),
     });
   }
 }

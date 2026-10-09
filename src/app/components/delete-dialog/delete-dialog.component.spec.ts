@@ -31,4 +31,27 @@ describe('DeleteDialogComponent', () => {
   it('should create', () => {
     expect(component).toBeTruthy();
   });
+
+  it('should default the confirmation text to DELETE', () => {
+    component.confirmInput = 'DELETE';
+
+    expect(component.confirmationText).toBe('DELETE');
+    expect(component.invalid).toBe(false);
+  });
+
+  it('should support a non-deletion confirmation label without changing existing dialogs', () => {
+    expect(component.confirmLabel).toBe('yes, delete');
+    component.config = { confirmLabel: 'Convert to draft' };
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).toContain('Convert to draft');
+    expect(fixture.nativeElement.textContent).not.toContain('yes, delete');
+  });
+
+  it('should use a STIX ID as the confirmation text when provided', () => {
+    component.config = { stixId: 'attack-pattern--123' };
+    component.confirmInput = 'attack-pattern--123';
+
+    expect(component.confirmationText).toBe('attack-pattern--123');
+    expect(component.invalid).toBe(false);
+  });
 });

@@ -4,7 +4,7 @@ import { RestApiConnectorService } from 'src/app/services/connectors/rest-api/re
 import { Observable, of } from 'rxjs';
 import { ValidationData } from '../serializable';
 import { logger } from '../../utils/logger';
-import { WorkflowState } from 'src/app/utils/types';
+import { WorkflowStatusType } from 'src/app/utils/types';
 
 export class MarkingDefinition extends StixObject {
   public name = '';
@@ -104,7 +104,7 @@ export class MarkingDefinition extends StixObject {
    */
   public validate(
     restAPIService: RestApiConnectorService,
-    tempWorkflowState?: WorkflowState
+    tempWorkflowState?: WorkflowStatusType
   ): Observable<ValidationData> {
     return this.base_validate(restAPIService, tempWorkflowState).pipe(
       map(result => {

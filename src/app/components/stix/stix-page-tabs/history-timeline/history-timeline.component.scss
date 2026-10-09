@@ -1,0 +1,82 @@
+@use '../../../../../style/globals';
+@use '../../../../../style/colors';
+
+.history-timeline {
+  h3 {
+    margin: 0;
+  }
+  .timeline-controls {
+    margin: 1em 0;
+  }
+  .history-list {
+    padding: 0;
+    border-radius: 4px;
+    .dark & {
+      border: 1px solid colors.border-color(dark);
+    }
+    .light & {
+      border: 1px solid colors.border-color(light);
+    }
+  }
+  .history-event {
+    display: flex;
+    justify-content: space-between;
+    padding: 12px 16px;
+    height: fit-content !important;
+    .history-event-content {
+      display: flex;
+      flex-direction: column;
+      flex: auto;
+      box-sizing: border-box;
+      overflow: hidden;
+      padding-left: 16px;
+    }
+    .hide-overflow {
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      display: block;
+      box-sizing: border-box;
+    }
+    &:hover {
+      .dark & {
+        background: colors.color-alternate(dark);
+      }
+      .light & {
+        background: colors.color-alternate(light);
+      }
+    }
+    .dark & {
+      border-bottom: 1px solid colors.border-color(dark);
+    }
+    .light & {
+      border-bottom: 1px solid colors.border-color(light);
+    }
+    &:last-of-type {
+      border-bottom: none;
+    }
+    &.object {
+      border-left: 4px solid colors.color(primary);
+    }
+    &.relationship {
+      border-left: 4px solid colors.color(secondary);
+    }
+    &.collection {
+      border-left: 4px solid colors.color-alternate(dark, 10);
+    }
+    .event-identity {
+      padding-left: 16px;
+    }
+  }
+  // collection event checkbox style
+  .tertiary
+    .mdc-checkbox
+    .mdc-checkbox__native-control:enabled:checked
+    ~ .mdc-checkbox__background {
+    background-color: colors.color-alternate(dark, 10);
+    border-color: colors.color-alternate(dark, 10);
+  }
+  .mdc-checkbox .mdc-checkbox__checkmark {
+    color: colors.color(light) !important;
+  }
+}

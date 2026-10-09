@@ -1,4 +1,4 @@
-<div class="data-source-view view-page grid spacing-16" *ngIf="!loading">
+<div class="data-source-view view-page" *ngIf="!loading">
   <app-outdated-content-warning></app-outdated-content-warning>
   <div class="row">
     <div class="col">
@@ -7,103 +7,129 @@
           mode: config.mode,
           object: config.object,
         }"></app-name-property>
-      <app-subheading
-        [config]="config"
-        (onOpenHistory)="openHistory()"
-        (onOpenNotes)="openNotes()"></app-subheading>
+      <app-subheading [config]="config"></app-subheading>
     </div>
   </div>
-  <div class="row">
-    <div class="col">
-      <!-- ATT&CK ID -->
-      <app-attackid-property
-        class="grow-to-row"
-        [config]="{
-          mode: config.mode,
-          object: config.object,
-        }"></app-attackid-property>
+
+  <app-stix-page-tabs
+    [config]="config"
+    [detailsTemplate]="detailsTpl"
+    [customTabs]="[
+      { label: 'Data Components', template: componentsTpl },
+      { label: 'Techniques', template: techniquesTpl },
+    ]">
+  </app-stix-page-tabs>
+
+  <ng-template #detailsTpl>
+    <div class="grid spacing-16">
+      <div class="row">
+        <div class="col">
+          <!-- ATT&CK ID -->
+          <app-attackid-property
+            class="grow-to-row"
+            [config]="{
+              mode: config.mode,
+              object: config.object,
+            }"></app-attackid-property>
+        </div>
+        <div class="col">
+          <!-- VERSION NUMBER -->
+          <app-version-property
+            class="grow-to-row"
+            [config]="{
+              mode: config.mode,
+              object: config.object,
+            }"></app-version-property>
+        </div>
+      </div>
+      <div class="row">
+        <div class="col">
+          <!-- Domains -->
+          <app-list-property
+            class="grow-to-row"
+            [config]="{
+              mode: config.mode,
+              object: config.object,
+              field: 'domains',
+              editType: 'select',
+            }"></app-list-property>
+        </div>
+        <div class="col">
+          <!-- CONTRIBUTORS -->
+          <app-list-property
+            class="grow-to-row"
+            [config]="{
+              mode: config.mode,
+              object: config.object,
+              field: 'contributors',
+              editType: 'any',
+            }"></app-list-property>
+        </div>
+      </div>
+      <div class="row">
+        <div class="col">
+          <!-- PLATFORMS -->
+          <app-list-property
+            class="grow-to-row"
+            [config]="{
+              mode: config.mode,
+              object: config.object,
+              field: 'platforms',
+              editType: 'select',
+            }"></app-list-property>
+        </div>
+        <div class="col">
+          <!-- COLLECTION LAYERS -->
+          <app-list-property
+            class="grow-to-row"
+            [config]="{
+              mode: config.mode,
+              object: config.object,
+              field: 'collection_layers',
+              label: 'collection layers',
+              editType: 'select',
+            }"></app-list-property>
+        </div>
+      </div>
+      <div class="row">
+        <div class="col">
+          <!-- DESCRIPTION -->
+          <app-descriptive-property
+            [config]="{
+              mode: config.mode,
+              object: config.object,
+              field: 'description',
+              firstParagraphOnly: false,
+              referencesField: 'external_references',
+              label: 'Description',
+            }"></app-descriptive-property>
+        </div>
+      </div>
+      <div
+        *ngIf="
+          dataSource.external_references.list().length > 0 ||
+          previous?.external_references.list().length > 0
+        ">
+        <div class="row">
+          <div class="col">
+            <h2 class="section-header">References</h2>
+          </div>
+        </div>
+        <div class="row">
+          <div class="col">
+            <app-external-references-property
+              [config]="{
+                mode: config.mode,
+                object: config.object,
+                referencesField: 'external_references',
+              }"></app-external-references-property>
+          </div>
+        </div>
+      </div>
     </div>
-    <div class="col">
-      <!-- VERSION NUMBER -->
-      <app-version-property
-        class="grow-to-row"
-        [config]="{
-          mode: config.mode,
-          object: config.object,
-        }"></app-version-property>
-    </div>
-  </div>
-  <div class="row">
-    <div class="col">
-      <!-- Domains -->
-      <app-list-property
-        class="grow-to-row"
-        [config]="{
-          mode: config.mode,
-          object: config.object,
-          field: 'domains',
-          editType: 'select',
-        }"></app-list-property>
-    </div>
-    <div class="col">
-      <!-- CONTRIBUTORS -->
-      <app-list-property
-        class="grow-to-row"
-        [config]="{
-          mode: config.mode,
-          object: config.object,
-          field: 'contributors',
-          editType: 'any',
-        }"></app-list-property>
-    </div>
-  </div>
-  <div class="row">
-    <div class="col">
-      <!-- PLATFORMS -->
-      <app-list-property
-        class="grow-to-row"
-        [config]="{
-          mode: config.mode,
-          object: config.object,
-          field: 'platforms',
-          editType: 'select',
-        }"></app-list-property>
-    </div>
-    <div class="col">
-      <!-- COLLECTION LAYERS -->
-      <app-list-property
-        class="grow-to-row"
-        [config]="{
-          mode: config.mode,
-          object: config.object,
-          field: 'collection_layers',
-          label: 'collection layers',
-          editType: 'select',
-        }"></app-list-property>
-    </div>
-  </div>
-  <div class="row">
-    <div class="col">
-      <!-- DESCRIPTION -->
-      <app-descriptive-property
-        [config]="{
-          mode: config.mode,
-          object: config.object,
-          field: 'description',
-          firstParagraphOnly: false,
-          referencesField: 'external_references',
-          label: 'Description',
-        }"></app-descriptive-property>
-    </div>
-  </div>
-  <!-- RELATIONSHIPS - NOTE: these are only shown in 'view' mode -->
-  <div
-    *ngIf="
-      (config.showRelationships ||
-        !config.hasOwnProperty('showRelationships')) &&
-      !editing
-    ">
-    <!-- data components -->
+  </ng-template>
+
+  <ng-template #componentsTpl>
     <div class="row">
       <div class="col">
         <h2 class="section-header">Data Components</h2>
@@ -119,13 +145,14 @@
             type: 'data-component',
             showDeprecatedFilter: true,
             clickBehavior: 'dialog',
-            allowEdits: true,
+            allowEdits: canEdit,
           }"
           (refresh)="getDataComponents()"></app-stix-list>
       </div>
     </div>
+  </ng-template>
 
-    <!-- techniques detected -->
+  <ng-template #techniquesTpl>
     <div class="row">
       <div class="col">
         <h2 class="section-header">Techniques Detected</h2>
@@ -138,6 +165,8 @@
           [config]="{
             stixObjects: techniquesDetected,
             type: 'relationship',
+            relationshipCreatedBefore: config.relationshipCreatedBefore,
+            relationshipAddedAfter: config.relationshipAddedAfter,
             showDeprecatedFilter: true,
             clickBehavior: 'dialog',
             allowEdits: false,
@@ -145,27 +174,5 @@
           (refresh)="getDataComponents()"></app-stix-list>
       </div>
     </div>
-  </div>
-  <!-- EXTERNAL REFERENCES -->
-  <div
-    *ngIf="
-      dataSource.external_references.list().length > 0 ||
-      previous?.external_references.list().length > 0
-    ">
-    <div class="row">
-      <div class="col">
-        <h2 class="section-header">References</h2>
-      </div>
-    </div>
-    <div class="row">
-      <div class="col">
-        <app-external-references-property
-          [config]="{
-            mode: config.mode,
-            object: config.object,
-            referencesField: 'external_references',
-          }"></app-external-references-property>
-      </div>
-    </div>
-  </div>
+  </ng-template>
 </div>

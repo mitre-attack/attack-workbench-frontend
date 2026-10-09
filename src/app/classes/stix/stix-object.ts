@@ -12,17 +12,13 @@ import {
   AttackTypeToRoute,
   StixTypeToAttackType,
 } from 'src/app/utils/type-mappings';
-import { StixType, WorkflowState } from 'src/app/utils/types';
+import { WorkflowStatus, WorkflowStatusType } from 'src/app/utils/types';
 import { v4 as uuid } from 'uuid';
 import { logger } from '../../utils/logger';
 import { ExternalReferences } from '../external-references';
 import { Serializable, ValidationData } from '../serializable';
+import { UserAccount } from '../authn/user-account';
 import { VersionNumber } from '../version-number';
-
-export type workflowStates =
-  | 'work-in-progress'
-  | 'awaiting-review'
-  | 'reviewed';
 
 export abstract class StixObject extends Serializable {
   public stixID: string; // STIX ID
@@ -35,12 +31,13 @@ export abstract class StixObject extends Serializable {
   public created_by?: any;
   public modified_by_ref: string; //embedded relationship
   public modified_by?: any;
+  public created_by_user_account?: UserAccount;
   public firstInitialized: boolean; // boolean to track if it is a newly created object
 
   public object_marking_refs: string[] = []; //list of embedded relationships to marking_defs
 
   public abstract readonly supportsAttackID: boolean; // boolean to determine if object supports ATT&CK IDs
-  public tempWorkflowState: WorkflowState;
+  public tempWorkflowState: WorkflowStatusType;
   protected abstract get attackIDValidator(): {
     regex: string; // regex to validate the ID
     format: string; // format to display to user
@@ -67,9 +64,10 @@ export abstract class StixObject extends Serializable {
   public version: VersionNumber; // version number of the object
   public external_references: ExternalReferences;
   public workflow: {
-    state: workflowStates;
+    state: WorkflowStatusType;
     created_by_user_account?: string;
   };
+  public workspace?: any;
 
   public deprecated = false; //is object deprecated?
   public revoked = false; //is object revoked?
@@ -90,9 +88,9 @@ export abstract class StixObject extends Serializable {
       this.version = new VersionNumber('0.1');
       this.attackID = '';
       this.external_references = new ExternalReferences();
-      if (this.type !== 'x-mitre-collection') {
+      if (this.type !== 'x-mitre-collection' && this.type !== 'relationship') {
         this.workflow = {
-          state: 'work-in-progress',
+          state: WorkflowStatus.WorkInProgress,
         };
       }
       this.description = '';
@@ -357,10 +355,16 @@ export abstract class StixObject extends Serializable {
           "ObjectError: 'stix' field does not exist in modified_by_identity object"
         );
     }
+    if ('created_by_user_account' in raw && raw.created_by_user_account) {
+      this.created_by_user_account = new UserAccount(
+        raw.created_by_user_account
+      );
+    }
 
     if ('workspace' in raw) {
       // parse workspace fields
       const workspaceData = raw.workspace;
+      this.workspace = workspaceData;
       if ('workflow' in workspaceData && workspaceData.workflow !== undefined) {
         if (typeof workspaceData.workflow == 'object') {
           this.workflow = workspaceData.workflow;
@@ -520,6 +524,8 @@ export abstract class StixObject extends Serializable {
           refs_fields.push('aliases');
         if (this.attackType == 'asset') refs_fields.push('relatedAssets');
         if (this.attackType == 'technique') refs_fields.push('detection');
+        if (this.attackType == 'campaign')
+          refs_fields.push('first_seen_citation', 'last_seen_citation');
 
         return this.external_references
           .validate(restAPIService, { object: this, fields: refs_fields })
@@ -796,6 +802,18 @@ export abstract class StixObject extends Serializable {
    * @returns {Observable} of the pout
    */
   abstract update(restAPIService: RestApiConnectorService): Observable<object>;
+
+  /**
+   * Revoke the STIX object in the database.
+   * @param restAPIService [RestApiConnectorService] the service to perform the revoke through
+   * @param revokingObject the revoking object payload
+   * @returns {Observable} of the revoke
+   */
+  public revoke?(
+    restAPIService: RestApiConnectorService,
+    revokingObject: { revoking: { stixId: string; modified: string } },
+    preserveRelationships?: boolean
+  ): Observable<object>;
 
   /**
    * Updates the object's marking definitions with the default the first time an object is created

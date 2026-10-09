@@ -4,7 +4,7 @@ Thanks for contributing to `attack-workbench-frontend`!
 
 You are welcome to comment on issues, open new issues, and open pull requests.
 
-Pull requests should target the **develop** branch of the repository. If your pull request is reliant on changes to the [REST API](https://github.com/center-for-threat-informed-defense/attack-workbench-rest-api), please make sure to document this in your pull request and link to the corresponding REST API pull request.
+Pull requests should target the **develop** branch of the repository. If your pull request is reliant on changes to the [REST API](https://github.com/mitre-attack/attack-workbench-rest-api), please make sure to document this in your pull request and link to the corresponding REST API pull request.
 
 Also, if you contribute any source code, we need you to agree to the following Developer's Certificate of Origin below.
 
@@ -35,3 +35,9 @@ By making a contribution to this project, I certify that:
     maintained indefinitely and may be redistributed consistent with
     this project or the open source license(s) involved.
 ```
+
+## Unit tests
+
+Run `npm test` for the unit suite or `npm run test:coverage` for the coverage run used in CI.
+
+For Angular tests using `createAsyncObservable`, use `fakeAsync` and `flush` to finish finite asynchronous initialization and save operations before making assertions. Fixed-duration sleeps do not guarantee that nested timers have completed. The SaveDialog candidate-enrollment regression uses this approach to verify enrollment in both the existing and newly selected tracks before the dialog closes.

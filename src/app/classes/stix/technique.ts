@@ -5,7 +5,7 @@ import { logger } from '../../utils/logger';
 import { ValidationData } from '../serializable';
 import { Relationship } from './relationship';
 import { StixObject } from './stix-object';
-import { WorkflowState } from 'src/app/utils/types';
+import { WorkflowStatusType } from 'src/app/utils/types';
 
 export class Technique extends StixObject {
   public name = '';
@@ -453,7 +453,7 @@ export class Technique extends StixObject {
    */
   public validate(
     restAPIService: RestApiConnectorService,
-    tempWorkflowState?: WorkflowState
+    tempWorkflowState?: WorkflowStatusType
   ): Observable<ValidationData> {
     return this.base_validate(restAPIService, tempWorkflowState).pipe(
       map(result => {
@@ -729,11 +729,29 @@ export class Technique extends StixObject {
    * @returns {Observable} of the post
    */
   public save(restApiService: RestApiConnectorService): Observable<Technique> {
-    const postObservable = this.updateParentRelationship(restApiService).pipe(
-      concatMap(() => this.syncTacticsWithParentOrSubs(restApiService)),
-      concatMap(() => restApiService.postTechnique(this)),
-      shareReplay(1) // share the result and ensure only the last POST result is emitted
-    );
+    // For a new subtechnique, save the child technique first, then create its subtechnique-of relationship, and sync tactics
+    const isNewSubtechniqueWithParent =
+      this.firstInitialized && this.is_subtechnique && this.parentTechnique;
+    const postObservable = isNewSubtechniqueWithParent
+      ? restApiService.postTechnique(this).pipe(
+          concatMap(savedTechnique => {
+            const serializedTechnique = savedTechnique.serialize(
+              savedTechnique.modified.toISOString()
+            );
+            this.base_deserialize(serializedTechnique);
+            this.deserialize(serializedTechnique);
+            return this.updateParentRelationship(restApiService).pipe(
+              concatMap(() => this.syncTacticsWithParentOrSubs(restApiService)),
+              map(() => savedTechnique)
+            );
+          }),
+          shareReplay(1)
+        )
+      : this.updateParentRelationship(restApiService).pipe(
+          concatMap(() => this.syncTacticsWithParentOrSubs(restApiService)),
+          concatMap(() => restApiService.postTechnique(this)),
+          shareReplay(1)
+        );
 
     const subscription = postObservable.subscribe({
       next: result => {
@@ -779,5 +797,23 @@ export class Technique extends StixObject {
       },
     });
     return putObservable;
+  }
+
+  /**
+   * Revoke the STIX object in the database.
+   * @param restAPIService [RestApiConnectorService] the service to perform the revoke through
+   * @param revokingObject the revoking object payload
+   * @returns {Observable} of the revoke
+   */
+  public revoke(
+    restAPIService: RestApiConnectorService,
+    revokingObject: { revoking: { stixId: string; modified: string } },
+    preserveRelationships = false
+  ): Observable<object> {
+    return restAPIService.revokeTechnique(
+      this.stixID,
+      revokingObject,
+      preserveRelationships
+    );
   }
 }

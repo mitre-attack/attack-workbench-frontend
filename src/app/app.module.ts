@@ -45,6 +45,7 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatRadioModule } from '@angular/material/radio';
 import { MatSelectModule } from '@angular/material/select';
 import { MatSidenavModule } from '@angular/material/sidenav';
+import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatSortModule } from '@angular/material/sort';
 import { MatStepperModule } from '@angular/material/stepper';
@@ -56,7 +57,6 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 // other library imports
 import { MtxPopoverModule } from '@ng-matero/extensions/popover';
 import { AutosizeModule } from 'ngx-autosize';
-import { JDENTICON_CONFIG, NgxJdenticonModule } from 'ngx-jdenticon';
 import { MarkdownModule } from 'ngx-markdown';
 
 // custom components
@@ -73,16 +73,24 @@ import { HeaderComponent } from './components/header/header.component';
 import { LoadingOverlayComponent } from './components/loading-overlay/loading-overlay.component';
 import { MarkdownViewDialogComponent } from './components/markdown-view-dialog/markdown-view-dialog.component';
 import { MultipleChoiceDialogComponent } from './components/multiple-choice-dialog/multiple-choice-dialog.component';
+import { NavigationComponent } from './components/navigation/navigation.component';
 import { ReferenceEditDialogComponent } from './components/reference-edit-dialog/reference-edit-dialog.component';
-import { HistoryTimelineComponent } from './components/resources-drawer/history-timeline/history-timeline.component';
+import { ReleasePreviewDialogComponent } from './components/release-preview-dialog/release-preview-dialog.component';
+import { ReleaseVersionDialogComponent } from './components/release-version-dialog/release-version-dialog.component';
+import { SnapshotDescriptionDialogComponent } from './components/snapshot-description-dialog/snapshot-description-dialog.component';
+import { VirtualSnapshotContentsComponent } from './components/virtual-snapshot-contents/virtual-snapshot-contents.component';
+import { HistoryTimelineComponent } from './components/stix/stix-page-tabs/history-timeline/history-timeline.component';
+import { MembershipSectionComponent } from './components/stix/stix-page-tabs/membership-section/membership-section.component';
 import { ReferenceSidebarComponent } from './components/resources-drawer/reference-sidebar/reference-sidebar.component';
 import { ResourcesDrawerComponent } from './components/resources-drawer/resources-drawer.component';
 import { SearchComponent } from './components/resources-drawer/search/search.component';
 import { SaveDialogComponent } from './components/save-dialog/save-dialog.component';
 import { SubheadingComponent } from './components/subheading/subheading.component';
 import { ToolbarComponent } from './components/toolbar/toolbar.component';
+import { UserAvatarComponent } from './components/user-avatar/user-avatar.component';
 import { ValidationResultsComponent } from './components/validation-results/validation-results.component';
 import { VersionPopoverComponent } from './components/version-popover/version-popover.component';
+import { WorkflowStatusDialogComponent } from './components/workflow-status-dialog/workflow-status-dialog.component';
 
 // STIX components
 import { StixListComponent } from './components/stix/stix-list/stix-list.component';
@@ -144,7 +152,8 @@ import { OrderedListViewComponent } from './components/stix/ordered-list-propert
 import { IconViewComponent } from './components/icon-view/icon-view.component';
 import { ObjectStatusComponent } from './components/object-status/object-status.component';
 import { RecentActivityComponent } from './components/recent-activity/recent-activity.component';
-import { NotesEditorComponent } from './components/resources-drawer/notes-editor/notes-editor.component';
+import { NotesEditorComponent } from './components/stix/stix-page-tabs/notes-editor/notes-editor.component';
+import { ReleaseReviewDialogComponent } from './components/release-review-dialog/release-review-dialog.component';
 import { IdentityPropertyComponent } from './components/stix/identity-property/identity-property.component';
 
 import { CitationEditComponent } from './components/stix/citation-property/citation-edit/citation-edit.component';
@@ -159,9 +168,14 @@ import { DataQualityComponent } from './views/dashboard-page/data-quality/data-q
 import { OrgSettingsPageComponent } from './views/dashboard-page/org-settings-page/org-settings-page.component';
 import { UserAccountsPageComponent } from './views/dashboard-page/user-accounts-page/user-accounts-page.component';
 import { DefaultMarkingDefinitionsComponent } from './views/dashboard-page/default-marking-definitions/default-marking-definitions.component';
+import { ValidationBypassRuleDialogComponent } from './views/dashboard-page/validation-bypasses/validation-bypass-rule-dialog/validation-bypass-rule-dialog.component';
+import { ValidationBypassesComponent } from './views/dashboard-page/validation-bypasses/validation-bypasses.component';
+import { AllowedValuesComponent } from './views/dashboard-page/allowed-values/allowed-values.component';
+import { AllowedValueDialogComponent } from './views/dashboard-page/allowed-values/allowed-value-dialog/allowed-value-dialog.component';
 import { ProfilePageComponent } from './views/profile-page/profile-page.component';
 import { ReferenceManagerComponent } from './views/reference-manager/reference-manager.component';
 
+import { AllObjectsPageComponent } from './views/stix/all-objects-page/all-objects-page.component';
 import { StixDialogComponent } from './views/stix/stix-dialog/stix-dialog.component';
 import { StixPageComponent } from './views/stix/stix-page/stix-page.component';
 
@@ -185,6 +199,7 @@ import { CampaignViewComponent } from './views/stix/campaign-view/campaign-view.
 import { DataComponentViewComponent } from './views/stix/data-component-view/data-component-view.component';
 import { DataSourceViewComponent } from './views/stix/data-source-view/data-source-view.component';
 import { GroupViewComponent } from './views/stix/group-view/group-view.component';
+import { IdentityViewComponent } from './views/stix/identity-view/identity-view.component';
 import { MarkingDefinitionViewComponent } from './views/stix/marking-definition-view/marking-definition-view.component';
 import { MatrixFlatComponent } from './views/stix/matrix/matrix-flat/matrix-flat.component';
 import { MatrixSideComponent } from './views/stix/matrix/matrix-side/matrix-side.component';
@@ -227,6 +242,14 @@ import { DictionaryPropertyComponent } from './components/stix/dictionary-proper
 import { DictionaryEditComponent } from './components/stix/dictionary-property/dictionary-edit/dictionary-edit.component';
 import { DictionaryViewComponent } from './components/stix/dictionary-property/dictionary-view/dictionary-view.component';
 import { DictionaryDiffComponent } from './components/stix/dictionary-property/dictionary-diff/dictionary-diff.component';
+import { StixPageTabsComponent } from './components/stix/stix-page-tabs/stix-page-tabs.component';
+import { ReleaseManagementComponent } from './views/dashboard-page/release-management/release-management.component';
+import { ReleaseTrackCardComponent } from './components/release-track-card/release-track-card.component';
+import { ReleaseTrackObjectCardComponent } from './components/release-track-object-card/release-track-object-card.component';
+import { NewTrackDialogComponent } from './components/new-track-dialog/new-track-dialog.component';
+import { ReleaseTrackPageComponent } from './views/dashboard-page/release-management/release-track-page/release-track-page.component';
+import { StatusChipComponent } from './components/status-chip/status-chip.component';
+import { WorkbenchChipComponent } from './components/workbench-chip/workbench-chip.component';
 
 export function initConfig(appConfigService: AppConfigService) {
   return () => appConfigService.loadAppConfig();
@@ -236,6 +259,7 @@ export function initConfig(appConfigService: AppConfigService) {
   declarations: [
     AppComponent,
     HeaderComponent,
+    NavigationComponent,
     FooterComponent,
     LoadingOverlayComponent,
     ToolbarComponent,
@@ -246,11 +270,16 @@ export function initConfig(appConfigService: AppConfigService) {
     MarkdownViewDialogComponent,
     CollectionImportSummaryComponent,
     SaveDialogComponent,
+    WorkflowStatusDialogComponent,
     AddDialogComponent,
     DeleteDialogComponent,
     HistoryTimelineComponent,
+    MembershipSectionComponent,
     ReferenceSidebarComponent,
     ReferenceEditDialogComponent,
+    ReleasePreviewDialogComponent,
+    ReleaseVersionDialogComponent,
+    SnapshotDescriptionDialogComponent,
     MultipleChoiceDialogComponent,
     ValidationResultsComponent,
     AddRelationshipButtonComponent,
@@ -284,12 +313,18 @@ export function initConfig(appConfigService: AppConfigService) {
     DatepickerPropertyComponent,
     IconViewComponent,
     LandingPageComponent,
+    AllObjectsPageComponent,
+    StixPageTabsComponent,
     HelpPageComponent,
     DashboardPageComponent,
     DataQualityComponent,
     OrgSettingsPageComponent,
     UserAccountsPageComponent,
     DefaultMarkingDefinitionsComponent,
+    ValidationBypassesComponent,
+    ValidationBypassRuleDialogComponent,
+    AllowedValuesComponent,
+    AllowedValueDialogComponent,
     ProfilePageComponent,
     ReferenceManagerComponent,
     StixDialogComponent,
@@ -323,11 +358,13 @@ export function initConfig(appConfigService: AppConfigService) {
     OrderedListViewComponent,
     OrderedListEditComponent,
     NotesEditorComponent,
+    ReleaseReviewDialogComponent,
     ObjectStatusComponent,
     RecentActivityComponent,
     IdentityPropertyComponent,
     DataSourceViewComponent,
     DataComponentViewComponent,
+    IdentityViewComponent,
     MarkingDefinitionViewComponent,
     CampaignViewComponent,
     CitationPropertyComponent,
@@ -372,11 +409,16 @@ export function initConfig(appConfigService: AppConfigService) {
     DictionaryEditComponent,
     DictionaryViewComponent,
     DictionaryDiffComponent,
+    ReleaseManagementComponent,
+    NewTrackDialogComponent,
+    ReleaseTrackPageComponent,
+    StatusChipComponent,
   ],
   exports: [
     MatToolbarModule,
     MatButtonModule,
     MatSidenavModule,
+    MatSlideToggleModule,
     MatIconModule,
     MatTableModule,
     MatSortModule,
@@ -394,6 +436,7 @@ export function initConfig(appConfigService: AppConfigService) {
     MatSelectModule,
     MatExpansionModule,
     MatCheckboxModule,
+    MatSlideToggleModule,
     MatRadioModule,
     MatProgressSpinnerModule,
     MatMenuModule,
@@ -405,6 +448,7 @@ export function initConfig(appConfigService: AppConfigService) {
   ],
   bootstrap: [AppComponent],
   imports: [
+    VirtualSnapshotContentsComponent,
     MarkdownModule.forRoot({
       loader: HttpClient,
     }),
@@ -413,7 +457,6 @@ export function initConfig(appConfigService: AppConfigService) {
       disableConsoleLogging: false,
     }),
     MtxPopoverModule,
-    NgxJdenticonModule,
     AutosizeModule,
     BrowserModule,
     AppRoutingModule,
@@ -422,6 +465,7 @@ export function initConfig(appConfigService: AppConfigService) {
     MatToolbarModule,
     MatButtonModule,
     MatSidenavModule,
+    MatSlideToggleModule,
     MatIconModule,
     MatTableModule,
     MatSortModule,
@@ -441,6 +485,7 @@ export function initConfig(appConfigService: AppConfigService) {
     MatSelectModule,
     MatExpansionModule,
     MatCheckboxModule,
+    MatSlideToggleModule,
     MatRadioModule,
     MatProgressSpinnerModule,
     MatMenuModule,
@@ -454,6 +499,10 @@ export function initConfig(appConfigService: AppConfigService) {
     ClipboardModule,
     OverlayModule,
     MatAutocompleteModule,
+    UserAvatarComponent,
+    WorkbenchChipComponent,
+    ReleaseTrackCardComponent,
+    ReleaseTrackObjectCardComponent,
   ],
   providers: [
     AppConfigService,
@@ -461,20 +510,6 @@ export function initConfig(appConfigService: AppConfigService) {
       const initializerFn = initConfig(inject(AppConfigService));
       return initializerFn();
     }),
-    {
-      provide: JDENTICON_CONFIG,
-      useValue: {
-        lightness: {
-          color: [0.35, 0.6],
-          grayscale: [0.35, 0.6],
-        },
-        saturation: {
-          color: 0.5,
-          grayscale: 0.5,
-        },
-        backColor: '#0000',
-      },
-    },
     {
       provide: HTTP_INTERCEPTORS,
       useClass: AuthInterceptor,

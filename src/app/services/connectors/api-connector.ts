@@ -14,7 +14,9 @@ export abstract class ApiConnector {
    */
   private errorSnack(error: any) {
     // show error field if it's a string (for some error's it's a string, for some it's an Object)
-    if ('error' in error && typeof error.error == 'string')
+    if ('error' in error && typeof error.error?.message == 'string')
+      this.snack(error.error.message, 'warn');
+    else if ('error' in error && typeof error.error == 'string')
       this.snack(error.error, 'warn');
     // otherwise, try showing the message
     else if ('message' in error) this.snack(error.message, 'warn');
@@ -63,7 +65,7 @@ export abstract class ApiConnector {
    */
   private snack(message: string, snackType?: 'warn' | 'success'): void {
     this.theSnackbar.open(message, 'dismiss', {
-      duration: 2000,
+      duration: snackType === 'warn' ? 6000 : 2000,
       panelClass: snackType,
     });
   }

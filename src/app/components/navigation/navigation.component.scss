@@ -1,0 +1,263 @@
+@use 'sass:color';
+@use '../../../style/globals';
+@use '../../../style/colors' as colors;
+
+$nav-background: color.mix(
+  colors.color(mitre-navy),
+  colors.color(mitre-black),
+  30%
+);
+$nav-parent-selected: colors.color(secondary);
+$nav-stroke: color.mix(
+  colors.color(mitre-navy),
+  colors.color(mitre-silver),
+  44%
+);
+$nav-text: color.mix(colors.color(mitre-navy), colors.color(mitre-silver), 8%);
+$nav-text-muted: rgba($nav-text, 0.82);
+$nav-child-text: rgba(colors.color(mitre-silver), 0.72);
+$nav-child-text-hover: colors.color(mitre-silver);
+$nav-hover: rgba(colors.color(mitre-silver), 0.1);
+$nav-active: rgba(colors.color(mitre-silver), 0.16);
+
+.app-nav-drawer {
+  background: $nav-background;
+}
+
+.app-navigation {
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  width: 286px;
+  height: 100%;
+  padding: 0 14px 20px;
+  overflow-y: auto;
+  background: $nav-background;
+  border-right: 1px solid rgba(colors.color(mitre-silver), 0.2);
+  color: $nav-text-muted;
+}
+
+.app-title {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  margin: 0 -14px;
+  padding: 15px 0;
+  background: $nav-background;
+  border-bottom: 1px solid rgba(colors.color(mitre-silver), 0.14);
+  text-align: center;
+
+  a {
+    @extend .heading;
+
+    border-bottom-width: 0 !important;
+    color: $nav-text !important;
+    font-size: 22px;
+    letter-spacing: 0.8px;
+
+    &:hover {
+      color: colors.color(mitre-silver) !important;
+    }
+  }
+}
+
+.nav-area,
+.nav-link {
+  display: flex;
+  align-items: center;
+  box-sizing: border-box;
+  min-width: 0;
+  text-decoration: none;
+}
+
+.nav-area {
+  flex: 0 0 46px;
+  gap: 10px;
+  height: 46px;
+  margin-bottom: 7px;
+  padding: 0 18px;
+  border: 2px solid transparent !important;
+  border-radius: 8px;
+  background: transparent;
+  color: rgba(colors.color(mitre-silver), 0.86);
+  font-weight: 500;
+
+  span {
+    color: inherit;
+  }
+
+  .mat-icon {
+    width: 18px;
+    height: 18px;
+    color: rgba(colors.color(mitre-silver), 0.68);
+    font-size: 18px;
+  }
+
+  &:hover {
+    border-color: rgba(colors.color(mitre-silver), 0.18) !important;
+    background: $nav-hover;
+    color: colors.color(mitre-silver) !important;
+
+    .mat-icon {
+      color: colors.color(mitre-silver);
+    }
+  }
+
+  &.active {
+    border-color: rgba($nav-parent-selected, 0.6) !important;
+    background: rgba($nav-parent-selected, 0.12);
+    color: colors.color(mitre-light-blue) !important;
+    // color: colors.color(mitre-silver) !important;
+
+    .mat-icon {
+      // color: colors.color(mitre-silver);
+      color: colors.color(mitre-light-blue);
+    }
+  }
+
+  &.disabled {
+    cursor: default;
+    opacity: 0.42;
+  }
+}
+
+.nav-attention-dot,
+.nav-attention-count {
+  flex: 0 0 auto;
+  background: colors.color(pending);
+}
+
+.nav-attention-dot {
+  width: 9px;
+  height: 9px;
+  margin-left: auto;
+  border-radius: 50%;
+  box-shadow: 0 0 0 2px rgba(colors.color(pending), 0.18);
+}
+
+.nav-attention-count {
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  color: colors.color(mitre-black) !important;
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 18px;
+  text-align: center;
+}
+
+.app-title + .nav-area {
+  margin-top: 14px;
+}
+
+.nav-section {
+  flex: 0 0 auto;
+  margin-top: 8px;
+}
+
+.nav-area-children {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  flex: 0 0 auto;
+  margin-bottom: 12px;
+
+  &::before {
+    position: absolute;
+    top: -5px;
+    bottom: 8px;
+    left: 24px;
+    width: 1px;
+    background: rgba(colors.color(mitre-silver), 0.42);
+    content: '';
+  }
+
+  .nav-link {
+    margin-left: 40px;
+    padding-left: 16px;
+  }
+}
+
+.nav-section-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  box-sizing: border-box;
+  width: 100%;
+  flex: 0 0 30px;
+  height: 30px;
+  padding: 0 18px 0 56px;
+  border: 0;
+  background: transparent;
+  color: $nav-child-text;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 650;
+  letter-spacing: 0.8px;
+  text-align: left;
+  text-transform: uppercase;
+
+  span {
+    color: colors.color(mitre-light-blue);
+  }
+
+  &:hover {
+    color: $nav-child-text-hover;
+  }
+
+  .mat-icon {
+    width: 16px;
+    height: 16px;
+    font-size: 16px;
+  }
+}
+
+.nav-section-items {
+  display: flex;
+  flex-direction: column;
+}
+
+.nav-link {
+  flex: 0 0 auto;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 34px;
+  padding: 0 18px 0 56px;
+  border-bottom: 0 !important;
+  border-radius: 6px;
+  color: $nav-child-text;
+  font-size: 13.5px;
+  font-weight: 400;
+  line-height: 18px;
+
+  span {
+    color: inherit;
+  }
+
+  &:hover {
+    color: $nav-child-text-hover !important;
+  }
+
+  &.active {
+    background: $nav-hover;
+    color: colors.color(mitre-silver) !important;
+  }
+
+  &.disabled {
+    cursor: default;
+    opacity: 0.42;
+  }
+
+  &.deprecated {
+    color: rgba(colors.color(mitre-silver), 0.5);
+  }
+
+  .mat-icon {
+    width: 16px;
+    height: 16px;
+    color: colors.color(warn);
+    font-size: 16px;
+  }
+}

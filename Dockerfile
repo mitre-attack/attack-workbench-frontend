@@ -7,6 +7,14 @@ COPY . .
 
 ARG TARGETOS
 ARG TARGETARCH
+ARG VERSION=dev
+ARG BUILDTIME=unknown
+ARG REVISION=unknown
+
+# Make the OCI build metadata available while Angular's static assets are built.
+ENV APP_VERSION=${VERSION} \
+    GIT_COMMIT=${REVISION} \
+    BUILD_DATE=${BUILDTIME}
 
 # Install dependencies
 RUN npm install --cpu ${TARGETARCH} --os ${TARGETOS}
@@ -30,9 +38,9 @@ ENV APP_VERSION=$VERSION \
 # Set Docker labels
 LABEL org.opencontainers.image.title="ATT&CK Workbench Frontend Service" \
     org.opencontainers.image.description="This Docker image contains the frontend service of the ATT&CK Workbench, an application for exploring, creating, annotating, and sharing extensions of the MITRE ATT&CK® knowledge base. The service handles the storage, querying, and editing of ATT&CK objects. It is an Angular SPA served by an Nginx reverse proxy." \
-    org.opencontainers.image.source="https://github.com/center-for-threat-informed-defense/attack-workbench-frontend" \
-    org.opencontainers.image.documentation="https://github.com/center-for-threat-informed-defense/attack-workbench-frontend/README.md" \
-    org.opencontainers.image.url="https://ghcr.io/center-for-threat-informed-defense/attack-workbench-frontend" \
+    org.opencontainers.image.source="https://github.com/mitre-attack/attack-workbench-frontend" \
+    org.opencontainers.image.documentation="https://github.com/mitre-attack/attack-workbench-frontend/README.md" \
+    org.opencontainers.image.url="https://ghcr.io/mitre-attack/attack-workbench-frontend" \
     org.opencontainers.image.vendor="The MITRE Corporation" \
     org.opencontainers.image.licenses="Apache-2.0" \
     org.opencontainers.image.authors="MITRE ATT&CK<attack@mitre.org>" \

@@ -57,6 +57,14 @@
             "browser": "src/main.ts"
           },
           "configurations": {
+            "snapshot-preview": {
+              "fileReplacements": [
+                {
+                  "replace": "src/environments/environment.ts",
+                  "with": "src/environments/environment.snapshot-preview.ts"
+                }
+              ]
+            },
             "production": {
               "fileReplacements": [
                 {
@@ -73,7 +81,7 @@
                 {
                   "type": "initial",
                   "maximumWarning": "3mb",
-                  "maximumError": "5mb"
+                  "maximumError": "6mb"
                 },
                 {
                   "type": "anyComponentStyle",
@@ -98,6 +106,10 @@
             "buildTarget": "app:build"
           },
           "configurations": {
+            "snapshot-preview": {
+              "buildTarget": "app:build:snapshot-preview",
+              "proxyConfig": "scripts/snapshot-preview.proxy.json"
+            },
             "production": {
               "buildTarget": "app:build:production"
             }

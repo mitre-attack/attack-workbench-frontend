@@ -1,0 +1,35 @@
+@use '../../../../../style/globals';
+
+.validation-bypass-rule-dialog {
+  .form-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap: 16px;
+    row-gap: 8px;
+    min-width: min(42em, 80vw);
+  }
+
+  .full-width,
+  .toggle-row {
+    grid-column: 1 / -1;
+  }
+
+  .toggle-row {
+    min-height: 48px;
+    display: flex;
+    align-items: center;
+  }
+
+  textarea {
+    resize: vertical;
+  }
+}
+
+@media (max-width: 720px) {
+  .validation-bypass-rule-dialog {
+    .form-grid {
+      grid-template-columns: 1fr;
+      min-width: 0;
+    }
+  }
+}

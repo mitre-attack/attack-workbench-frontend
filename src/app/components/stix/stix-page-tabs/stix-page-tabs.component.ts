@@ -1,0 +1,33 @@
+import { ViewEncapsulation } from '@angular/core';
+import {
+  Component,
+  EventEmitter,
+  Input,
+  Output,
+  TemplateRef,
+} from '@angular/core';
+import { StixViewConfig } from 'src/app/views/stix/stix-view-page';
+
+interface CustomTab {
+  label: string;
+  template: TemplateRef<any>;
+}
+
+@Component({
+  selector: 'app-stix-page-tabs',
+  templateUrl: './stix-page-tabs.component.html',
+  styleUrls: ['./stix-page-tabs.component.scss'],
+  standalone: false,
+  encapsulation: ViewEncapsulation.None,
+})
+export class StixPageTabsComponent {
+  @Input() config!: StixViewConfig;
+  @Input() detailsTemplate!: TemplateRef<any>;
+  /** Label of the details tab; pages whose first tab is not a plain details view override it. */
+  @Input() detailsLabel = 'Details';
+  @Input() customTabs: CustomTab[] = [];
+  @Input() showHistory = true;
+  @Input() showNotes = true;
+  @Input() showMembership = true;
+  @Output() selectedIndexChange = new EventEmitter<number>();
+}

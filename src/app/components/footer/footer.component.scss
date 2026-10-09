@@ -1,8 +1,22 @@
 @use '../../../style/globals';
+@use '../../../style/colors' as colors;
+
+:host {
+  display: block;
+  margin-top: auto;
+  padding-top: 16px;
+}
+
 .footer {
-  height: 48px;
+  padding: 12px 18px 0;
+  border-top: 1px solid rgba(colors.color(mitre-silver), 0.2);
+
   .version-info {
     @extend .text-label;
-    opacity: 0.6;
+
+    color: rgba(colors.color(mitre-silver), 0.62);
+    font-size: 11px;
+    line-height: 18px;
+    white-space: nowrap;
   }
 }

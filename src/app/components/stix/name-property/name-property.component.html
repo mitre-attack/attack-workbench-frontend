@@ -1,5 +1,6 @@
 <div class="name-property">
   <div *ngIf="!config.mode || config.mode === 'view'">
+    <!-- obj name -->
     <h1 class="lowercase">
       <span *ngIf="config.parent">
         <a class="external-link" [href]="internalParentLink" target="_blank">{{
@@ -8,9 +9,100 @@
         >:&nbsp;
       </span>
       {{ config.object[field] }}
-      <app-icon-view
-        [config]="{ object: config.object, field: 'workflow' }"></app-icon-view>
     </h1>
+
+    <!-- copy stix id -->
+    <div *ngIf="showWorkflowControl" class="workflow-control-row">
+      <button
+        mat-button
+        type="button"
+        class="workflow-action-button stix-id-copy-button"
+        [cdkCopyToClipboard]="object.stixID"
+        (click)="
+          snackbar.open('STIX ID copied to clipboard', null, {
+            duration: 1000,
+          })
+        "
+        aria-label="Copy STIX ID">
+        <mat-icon>content_copy</mat-icon>
+        <span>Copy STIX ID</span>
+      </button>
+
+      <!-- update workflow status -->
+      <span
+        matTooltip="Add this object to a release track to submit it for review"
+        [matTooltipDisabled]="loadingTracks || hasTracks">
+        <button
+          mat-button
+          type="button"
+          class="workflow-action-button workflow-trigger"
+          [disabled]="!loadingTracks && !hasTracks"
+          [matMenuTriggerFor]="workflowStatusMenu"
+          #workflowTriggerButton
+          #workflowMenuTrigger="matMenuTrigger"
+          aria-label="Submit object for review">
+          <mat-icon>assignment_ind</mat-icon>
+          <span>Submit for Review</span>
+        </button>
+      </span>
+
+      <mat-menu
+        #workflowStatusMenu="matMenu"
+        class="workflow-status-menu-panel"
+        xPosition="after"
+        yPosition="below">
+        <div class="workflow-status-menu">
+          <h3 class="workflow-menu-title">Object Release Tracks</h3>
+
+          <div *ngIf="loadingTracks" class="workflow-menu-empty">
+            Loading release tracks...
+          </div>
+
+          <div
+            *ngIf="!loadingTracks && hasTracks; else noReleaseTracks"
+            class="workflow-menu-track-list">
+            <section
+              *ngFor="let rt of trackStatuses"
+              class="workflow-menu-track">
+              <div class="workflow-menu-track-header">
+                <div>
+                  <h4>{{ rt.name }}</h4>
+                  <p *ngIf="rt.description">
+                    {{ rt.description }}
+                  </p>
+                </div>
+                <app-status-chip
+                  class="workflow-menu-state-chip"
+                  [status]="rt.status"></app-status-chip>
+              </div>
+
+              <div
+                class="workflow-menu-actions"
+                aria-label="Release track workflow status options">
+                <button
+                  *ngFor="let action of statusActions"
+                  type="button"
+                  [class]="'workflow-option-' + action.modifier"
+                  [class.active]="isStatusActive(rt, action.status)"
+                  [disabled]="isStatusDisabled(rt, action.status)"
+                  (click)="
+                    openStatusDialog(action.status, workflowMenuTrigger, rt)
+                  ">
+                  {{ action.label }}
+                </button>
+              </div>
+            </section>
+          </div>
+
+          <ng-template #noReleaseTracks>
+            <div *ngIf="!loadingTracks" class="workflow-menu-empty">
+              No active release track status found.
+            </div>
+          </ng-template>
+        </div>
+      </mat-menu>
+    </div>
+
     <h3 class="status">
       <span class="error-text" *ngIf="config.object['deprecated']"
         >deprecated</span

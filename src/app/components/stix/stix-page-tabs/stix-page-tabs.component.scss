@@ -1,0 +1,24 @@
+@use '../../../../style/colors.scss';
+@use '../../../../style/globals.scss';
+
+.stix-page-tabs {
+  .mat-mdc-tab-header {
+    .dark & {
+      border-bottom: 1px solid colors.border-color(dark) !important;
+    }
+    .light & {
+      border-bottom: 1px solid colors.border-color(light) !important;
+    }
+  }
+  .nav-tab-label {
+    font-family: Roboto, Arial, sans-serif;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    display: inline-block;
+  }
+
+  .details-tpl-wrapper {
+    margin-top: 20px;
+  }
+}

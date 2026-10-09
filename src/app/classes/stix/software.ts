@@ -3,13 +3,13 @@ import { RestApiConnectorService } from 'src/app/services/connectors/rest-api/re
 import { ValidationData } from '../serializable';
 import { StixObject } from './stix-object';
 import { logger } from '../../utils/logger';
-import { WorkflowState } from 'src/app/utils/types';
+import { WorkflowStatusType } from 'src/app/utils/types';
 
 type type_software = 'malware' | 'tool';
 export class Software extends StixObject {
   public name = '';
   public description: string;
-  public aliases: string[] = ['placeholder']; // initialize field with placeholder in first index for software name
+  public aliases: string[] = [];
   public platforms: string[] = [];
   public type: string;
   public contributors: string[] = [];
@@ -142,7 +142,7 @@ export class Software extends StixObject {
    */
   public validate(
     restAPIService: RestApiConnectorService,
-    tempWorkflowState?: WorkflowState
+    tempWorkflowState?: WorkflowStatusType
   ): Observable<ValidationData> {
     return this.base_validate(restAPIService, tempWorkflowState);
   }
@@ -153,8 +153,6 @@ export class Software extends StixObject {
    * @returns {Observable} of the post
    */
   public save(restAPIService: RestApiConnectorService): Observable<Software> {
-    // update first index of aliases field to software name
-    this.aliases[0] = this.name;
     const postObservable = restAPIService.postSoftware(this);
     const subscription = postObservable.subscribe({
       next: result => {
@@ -197,5 +195,23 @@ export class Software extends StixObject {
       },
     });
     return putObservable;
+  }
+
+  /**
+   * Revoke the STIX object in the database.
+   * @param restAPIService [RestApiConnectorService] the service to perform the revoke through
+   * @param revokingObject the revoking object payload
+   * @returns {Observable} of the revoke
+   */
+  public revoke(
+    restAPIService: RestApiConnectorService,
+    revokingObject: { revoking: { stixId: string; modified: string } },
+    preserveRelationships = false
+  ): Observable<object> {
+    return restAPIService.revokeSoftware(
+      this.stixID,
+      revokingObject,
+      preserveRelationships
+    );
   }
 }

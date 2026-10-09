@@ -1,0 +1,190 @@
+@use 'sass:color';
+@use '../../../style/colors';
+
+$candidate-dark: colors.color(mitre-light-blue);
+$staged-dark: color.mix(white, colors.color(success), 28%);
+$description-line-height: 1.25rem;
+$description-lines: 4;
+
+.list-card {
+  cursor: pointer;
+  width: 22rem;
+  height: 19rem;
+  box-sizing: border-box;
+  color: colors.on-color-emphasis(light);
+}
+
+.card-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  min-height: 3.5rem;
+  margin-bottom: 8px;
+}
+
+.subheading {
+  display: -webkit-box;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.release-track-type-chip {
+  flex: none;
+}
+
+.card-body {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.card-desc {
+  display: -webkit-box;
+  flex: 0 0 ($description-line-height * $description-lines);
+  min-width: 0;
+  max-height: $description-line-height * $description-lines;
+  margin-bottom: 12px;
+  overflow: hidden;
+  line-height: $description-line-height;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: $description-lines;
+}
+
+.card-middle {
+  margin-top: auto;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  align-items: stretch;
+  min-height: 4.5rem;
+}
+
+.card-stats {
+  display: flex;
+  gap: 1rem;
+  width: 100%;
+  justify-content: flex-start;
+  align-items: center;
+  min-height: 3.25rem;
+  padding: 12px 16px;
+  box-sizing: border-box;
+  background: colors.color-alternate(light);
+  border-radius: 8px;
+}
+
+.stat {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  flex: 1;
+  text-align: center;
+}
+
+.card-standard,
+.card-virtual {
+  border-radius: 8px;
+  padding: 24px;
+  min-height: 12rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  background: colors.color(light);
+  border: 1px solid colors.border-color(light);
+  color: colors.on-color-emphasis(light);
+  overflow: hidden;
+  transition:
+    background-color 120ms ease,
+    border-color 120ms ease,
+    color 120ms ease;
+
+  &:hover {
+    border-color: colors.color(secondary);
+
+    .subheading {
+      color: colors.color(secondary);
+    }
+  }
+
+  .stat-label {
+    font-size: 11px;
+    color: colors.on-color-deemphasis(light);
+    line-height: 13px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-bottom: 6px;
+  }
+
+  .stat-value {
+    font-weight: 700;
+    font-size: 1.25rem;
+  }
+
+  .candidates-stat-value {
+    color: colors.color(info);
+  }
+
+  .staged-stat-value {
+    color: colors.color(success);
+  }
+
+  .card-sep {
+    margin: 12px 0;
+    border-top-color: colors.border-color(light);
+  }
+
+  .card-footer {
+    display: flex;
+    justify-content: space-between;
+    color: colors.on-color-deemphasis(light);
+    font-size: 13px;
+  }
+}
+
+:host-context(.dark) {
+  .list-card {
+    color: colors.on-color-emphasis(dark);
+  }
+
+  .card-stats {
+    background: colors.color-alternate(dark);
+  }
+
+  .card-standard,
+  .card-virtual {
+    background: colors.color(dark);
+    border-color: colors.border-color(dark);
+    color: colors.on-color-emphasis(dark);
+
+    &:hover {
+      border-color: colors.color(mitre-light-blue);
+
+      .subheading {
+        color: colors.color(mitre-light-blue);
+      }
+    }
+
+    .stat-label,
+    .card-footer {
+      color: colors.on-color-deemphasis(dark);
+    }
+
+    .candidates-stat-value {
+      color: $candidate-dark;
+    }
+
+    .staged-stat-value {
+      color: $staged-dark;
+    }
+
+    .card-sep {
+      border-top-color: colors.border-color(dark);
+    }
+  }
+}

@@ -9,3 +9,57 @@
 hr {
   margin-bottom: 30px;
 }
+
+.mitre-identity-write-setting {
+  align-items: center;
+  display: flex;
+  gap: 24px;
+  justify-content: space-between;
+
+  p {
+    margin: 0;
+    max-width: 760px;
+  }
+}
+
+.mitre-identity-write-controls {
+  align-items: center;
+  display: flex;
+  flex-shrink: 0;
+  gap: 16px;
+}
+
+.mitre-identity-write-controls .mat-mdc-slide-toggle.toggle-enabled {
+  --mdc-switch-selected-focus-handle-color: #ffffff;
+  --mdc-switch-selected-focus-state-layer-color: #2e7d32;
+  --mdc-switch-selected-focus-track-color: #2e7d32;
+  --mdc-switch-selected-handle-color: #ffffff;
+  --mdc-switch-selected-hover-handle-color: #ffffff;
+  --mdc-switch-selected-hover-state-layer-color: #2e7d32;
+  --mdc-switch-selected-hover-track-color: #2e7d32;
+  --mdc-switch-selected-pressed-handle-color: #ffffff;
+  --mdc-switch-selected-pressed-state-layer-color: #2e7d32;
+  --mdc-switch-selected-pressed-track-color: #2e7d32;
+  --mdc-switch-selected-track-color: #2e7d32;
+}
+
+.mitre-identity-write-controls .mat-mdc-slide-toggle.toggle-disabled {
+  --mdc-switch-unselected-focus-handle-color: #ffffff;
+  --mdc-switch-unselected-focus-state-layer-color: #c62828;
+  --mdc-switch-unselected-focus-track-color: #c62828;
+  --mdc-switch-unselected-handle-color: #ffffff;
+  --mdc-switch-unselected-hover-handle-color: #ffffff;
+  --mdc-switch-unselected-hover-state-layer-color: #c62828;
+  --mdc-switch-unselected-hover-track-color: #c62828;
+  --mdc-switch-unselected-pressed-handle-color: #ffffff;
+  --mdc-switch-unselected-pressed-state-layer-color: #c62828;
+  --mdc-switch-unselected-pressed-track-color: #c62828;
+  --mdc-switch-unselected-track-color: #c62828;
+}
+
+@media (max-width: 760px) {
+  .mitre-identity-write-setting {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}

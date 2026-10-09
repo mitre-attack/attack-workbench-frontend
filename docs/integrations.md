@@ -95,7 +95,7 @@ To allow Navigator to access your Workbench data, you must enable basic API key 
     JSON_CONFIG_PATH=/some/path/to/rest-api-service-config.json
     ```
 
-    Make sure this path points to your actual configuration file. For more details on configuring the REST API, see the [Usage Documentation: Configuration](https://github.com/center-for-threat-informed-defense/attack-workbench-rest-api/blob/main/USAGE.md#configuration).
+    Make sure this path points to your actual configuration file. For more details on configuring the REST API, see the [Usage Documentation: Configuration](https://github.com/mitre-attack/attack-workbench-rest-api/blob/main/USAGE.md#configuration).
 
 2. In your REST API config file, add a `basicApikey` section to the `serviceAuthn` block, specifying a service account for Navigator. Example:
 
@@ -116,7 +116,7 @@ To allow Navigator to access your Workbench data, you must enable basic API key 
     }
     ```
 
-    For more example configurations, see the [sample REST API configuration files](https://github.com/center-for-threat-informed-defense/attack-workbench-rest-api/tree/main/resources/sample-configurations). For more details on Service Authentication, see the [REST API Service Authentication documentation](https://github.com/center-for-threat-informed-defense/attack-workbench-rest-api/blob/main/docs/legacy/authentication.md#service-authentication).
+    For more example configurations, see the [sample REST API configuration files](https://github.com/mitre-attack/attack-workbench-rest-api/tree/main/resources/sample-configurations). For more details on Service Authentication, see the [REST API Service Authentication documentation](https://github.com/mitre-attack/attack-workbench-rest-api/blob/main/docs/legacy/authentication.md#service-authentication).
 
 ### 4. Serve the application
 

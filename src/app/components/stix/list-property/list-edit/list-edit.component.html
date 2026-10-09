@@ -58,10 +58,12 @@
           </mat-chip>
         </mat-chip-listbox>
       </mat-select-trigger>
+      @let enabledValues = getEnabledValues();
       <mat-option
-        *ngFor="let item of getAllowedValues()"
+        *ngFor="let item of getAllowedValues(enabledValues)"
         (onSelectionChange)="change($event)"
         [value]="item"
+        [disabled]="!enabledValues.has(item)"
         >{{ item }}</mat-option
       >
     </mat-select>

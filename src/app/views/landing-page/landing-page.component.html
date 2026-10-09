@@ -53,18 +53,4 @@
       </div>
     </div>
   </div>
-  <div class="row" *ngIf="isAdmin || isTeamLead">
-    <div class="col center admin-link">
-      <div class="text-deemphasis text-label">
-        <a
-          class="a"
-          routerLink="/dashboard"
-          [matBadge]="pendingUsers"
-          matBadgeDescription="pending users"
-          matBadgeOverlap="false"
-          >dashboard</a
-        >
-      </div>
-    </div>
-  </div>
 </div>

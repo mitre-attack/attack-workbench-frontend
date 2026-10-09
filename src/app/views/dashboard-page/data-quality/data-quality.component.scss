@@ -30,6 +30,39 @@
   }
 }
 
+.data-quality-note {
+  margin: 0 0 16px;
+  opacity: 0.85;
+}
+
+.dq-domain-table-wrapper {
+  overflow-x: auto;
+  margin-bottom: 24px;
+}
+
+.dq-domain-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.95rem;
+
+  th,
+  td {
+    text-align: left;
+    padding: 8px 12px;
+    border-bottom: 1px solid rgba(128, 128, 128, 0.3);
+    vertical-align: top;
+  }
+
+  th {
+    font-weight: 600;
+  }
+
+  .dq-object-name {
+    display: block;
+    opacity: 0.8;
+  }
+}
+
 .missing-list {
   .missing-id {
     font-family: Roboto, Arial, sans-serif;

@@ -1,0 +1,128 @@
+<div class="validation-bypasses-page list-page grid spacing-20">
+  <div class="list-page-header">
+    <h1>ADM Validation Bypasses</h1>
+    <div class="button-group">
+      <button
+        mat-raised-button
+        class="extended-button"
+        color="primary"
+        (click)="createRule()">
+        <mat-icon>add</mat-icon>
+        <span class="text-label">create rule</span>
+      </button>
+    </div>
+  </div>
+
+  <div class="table-container">
+    <div class="controls">
+      <div class="input-group">
+        <mat-form-field class="search" appearance="fill">
+          <mat-label>search</mat-label>
+          <input matInput (keyup)="applySearch($event.target.value)" />
+        </mat-form-field>
+      </div>
+    </div>
+
+    <div class="scroll-container" *ngIf="!loadingRules; else loading">
+      <table
+        mat-table
+        matSort
+        *ngIf="dataSource.data.length > 0; else nothingHere"
+        [dataSource]="dataSource"
+        aria-label="validation bypass rules table">
+        <ng-container matColumnDef="fieldPath">
+          <th scope="col" mat-header-cell mat-sort-header *matHeaderCellDef>
+            Field Path
+          </th>
+          <td mat-cell *matCellDef="let rule" class="path-cell">
+            {{ fieldPath(rule) }}
+          </td>
+        </ng-container>
+
+        <ng-container matColumnDef="errorCode">
+          <th scope="col" mat-header-cell mat-sort-header *matHeaderCellDef>
+            Error Code
+          </th>
+          <td mat-cell *matCellDef="let rule">{{ rule.errorCode }}</td>
+        </ng-container>
+
+        <ng-container matColumnDef="stixType">
+          <th scope="col" mat-header-cell mat-sort-header *matHeaderCellDef>
+            STIX Type
+          </th>
+          <td mat-cell *matCellDef="let rule">{{ rule.stixType }}</td>
+        </ng-container>
+
+        <ng-container matColumnDef="behavior">
+          <th scope="col" mat-header-cell mat-sort-header *matHeaderCellDef>
+            Behavior
+          </th>
+          <td mat-cell *matCellDef="let rule">
+            <span
+              class="behavior-label"
+              [class.inactive]="behavior(rule) === 'inactive'">
+              {{ behavior(rule) }}
+            </span>
+          </td>
+        </ng-container>
+
+        <ng-container matColumnDef="source">
+          <th scope="col" mat-header-cell mat-sort-header *matHeaderCellDef>
+            Source
+          </th>
+          <td mat-cell *matCellDef="let rule">{{ source(rule) }}</td>
+        </ng-container>
+
+        <ng-container matColumnDef="warningMessage">
+          <th scope="col" mat-header-cell mat-sort-header *matHeaderCellDef>
+            Warning Message
+          </th>
+          <td mat-cell *matCellDef="let rule" class="warning-cell">
+            {{ rule.warningMessage || '-' }}
+          </td>
+        </ng-container>
+
+        <ng-container matColumnDef="actions">
+          <th scope="col" mat-header-cell *matHeaderCellDef></th>
+          <td mat-cell *matCellDef="let rule" class="action-cell">
+            <button
+              mat-icon-button
+              matTooltip="Edit rule"
+              aria-label="Edit validation bypass rule"
+              (click)="editRule(rule); $event.stopPropagation()">
+              <mat-icon>edit</mat-icon>
+            </button>
+            <button
+              mat-icon-button
+              matTooltip="Delete rule"
+              aria-label="Delete validation bypass rule"
+              (click)="deleteRule(rule); $event.stopPropagation()">
+              <mat-icon>delete</mat-icon>
+            </button>
+          </td>
+        </ng-container>
+
+        <tr mat-header-row *matHeaderRowDef="columnsToDisplay"></tr>
+        <tr
+          mat-row
+          *matRowDef="let myRowData; columns: columnsToDisplay"
+          class="element-row"></tr>
+      </table>
+      <ng-template #nothingHere>
+        <app-empty-list-marker
+          [message]="'Nothing here'"
+          (onCheckAgain)="loadRules()"></app-empty-list-marker>
+      </ng-template>
+    </div>
+
+    <ng-template #loading>
+      <app-loading-overlay message="loading validation bypass rules">
+      </app-loading-overlay>
+    </ng-template>
+
+    <mat-paginator
+      [pageSizeOptions]="[5, 10, 25, 100]"
+      pageSize="10"
+      [length]="dataSource.filteredData.length"></mat-paginator>
+  </div>
+</div>

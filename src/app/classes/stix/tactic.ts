@@ -4,7 +4,7 @@ import { ValidationData } from '../serializable';
 import { StixObject } from './stix-object';
 import { logger } from '../../utils/logger';
 import { Technique } from './technique';
-import { WorkflowState } from 'src/app/utils/types';
+import { WorkflowStatusType } from 'src/app/utils/types';
 
 export class Tactic extends StixObject {
   public name = '';
@@ -105,7 +105,7 @@ export class Tactic extends StixObject {
    */
   public validate(
     restAPIService: RestApiConnectorService,
-    tempWorkflowState?: WorkflowState
+    tempWorkflowState?: WorkflowStatusType
   ): Observable<ValidationData> {
     return this.base_validate(restAPIService, tempWorkflowState);
   }
@@ -149,5 +149,23 @@ export class Tactic extends StixObject {
       },
     });
     return putObservable;
+  }
+
+  /**
+   * Revoke the STIX object in the database.
+   * @param restAPIService [RestApiConnectorService] the service to perform the revoke through
+   * @param revokingObject the revoking object payload
+   * @returns {Observable} of the revoke
+   */
+  public revoke(
+    restAPIService: RestApiConnectorService,
+    revokingObject: { revoking: { stixId: string; modified: string } },
+    preserveRelationships = false
+  ): Observable<object> {
+    return restAPIService.revokeTactic(
+      this.stixID,
+      revokingObject,
+      preserveRelationships
+    );
   }
 }

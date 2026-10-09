@@ -1,9 +1,13 @@
 import { Component, OnInit } from '@angular/core';
+import { forkJoin } from 'rxjs';
 import { Identity } from 'src/app/classes/stix/identity';
 import {
+  MitreIdentityWrites,
   Namespace,
   RestApiConnectorService,
 } from 'src/app/services/connectors/rest-api/rest-api-connector.service';
+
+const MITRE_IDENTITY_STIX_ID = 'identity--c78cb6e5-0c4b-4611-8297-d1b8b55e40b5';
 
 @Component({
   selector: 'app-org-settings-page',
@@ -13,7 +17,11 @@ import {
 })
 export class OrgSettingsPageComponent implements OnInit {
   public organizationIdentity: Identity;
+  public organizationIdentities: Identity[];
+  public selectedOrganizationIdentityId: string;
   public organizationNamespace: Namespace;
+  public mitreIdentityWrites: MitreIdentityWrites;
+  private savedMitreIdentityWritesEnabled: boolean;
   public idRegex = `^([A-Za-z])*$`;
   public rangeRegex = `^([0-9]){1,4}$`;
 
@@ -29,11 +37,58 @@ export class OrgSettingsPageComponent implements OnInit {
     );
   }
 
+  public get selectedOrganizationIdentity(): Identity {
+    return this.organizationIdentities?.find(
+      identity => identity.stixID === this.selectedOrganizationIdentityId
+    );
+  }
+
+  public get isIdentityUnchanged(): boolean {
+    return (
+      !this.selectedOrganizationIdentityId ||
+      this.selectedOrganizationIdentityId === this.organizationIdentity?.stixID
+    );
+  }
+
+  public get isMitreIdentityWritesUnchanged(): boolean {
+    return (
+      !this.mitreIdentityWrites ||
+      this.mitreIdentityWrites.enabled === this.savedMitreIdentityWritesEnabled
+    );
+  }
+
+  public get hasMitreIdentity(): boolean {
+    return (
+      this.organizationIdentities?.some(
+        identity => identity.stixID === MITRE_IDENTITY_STIX_ID
+      ) ?? false
+    );
+  }
+
   constructor(private restAPIConnector: RestApiConnectorService) {}
 
   ngOnInit(): void {
-    const idSub = this.restAPIConnector.getOrganizationIdentity().subscribe({
-      next: identity => (this.organizationIdentity = identity),
+    const idSub = forkJoin({
+      identity: this.restAPIConnector.getOrganizationIdentity(),
+      identities: this.restAPIConnector.getAllIdentities(),
+    }).subscribe({
+      next: ({ identity, identities }) => {
+        this.organizationIdentity = identity;
+        this.organizationIdentities = identities.data as Identity[];
+        if (
+          !this.organizationIdentities.some(
+            organizationIdentity =>
+              organizationIdentity.stixID === identity.stixID
+          )
+        ) {
+          this.organizationIdentities.push(identity);
+        }
+        this.organizationIdentities.sort((a, b) =>
+          (a.name || a.stixID).localeCompare(b.name || b.stixID)
+        );
+        this.selectedOrganizationIdentityId = identity.stixID;
+        if (this.hasMitreIdentity) this.loadMitreIdentityWrites();
+      },
       complete: () => idSub.unsubscribe(),
     });
 
@@ -52,6 +107,18 @@ export class OrgSettingsPageComponent implements OnInit {
       });
   }
 
+  private loadMitreIdentityWrites(): void {
+    const mitreIdentityWritesSub = this.restAPIConnector
+      .getMitreIdentityWrites()
+      .subscribe({
+        next: mitreIdentityWrites => {
+          this.mitreIdentityWrites = mitreIdentityWrites;
+          this.savedMitreIdentityWritesEnabled = mitreIdentityWrites.enabled;
+        },
+        complete: () => mitreIdentityWritesSub.unsubscribe(),
+      });
+  }
+
   onBlur(): void {
     if (!this.isNOU(this.organizationNamespace.range_start)) {
       this.organizationNamespace.range_start =
@@ -61,9 +128,10 @@ export class OrgSettingsPageComponent implements OnInit {
 
   saveIdentity(): void {
     const subscription = this.restAPIConnector
-      .postIdentity(this.organizationIdentity)
+      .setOrganizationIdentityRef(this.selectedOrganizationIdentityId)
       .subscribe({
-        next: identity => (this.organizationIdentity = identity),
+        next: () =>
+          (this.organizationIdentity = this.selectedOrganizationIdentity),
         complete: () => subscription.unsubscribe(),
       });
   }
@@ -73,6 +141,17 @@ export class OrgSettingsPageComponent implements OnInit {
       .setOrganizationNamespace(this.organizationNamespace)
       .subscribe({
         next: namespace => (this.organizationNamespace = namespace),
+        complete: () => subscription.unsubscribe(),
+      });
+  }
+
+  saveMitreIdentityWrites(): void {
+    const subscription = this.restAPIConnector
+      .setMitreIdentityWrites(this.mitreIdentityWrites.enabled)
+      .subscribe({
+        next: () =>
+          (this.savedMitreIdentityWritesEnabled =
+            this.mitreIdentityWrites.enabled),
         complete: () => subscription.unsubscribe(),
       });
   }

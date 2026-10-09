@@ -1,0 +1,21 @@
+<svg
+  class="user-avatar"
+  [attr.aria-label]="ariaLabel"
+  [attr.height]="size"
+  [attr.viewBox]="'0 0 ' + size + ' ' + size"
+  [attr.width]="size">
+  <circle
+    [attr.cx]="size / 2"
+    [attr.cy]="size / 2"
+    [attr.fill]="background"
+    [attr.r]="size / 2"></circle>
+  <text
+    fill="#ffffff"
+    [attr.font-size]="fontSize"
+    [attr.x]="size / 2"
+    [attr.y]="size / 2"
+    dominant-baseline="central"
+    text-anchor="middle">
+    {{ initials }}
+  </text>
+</svg>

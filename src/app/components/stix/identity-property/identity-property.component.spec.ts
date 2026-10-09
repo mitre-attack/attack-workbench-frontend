@@ -3,6 +3,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 
 import { IdentityPropertyComponent } from './identity-property.component';
+import { UserAvatarComponent } from '../../user-avatar/user-avatar.component';
 import { RestApiConnectorService } from 'src/app/services/connectors/rest-api/rest-api-connector.service';
 import {
   createMockRestApiConnector,
@@ -21,6 +22,7 @@ describe('IdentityPropertyComponent', () => {
 
     await TestBed.configureTestingModule({
       declarations: [IdentityPropertyComponent],
+      imports: [UserAvatarComponent],
       providers: [
         provideHttpClient(),
         { provide: RestApiConnectorService, useValue: mockRestApiConnector },

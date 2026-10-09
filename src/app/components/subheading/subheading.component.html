@@ -2,7 +2,7 @@
 <app-stixid-property
   class="stixid-property grow-to-row"
   [class.editing]="editing"
-  *ngIf="object['stixID']"
+  *ngIf="showStixIdProperty"
   [config]="{
     object: config.object,
   }"></app-stixid-property>
@@ -16,7 +16,6 @@
         *ngIf="object.hasOwnProperty('modified')"
         style="border-radius: 16px"
         [disabled]="config.sidebarControl === 'disable'"
-        (click)="openHistory()"
         cdkDrag
         #popoverTrigger2="mtxPopoverTrigger"
         [mtxPopoverTriggerFor]="historyPopover"

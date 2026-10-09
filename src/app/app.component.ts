@@ -1,10 +1,8 @@
 import {
-  AfterViewInit,
   Component,
   ElementRef,
   ViewChild,
   ViewEncapsulation,
-  OnDestroy,
 } from '@angular/core';
 import { MatDrawerContainer } from '@angular/material/sidenav';
 import { OverlayContainer } from '@angular/cdk/overlay';
@@ -25,20 +23,16 @@ import { AppConfigService } from './services/config/app-config.service';
   encapsulation: ViewEncapsulation.None,
   standalone: false,
 })
-export class AppComponent implements AfterViewInit, OnDestroy {
+export class AppComponent {
   // Drawer container to resize when contents change size
   @ViewChild(MatDrawerContainer, { static: true })
   private container: MatDrawerContainer;
 
-  // Elements for scroll behavior
-  @ViewChild('header', { static: false, read: ElementRef })
-  private header: ElementRef;
   @ViewChild('scrollRef', { static: false, read: ElementRef })
   private scrollRef: ElementRef;
 
   public theme;
   public alertStatus;
-  public hiddenHeaderPX = 0; // number of px of the header which is hidden
 
   public get sidebarOpened() {
     return this.sidebarService.opened && this.editorService.sidebarEnabled;
@@ -77,7 +71,7 @@ export class AppComponent implements AfterViewInit, OnDestroy {
           const authSubscription = this.authenticationService
             .getSession()
             .subscribe({
-              next: res => {
+              next: () => {
                 this.checkStatus();
               },
               complete: () => {
@@ -91,25 +85,6 @@ export class AppComponent implements AfterViewInit, OnDestroy {
       },
     });
     initLogger(logger);
-  }
-
-  ngAfterViewInit(): void {
-    // header hiding with scroll
-    this.scrollRef.nativeElement.addEventListener(
-      'scroll',
-      e => this.adjustHeaderPlacement(),
-      true
-    );
-    // to fix rare cases that the page has resized without scroll events triggering, recompute the offset every 5 seconds
-    setInterval(() => this.adjustHeaderPlacement(), 5000);
-  }
-
-  ngOnDestroy(): void {
-    this.scrollRef.nativeElement.removeEventListener(
-      'scroll',
-      e => this.adjustHeaderPlacement(),
-      true
-    );
   }
 
   /**
@@ -198,18 +173,6 @@ export class AppComponent implements AfterViewInit, OnDestroy {
       this.overlayContainer.getContainerElement().classList;
     overlayContainerClasses.remove(Theme.DarkMode, Theme.LightMode);
     overlayContainerClasses.add(this.theme);
-  }
-
-  // adjust the header placement
-  private adjustHeaderPlacement(): void {
-    const headerHeight = this.header.nativeElement.offsetHeight;
-    // constrain amount of hidden to bounds, round up because decimal scroll causes flicker
-    this.hiddenHeaderPX = Math.floor(
-      Math.min(
-        Math.max(0, this.scrollRef.nativeElement.scrollTop / 2),
-        headerHeight
-      )
-    );
   }
 
   // scroll to the top of the main content

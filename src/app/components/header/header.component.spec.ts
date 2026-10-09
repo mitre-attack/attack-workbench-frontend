@@ -1,6 +1,5 @@
 import { NO_ERRORS_SCHEMA } from '@angular/core';
 import { ComponentFixture, TestBed, waitForAsync } from '@angular/core/testing';
-import { ActivatedRoute } from '@angular/router';
 import { provideHttpClient } from '@angular/common/http';
 import { provideRouter } from '@angular/router';
 import { MatToolbarModule } from '@angular/material/toolbar';
@@ -9,13 +8,17 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { NoopAnimationsModule } from '@angular/platform-browser/animations';
-import { of } from 'rxjs';
+import { By } from '@angular/platform-browser';
 
 import { HeaderComponent } from './header.component';
+import { UserAvatarComponent } from '../user-avatar/user-avatar.component';
 import { RestApiConnectorService } from 'src/app/services/connectors/rest-api/rest-api-connector.service';
 import { AuthenticationService } from 'src/app/services/connectors/authentication/authentication.service';
 import { createMockRestApiConnector } from 'src/app/testing/mocks/rest-api-connector.mock';
-import { createMockAuthenticationService } from 'src/app/testing/mocks/authentication-service.mock';
+import {
+  createMockAuthenticationService,
+  createMockUserAccount,
+} from 'src/app/testing/mocks/authentication-service.mock';
 
 describe('HeaderComponent', () => {
   let component: HeaderComponent;
@@ -23,11 +26,15 @@ describe('HeaderComponent', () => {
 
   beforeEach(waitForAsync(() => {
     const mockRestApiConnector = createMockRestApiConnector({});
-    const mockAuthService = createMockAuthenticationService({});
+    const mockAuthService = createMockAuthenticationService({
+      currentUser: createMockUserAccount(),
+      isLoggedIn: true,
+    });
 
     TestBed.configureTestingModule({
       declarations: [HeaderComponent],
       imports: [
+        UserAvatarComponent,
         MatToolbarModule,
         MatMenuModule,
         MatButtonModule,
@@ -39,13 +46,6 @@ describe('HeaderComponent', () => {
         { provide: RestApiConnectorService, useValue: mockRestApiConnector },
         { provide: AuthenticationService, useValue: mockAuthService },
         provideRouter([]),
-        {
-          provide: ActivatedRoute,
-          useValue: {
-            params: of({}),
-            queryParams: of({}),
-          },
-        },
         provideHttpClient(),
       ],
       schemas: [NO_ERRORS_SCHEMA],
@@ -60,5 +60,11 @@ describe('HeaderComponent', () => {
 
   it('should create', () => {
     expect(component).toBeTruthy();
+  });
+
+  it('should show the current user display name in the account trigger', () => {
+    const accountButton = fixture.debugElement.query(By.css('button.account'));
+
+    expect(accountButton.nativeElement.textContent).toContain('Test User');
   });
 });
