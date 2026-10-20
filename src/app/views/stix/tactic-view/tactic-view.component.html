@@ -13,6 +13,14 @@
   <app-stix-page-tabs
     [config]="config"
     [detailsTemplate]="detailsTpl"
+    [detailsFields]="[
+      'attackID',
+      'version',
+      'contributors',
+      'description',
+      'domains',
+      'external_references',
+    ]"
     [customTabs]="[{ label: 'Techniques', template: techniquesTpl }]">
   </app-stix-page-tabs>
 

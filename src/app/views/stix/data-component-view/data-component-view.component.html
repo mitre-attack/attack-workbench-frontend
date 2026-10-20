@@ -11,7 +11,17 @@
     </div>
   </div>
 
-  <app-stix-page-tabs [config]="config" [detailsTemplate]="detailsTpl">
+  <app-stix-page-tabs
+    [config]="config"
+    [detailsTemplate]="detailsTpl"
+    [detailsFields]="[
+      'attackID',
+      'version',
+      'description',
+      'domains',
+      'external_references',
+      'logSources',
+    ]">
   </app-stix-page-tabs>
 
   <ng-template #detailsTpl>
