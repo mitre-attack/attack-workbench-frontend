@@ -65,6 +65,20 @@ Refer to the official [Deployment Guide](https://github.com/mitre-attack/attack-
 
 > **Note:** Docker Compose is the **recommended** and **only officially supported** method for deploying Workbench.
 
+For local builds behind a corporate TLS proxy, pass an optional BuildKit secret:
+
+```bash
+docker build --secret id=build_ca_cert,src=/absolute/path/to/combined-ca.pem -t attack-workbench-frontend:local .
+```
+
+The PEM bundle must include public roots and your corporate CA chain: npm uses it
+as additional trust in both development and production builds, and the production
+Alpine package install uses it as its CA bundle. The secret is mounted only for
+installation and is not stored in image layers. Add `--target dev` for the live-reload
+image; Compose users can provide the same `build_ca_cert` through `build.secrets`.
+BuildKit itself must already trust your registry/proxy to pull base images.
+Runtime certificates remain separately configured; do not disable TLS verification.
+
 ### Manual Installation
 
 Developers who prefer to run the Workbench frontend locally (outside of Docker) can follow the steps below.
