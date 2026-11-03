@@ -11,3 +11,7 @@ commitlint.config.cjs
 .git
 .env
 .env.*
+.claude
+.nocommit
+coverage
+**/.DS_Store
