@@ -1,6 +1,9 @@
 import { Component, OnInit, ViewEncapsulation, ViewChild } from '@angular/core';
 import { MatDialog } from '@angular/material/dialog';
-import { RestApiConnectorService } from 'src/app/services/connectors/rest-api/rest-api-connector.service';
+import {
+  ReleaseTrackCoverageObject,
+  RestApiConnectorService,
+} from 'src/app/services/connectors/rest-api/rest-api-connector.service';
 import { StixObject } from 'src/app/classes/stix/stix-object';
 import { StixListConfig } from 'src/app/components/stix/stix-list/stix-list.component';
 import { StixTypeToAttackType } from 'src/app/utils/type-mappings';
@@ -65,6 +68,16 @@ export class DataQualityComponent implements OnInit {
   loadingDomainConsistency = false;
   domainConsistencyError?: string;
 
+  untrackedLatestRevisionsConfig: StixListConfig =
+    this.releaseTrackCoverageConfig([]);
+  neverEnrolledObjectsConfig: StixListConfig = this.releaseTrackCoverageConfig(
+    []
+  );
+  untrackedLatestRevisionCount = 0;
+  neverEnrolledObjectCount = 0;
+  loadingReleaseTrackCoverage = false;
+  releaseTrackCoverageError?: string;
+
   stixRelationshipConfig: StixListConfig = {
     type: 'relationship',
     stixObjects: [],
@@ -80,6 +93,55 @@ export class DataQualityComponent implements OnInit {
     this.loadParallelRelationships();
     this.loadMissingLinks();
     this.loadDomainConsistency();
+    this.loadReleaseTrackCoverage();
+  }
+
+  loadReleaseTrackCoverage(): void {
+    this.loadingReleaseTrackCoverage = true;
+    this.releaseTrackCoverageError = undefined;
+    this.reportService.getReleaseTrackCoverageReport().subscribe({
+      next: report => {
+        this.untrackedLatestRevisionsConfig = this.releaseTrackCoverageConfig(
+          report.untracked_latest_revisions
+        );
+        this.neverEnrolledObjectsConfig = this.releaseTrackCoverageConfig(
+          report.never_enrolled_objects
+        );
+        this.untrackedLatestRevisionCount =
+          report.summary.untracked_latest_revision_count;
+        this.neverEnrolledObjectCount =
+          report.summary.never_enrolled_object_count;
+        this.loadingReleaseTrackCoverage = false;
+      },
+      error: err => {
+        this.releaseTrackCoverageError =
+          'Failed to load release-track coverage report';
+        this.loadingReleaseTrackCoverage = false;
+        console.error(err);
+      },
+    });
+  }
+
+  private releaseTrackCoverageConfig(
+    objects: ReleaseTrackCoverageObject[]
+  ): StixListConfig {
+    return {
+      stixObjects: objects.map(
+        item =>
+          ({
+            stixID: item.stix.id,
+            type: item.stix.type,
+            attackType: StixTypeToAttackType[item.stix.type],
+            attackID: item.workspace.attack_id || item.stix.id,
+            name: item.stix.name || item.stix.id,
+          }) as StixObject & { name: string }
+      ),
+      columnsPreset: 'id-name',
+      showControls: false,
+      showFilters: false,
+      includeDeprecatedObjects: true,
+      clickBehavior: 'linkToObjectPage',
+    };
   }
 
   /**

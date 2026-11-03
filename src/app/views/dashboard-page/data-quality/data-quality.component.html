@@ -120,6 +120,64 @@
     No objects without domains found.
   </div>
 
+  <h1>Untracked Latest Revisions</h1>
+  <p class="data-quality-note">
+    Objects whose latest revision has no release-track membership, but an
+    earlier revision does. This may be intentional. Review these objects to
+    determine whether their latest revisions should be enrolled as
+    release-track candidates.
+  </p>
+  <app-loading-overlay
+    *ngIf="loadingReleaseTrackCoverage"></app-loading-overlay>
+  <div *ngIf="releaseTrackCoverageError" class="error" role="alert">
+    {{ releaseTrackCoverageError }}
+  </div>
+  <ng-container
+    *ngIf="!loadingReleaseTrackCoverage && !releaseTrackCoverageError">
+    <mat-accordion class="dq-accordion" *ngIf="untrackedLatestRevisionCount > 0">
+      <mat-expansion-panel>
+        <mat-expansion-panel-header>
+          <mat-panel-title>
+            Untracked latest revisions ({{ untrackedLatestRevisionCount }})
+          </mat-panel-title>
+        </mat-expansion-panel-header>
+        <app-stix-list [config]="untrackedLatestRevisionsConfig"></app-stix-list>
+      </mat-expansion-panel>
+    </mat-accordion>
+    <div *ngIf="untrackedLatestRevisionCount === 0">
+      No untracked latest revisions found.
+    </div>
+  </ng-container>
+
+  <h1>Never Enrolled Objects</h1>
+  <p class="data-quality-note">
+    Objects with no recorded release-track membership on any stored revision.
+    These are typically new objects requiring manual initial enrollment.
+    Historical membership that was removed cannot be distinguished from
+    membership that never existed.
+  </p>
+  <app-loading-overlay
+    *ngIf="loadingReleaseTrackCoverage"></app-loading-overlay>
+  <div *ngIf="releaseTrackCoverageError" class="error" role="alert">
+    {{ releaseTrackCoverageError }}
+  </div>
+  <ng-container
+    *ngIf="!loadingReleaseTrackCoverage && !releaseTrackCoverageError">
+    <mat-accordion class="dq-accordion" *ngIf="neverEnrolledObjectCount > 0">
+      <mat-expansion-panel>
+        <mat-expansion-panel-header>
+          <mat-panel-title>
+            Never enrolled objects ({{ neverEnrolledObjectCount }})
+          </mat-panel-title>
+        </mat-expansion-panel-header>
+        <app-stix-list [config]="neverEnrolledObjectsConfig"></app-stix-list>
+      </mat-expansion-panel>
+    </mat-accordion>
+    <div *ngIf="neverEnrolledObjectCount === 0">
+      No objects without recorded release-track membership found.
+    </div>
+  </ng-container>
+
   <!-- Missing Links Section -->
   <h1>Missing LinkByIds Status</h1>
   <app-loading-overlay *ngIf="loadingMissingLinks"></app-loading-overlay>

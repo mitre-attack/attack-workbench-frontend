@@ -1,7 +1,12 @@
+import { CommonModule } from '@angular/common';
+import { NO_ERRORS_SCHEMA } from '@angular/core';
 import { TestBed, ComponentFixture } from '@angular/core/testing';
-import { of } from 'rxjs';
+import { of, Subject } from 'rxjs';
 import { DataQualityComponent } from './data-quality.component';
-import { RestApiConnectorService } from 'src/app/services/connectors/rest-api/rest-api-connector.service';
+import {
+  ReleaseTrackCoverageReport,
+  RestApiConnectorService,
+} from 'src/app/services/connectors/rest-api/rest-api-connector.service';
 import { MatDialog } from '@angular/material/dialog';
 import { vi } from 'vitest';
 import { Relationship } from 'src/app/classes/stix/relationship';
@@ -15,6 +20,7 @@ describe('DataQualityComponent', () => {
     getRelationship: vi.fn(),
     getMissingLinkById: () => of([]),
     getParallelRelationships: () => of({}),
+    getReleaseTrackCoverageReport: vi.fn(),
     getDomainConsistencyReport: () =>
       of({
         cross_domain_relationships: [
@@ -66,8 +72,20 @@ describe('DataQualityComponent', () => {
 
   beforeEach(async () => {
     vi.clearAllMocks();
+    mockReportService.getReleaseTrackCoverageReport.mockReturnValue(
+      of({
+        untracked_latest_revisions: [],
+        never_enrolled_objects: [],
+        summary: {
+          untracked_latest_revision_count: 0,
+          never_enrolled_object_count: 0,
+        },
+      })
+    );
     await TestBed.configureTestingModule({
       declarations: [DataQualityComponent],
+      imports: [CommonModule],
+      schemas: [NO_ERRORS_SCHEMA],
       providers: [
         { provide: RestApiConnectorService, useValue: mockReportService },
         { provide: DeprecationService, useValue: lifecycle },
@@ -104,6 +122,91 @@ describe('DataQualityComponent', () => {
         name: 'Domainless',
       }),
     ]);
+  });
+
+  it('keeps report objects navigable when ATT&CK ID or name is absent', () => {
+    mockReportService.getReleaseTrackCoverageReport.mockReturnValue(
+      of({
+        untracked_latest_revisions: [
+          {
+            stix: {
+              id: 'attack-pattern--latest',
+              type: 'attack-pattern',
+              name: 'Latest',
+            },
+            workspace: { attack_id: 'T0001' },
+          },
+        ],
+        never_enrolled_objects: [
+          {
+            stix: { id: 'x-mitre-analytic--new', type: 'x-mitre-analytic' },
+            workspace: {},
+          },
+        ],
+        summary: {
+          untracked_latest_revision_count: 1,
+          never_enrolled_object_count: 1,
+        },
+      })
+    );
+    component.loadReleaseTrackCoverage();
+
+    expect(component.untrackedLatestRevisionsConfig.stixObjects).toEqual([
+      expect.objectContaining({
+        stixID: 'attack-pattern--latest',
+        attackType: 'technique',
+        attackID: 'T0001',
+        name: 'Latest',
+      }),
+    ]);
+    expect(component.neverEnrolledObjectsConfig.stixObjects).toEqual([
+      expect.objectContaining({
+        stixID: 'x-mitre-analytic--new',
+        attackType: 'analytic',
+        attackID: 'x-mitre-analytic--new',
+        name: 'x-mitre-analytic--new',
+      }),
+    ]);
+  });
+
+  it('does not present loading or failed coverage as an empty successful report', () => {
+    const response = new Subject<ReleaseTrackCoverageReport>();
+    mockReportService.getReleaseTrackCoverageReport.mockReturnValue(response);
+    component.loadReleaseTrackCoverage();
+    fixture.detectChanges();
+    const text = () => fixture.nativeElement.textContent as string;
+    expect(text()).not.toContain('No untracked latest revisions found.');
+    expect(text()).not.toContain(
+      'No objects without recorded release-track membership found.'
+    );
+
+    response.error(new Error('Report unavailable'));
+    fixture.detectChanges();
+    expect(text()).toContain('Failed to load release-track coverage report');
+    expect(text()).not.toContain('No untracked latest revisions found.');
+    expect(text()).not.toContain(
+      'No objects without recorded release-track membership found.'
+    );
+
+    mockReportService.getReleaseTrackCoverageReport.mockReturnValue(
+      of({
+        untracked_latest_revisions: [],
+        never_enrolled_objects: [],
+        summary: {
+          untracked_latest_revision_count: 0,
+          never_enrolled_object_count: 0,
+        },
+      })
+    );
+    component.loadReleaseTrackCoverage();
+    fixture.detectChanges();
+    expect(text()).not.toContain(
+      'Failed to load release-track coverage report'
+    );
+    expect(text()).toContain('No untracked latest revisions found.');
+    expect(text()).toContain(
+      'No objects without recorded release-track membership found.'
+    );
   });
 
   for (const relationshipType of ['subtechnique-of', 'revoked-by']) {

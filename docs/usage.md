@@ -10,6 +10,37 @@ see the source commit and build date. If the REST API cannot be reached, its
 version is shown as `unknown` without preventing the rest of the application
 from loading.
 
+## Data Quality: Release-Track Coverage
+
+Open **Dashboard → Data Quality** (`/dashboard/data-quality`) to review two
+read-only release-track coverage reports:
+
+- **Untracked Latest Revisions**: Objects whose latest revision has no
+  release-track membership, but an earlier revision does. This may be
+  intentional. Review these objects to determine whether their latest revisions
+  should be enrolled as release-track candidates. Specifically, the latest
+  revision must be missing the `workspace.release_tracks` key and an older
+  revision must have a nonempty membership array. A latest revision with an
+  explicit empty array or `null` is not included.
+- **Never Enrolled Objects**: No stored revision has a nonempty recorded
+  release-track membership array. These are typically new objects requiring
+  manual initial enrollment. Current records cannot distinguish membership
+  that never existed from historical membership that was removed.
+
+Expand either list to see ATT&CK IDs and names, with STIX IDs used when those
+fields are absent. Select a row or its open-link control to visit the object's
+library page. Each object appears once, using its latest stored revision.
+Both reports include inactive objects (revoked or deprecated) among the
+supported domain-bearing ATT&CK types: techniques, tactics, groups, software,
+mitigations, campaigns, data sources, data components, assets, matrices,
+detection strategies, and analytics. Relationships, identities, marking
+definitions, notes, and projected collections are outside these reports.
+
+Loading and retrieval failures are shown separately from successful empty
+results. The reports do not enroll objects, change release-track strategies,
+or repair membership automatically; any enrollment remains an explicit editor
+decision.
+
 ## Exploring ATT&CK
 
 When first instantiated, the ATT&CK Workbench will not include any data. You can use the application to build a custom dataset, or import data from a data provider such as MITRE using the collections browser.

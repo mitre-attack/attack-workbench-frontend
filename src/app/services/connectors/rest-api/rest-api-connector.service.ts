@@ -56,6 +56,25 @@ import {
   StreamProgress,
 } from '../collection-stream.service';
 
+export interface ReleaseTrackCoverageObject {
+  stix: {
+    id: string;
+    type: string;
+    name?: string;
+    modified?: string;
+  };
+  workspace: { attack_id?: string };
+}
+
+export interface ReleaseTrackCoverageReport {
+  untracked_latest_revisions: ReleaseTrackCoverageObject[];
+  never_enrolled_objects: ReleaseTrackCoverageObject[];
+  summary: {
+    untracked_latest_revision_count: number;
+    never_enrolled_object_count: number;
+  };
+}
+
 export interface Paginated<T> {
   data: T[];
   pagination: {
@@ -3278,6 +3297,15 @@ export class RestApiConnectorService extends ApiConnector {
         })
       ),
       share() // multicast so that multiple subscribers don't trigger the call twice. THIS MUST BE THE LAST LINE OF THE PIPE
+    );
+  }
+
+  /** Retrieve recorded release-track coverage without changing enrollment. */
+  public getReleaseTrackCoverageReport(): Observable<ReleaseTrackCoverageReport> {
+    const url = `${this.apiUrl}/reports/release-track-coverage`;
+    return this.http.get<ReleaseTrackCoverageReport>(url).pipe(
+      catchError(this.handleError_raise<ReleaseTrackCoverageReport>()),
+      share()
     );
   }
 
