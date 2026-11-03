@@ -3303,10 +3303,12 @@ export class RestApiConnectorService extends ApiConnector {
   /** Retrieve recorded release-track coverage without changing enrollment. */
   public getReleaseTrackCoverageReport(): Observable<ReleaseTrackCoverageReport> {
     const url = `${this.apiUrl}/reports/release-track-coverage`;
-    return this.http.get<ReleaseTrackCoverageReport>(url).pipe(
-      catchError(this.handleError_raise<ReleaseTrackCoverageReport>()),
-      share()
-    );
+    return this.http
+      .get<ReleaseTrackCoverageReport>(url)
+      .pipe(
+        catchError(this.handleError_raise<ReleaseTrackCoverageReport>()),
+        share()
+      );
   }
 
   /**

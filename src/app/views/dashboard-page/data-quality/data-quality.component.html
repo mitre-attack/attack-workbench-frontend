@@ -124,8 +124,8 @@
   <p class="data-quality-note">
     Objects whose latest revision has no release-track membership, but an
     earlier revision does. This may be intentional. Review these objects to
-    determine whether their latest revisions should be enrolled as
-    release-track candidates.
+    determine whether their latest revisions should be enrolled as release-track
+    candidates.
   </p>
   <app-loading-overlay
     *ngIf="loadingReleaseTrackCoverage"></app-loading-overlay>
@@ -134,14 +134,17 @@
   </div>
   <ng-container
     *ngIf="!loadingReleaseTrackCoverage && !releaseTrackCoverageError">
-    <mat-accordion class="dq-accordion" *ngIf="untrackedLatestRevisionCount > 0">
+    <mat-accordion
+      class="dq-accordion"
+      *ngIf="untrackedLatestRevisionCount > 0">
       <mat-expansion-panel>
         <mat-expansion-panel-header>
           <mat-panel-title>
             Untracked latest revisions ({{ untrackedLatestRevisionCount }})
           </mat-panel-title>
         </mat-expansion-panel-header>
-        <app-stix-list [config]="untrackedLatestRevisionsConfig"></app-stix-list>
+        <app-stix-list
+          [config]="untrackedLatestRevisionsConfig"></app-stix-list>
       </mat-expansion-panel>
     </mat-accordion>
     <div *ngIf="untrackedLatestRevisionCount === 0">
