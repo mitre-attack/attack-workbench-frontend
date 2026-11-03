@@ -1,18 +1,42 @@
-import { Component, OnInit, ViewEncapsulation, ViewChild } from '@angular/core';
+import {
+  Component,
+  OnDestroy,
+  OnInit,
+  ViewEncapsulation,
+  ViewChild,
+} from '@angular/core';
 import { MatDialog } from '@angular/material/dialog';
 import {
   ReleaseTrackCoverageObject,
+  ReleaseTrackCoverageReport,
   RestApiConnectorService,
+  UntrackedLatestRevision,
 } from 'src/app/services/connectors/rest-api/rest-api-connector.service';
 import { StixObject } from 'src/app/classes/stix/stix-object';
 import { StixListConfig } from 'src/app/components/stix/stix-list/stix-list.component';
 import { StixTypeToAttackType } from 'src/app/utils/type-mappings';
 import { StixListComponent } from 'src/app/components/stix/stix-list/stix-list.component';
 import { SelectionModel } from '@angular/cdk/collections';
-import { from, of } from 'rxjs';
-import { concatMap, finalize, takeWhile, toArray } from 'rxjs/operators';
+import { from, of, Subject } from 'rxjs';
+import {
+  concatMap,
+  finalize,
+  takeUntil,
+  takeWhile,
+  tap,
+  toArray,
+} from 'rxjs/operators';
 import { DeprecationService } from 'src/app/services/helpers/deprecation.service';
 import { ConfirmationDialogComponent } from 'src/app/components/confirmation-dialog/confirmation-dialog.component';
+import { Role } from 'src/app/classes/authn/role';
+import { ReleaseTrackType } from 'src/app/classes/release-tracks/enums';
+import { AuthenticationService } from 'src/app/services/connectors/authentication/authentication.service';
+import { ReleaseTracksConnectorService } from 'src/app/services/connectors/rest-api/release-tracks.service';
+
+interface CandidateEnrollmentTrack {
+  track_id: string;
+  name: string;
+}
 
 export interface CrossDomainRelationshipRow {
   stixId: string;
@@ -47,11 +71,13 @@ interface ParallelRelationshipGroup {
   encapsulation: ViewEncapsulation.None,
   standalone: false,
 })
-export class DataQualityComponent implements OnInit {
+export class DataQualityComponent implements OnInit, OnDestroy {
   constructor(
     private reportService: RestApiConnectorService,
     private dialog: MatDialog,
-    private deprecationService: DeprecationService
+    private deprecationService: DeprecationService,
+    private releaseTracks: ReleaseTracksConnectorService,
+    private authenticationService: AuthenticationService
   ) {}
 
   missingLinks: any[] = [];
@@ -68,15 +94,42 @@ export class DataQualityComponent implements OnInit {
   loadingDomainConsistency = false;
   domainConsistencyError?: string;
 
-  untrackedLatestRevisionsConfig: StixListConfig =
-    this.releaseTrackCoverageConfig([]);
-  neverEnrolledObjectsConfig: StixListConfig = this.releaseTrackCoverageConfig(
-    []
-  );
+  untrackedLatestRevisions: UntrackedLatestRevision[] = [];
+  neverEnrolledObjects: ReleaseTrackCoverageObject[] = [];
+  readonly coverageObjectTypes = StixTypeToAttackType;
+  readonly untrackedColumns = [
+    'attackID',
+    'name',
+    'type',
+    'modified',
+    'lastEnrolled',
+    'releaseTracks',
+    'unenrolledCount',
+    'enroll',
+  ];
+  readonly neverEnrolledColumns = [
+    'attackID',
+    'name',
+    'type',
+    'created',
+    'modified',
+    'version',
+    'enroll',
+  ];
+  untrackedPage = { pageIndex: 0, pageSize: 10 };
+  neverEnrolledPage = { pageIndex: 0, pageSize: 10 };
   untrackedLatestRevisionCount = 0;
   neverEnrolledObjectCount = 0;
   loadingReleaseTrackCoverage = false;
   releaseTrackCoverageError?: string;
+  standardTracks: CandidateEnrollmentTrack[] = [];
+  loadingStandardTracks = false;
+  standardTracksError?: string;
+  enrollingObjectId?: string;
+  enrollmentError?: { objectId: string; message: string };
+  enrollmentFeedback?: string;
+  enrollmentRefreshError?: string;
+  private readonly destroy$ = new Subject<void>();
 
   stixRelationshipConfig: StixListConfig = {
     type: 'relationship',
@@ -96,52 +149,167 @@ export class DataQualityComponent implements OnInit {
     this.loadReleaseTrackCoverage();
   }
 
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
+  }
+
+  get canEnrollCandidates(): boolean {
+    return this.authenticationService.isAuthorized([
+      Role.ADMIN,
+      Role.TEAM_LEAD,
+    ]);
+  }
+
+  loadCandidateTracks(): void {
+    if (!this.canEnrollCandidates || this.loadingStandardTracks) return;
+    this.loadingStandardTracks = true;
+    this.standardTracks = [];
+    this.standardTracksError = undefined;
+    this.releaseTracks
+      .listReleaseTracks({ type: ReleaseTrackType.Standard })
+      .pipe(
+        takeUntil(this.destroy$),
+        finalize(() => (this.loadingStandardTracks = false))
+      )
+      .subscribe({
+        next: response => {
+          // This connector returns null on HTTP failure; that is not an empty list.
+          if (!response || !Array.isArray(response.data)) {
+            this.standardTracksError =
+              'Available release tracks could not be loaded.';
+            return;
+          }
+          this.standardTracks = response.data
+            .filter(
+              track =>
+                track.type === ReleaseTrackType.Standard && track.track_id
+            )
+            .map(track => ({
+              track_id: track.track_id,
+              name: track.name || track.track_id,
+            }))
+            .sort((left, right) => left.name.localeCompare(right.name));
+        },
+        error: () => {
+          this.standardTracksError =
+            'Available release tracks could not be loaded.';
+        },
+      });
+  }
+
+  enrollCandidate(
+    row: ReleaseTrackCoverageObject,
+    track: CandidateEnrollmentTrack
+  ): void {
+    if (
+      !this.canEnrollCandidates ||
+      this.enrollingObjectId ||
+      this.loadingReleaseTrackCoverage ||
+      this.enrollmentRefreshError ||
+      !this.standardTracks.some(
+        available => available.track_id === track.track_id
+      )
+    )
+      return;
+
+    this.enrollingObjectId = row.stix.id;
+    this.enrollmentError = undefined;
+    this.enrollmentFeedback = undefined;
+    let enrollmentCompleted = false;
+    this.releaseTracks
+      // An ID-only reference follows latest, matching the existing membership workflow.
+      .addCandidates(track.track_id, [row.stix.id])
+      .pipe(
+        tap(() => (enrollmentCompleted = true)),
+        concatMap(() => this.reportService.getReleaseTrackCoverageReport()),
+        takeUntil(this.destroy$),
+        finalize(() => (this.enrollingObjectId = undefined))
+      )
+      .subscribe({
+        next: report => {
+          this.applyCoverageReport(report, false);
+          this.enrollmentFeedback = `Candidate request completed for ${row.workspace.attack_id || row.stix.id} in ${track.name}.`;
+        },
+        error: error => {
+          if (enrollmentCompleted) {
+            this.enrollmentRefreshError =
+              'Enrollment succeeded, but the reports could not be refreshed. Refresh them before enrolling another object.';
+          } else {
+            this.enrollmentError = {
+              objectId: row.stix.id,
+              message:
+                typeof error?.error?.message === 'string'
+                  ? error.error.message
+                  : typeof error?.error === 'string'
+                    ? error.error
+                    : 'The object could not be added to the release track.',
+            };
+          }
+        },
+      });
+  }
+
+  private applyCoverageReport(
+    report: ReleaseTrackCoverageReport,
+    resetPages: boolean
+  ): void {
+    this.untrackedLatestRevisions = report.untracked_latest_revisions;
+    this.neverEnrolledObjects = report.never_enrolled_objects;
+    this.untrackedLatestRevisionCount =
+      report.summary.untracked_latest_revision_count;
+    this.neverEnrolledObjectCount = report.summary.never_enrolled_object_count;
+    this.enrollmentRefreshError = undefined;
+    this.untrackedPage = {
+      ...this.untrackedPage,
+      pageIndex: resetPages
+        ? 0
+        : Math.min(
+            this.untrackedPage.pageIndex,
+            Math.max(
+              0,
+              Math.ceil(
+                this.untrackedLatestRevisions.length /
+                  this.untrackedPage.pageSize
+              ) - 1
+            )
+          ),
+    };
+    this.neverEnrolledPage = {
+      ...this.neverEnrolledPage,
+      pageIndex: resetPages
+        ? 0
+        : Math.min(
+            this.neverEnrolledPage.pageIndex,
+            Math.max(
+              0,
+              Math.ceil(
+                this.neverEnrolledObjects.length /
+                  this.neverEnrolledPage.pageSize
+              ) - 1
+            )
+          ),
+    };
+  }
+
   loadReleaseTrackCoverage(): void {
     this.loadingReleaseTrackCoverage = true;
     this.releaseTrackCoverageError = undefined;
-    this.reportService.getReleaseTrackCoverageReport().subscribe({
-      next: report => {
-        this.untrackedLatestRevisionsConfig = this.releaseTrackCoverageConfig(
-          report.untracked_latest_revisions
-        );
-        this.neverEnrolledObjectsConfig = this.releaseTrackCoverageConfig(
-          report.never_enrolled_objects
-        );
-        this.untrackedLatestRevisionCount =
-          report.summary.untracked_latest_revision_count;
-        this.neverEnrolledObjectCount =
-          report.summary.never_enrolled_object_count;
-        this.loadingReleaseTrackCoverage = false;
-      },
-      error: err => {
-        this.releaseTrackCoverageError =
-          'Failed to load release-track coverage report';
-        this.loadingReleaseTrackCoverage = false;
-        console.error(err);
-      },
-    });
-  }
-
-  private releaseTrackCoverageConfig(
-    objects: ReleaseTrackCoverageObject[]
-  ): StixListConfig {
-    return {
-      stixObjects: objects.map(
-        item =>
-          ({
-            stixID: item.stix.id,
-            type: item.stix.type,
-            attackType: StixTypeToAttackType[item.stix.type],
-            attackID: item.workspace.attack_id || item.stix.id,
-            name: item.stix.name || item.stix.id,
-          }) as StixObject & { name: string }
-      ),
-      columnsPreset: 'id-name',
-      showControls: false,
-      showFilters: false,
-      includeDeprecatedObjects: true,
-      clickBehavior: 'linkToObjectPage',
-    };
+    this.reportService
+      .getReleaseTrackCoverageReport()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: report => {
+          this.applyCoverageReport(report, true);
+          this.loadingReleaseTrackCoverage = false;
+        },
+        error: err => {
+          this.releaseTrackCoverageError =
+            'Failed to load release-track coverage report';
+          this.loadingReleaseTrackCoverage = false;
+          console.error(err);
+        },
+      });
   }
 
   /**

@@ -120,6 +120,17 @@
     No objects without domains found.
   </div>
 
+  <p *ngIf="enrollmentFeedback" role="status">{{ enrollmentFeedback }}</p>
+  <div *ngIf="enrollmentRefreshError" class="error" role="alert">
+    {{ enrollmentRefreshError }}
+    <button
+      mat-button
+      [disabled]="loadingReleaseTrackCoverage"
+      (click)="loadReleaseTrackCoverage()">
+      Refresh reports
+    </button>
+  </div>
+
   <h1>Untracked Latest Revisions</h1>
   <p class="data-quality-note">
     Objects whose latest revision has no release-track membership, but an
@@ -143,8 +154,129 @@
             Untracked latest revisions ({{ untrackedLatestRevisionCount }})
           </mat-panel-title>
         </mat-expansion-panel-header>
-        <app-stix-list
-          [config]="untrackedLatestRevisionsConfig"></app-stix-list>
+        <div class="dq-coverage-table-wrapper">
+          <table
+            mat-table
+            class="dq-coverage-table"
+            aria-label="Untracked latest revisions"
+            [dataSource]="
+              untrackedLatestRevisions
+                | slice
+                  : untrackedPage.pageIndex * untrackedPage.pageSize
+                  : (untrackedPage.pageIndex + 1) * untrackedPage.pageSize
+            ">
+            <ng-container matColumnDef="attackID">
+              <th mat-header-cell *matHeaderCellDef scope="col">ATT&CK ID</th>
+              <td mat-cell *matCellDef="let row">
+                <a
+                  [routerLink]="objectLink(row)"
+                  (click)="$event.stopPropagation()">
+                  {{ row.workspace.attack_id || row.stix.id }}
+                </a>
+              </td>
+            </ng-container>
+            <ng-container matColumnDef="name">
+              <th mat-header-cell *matHeaderCellDef scope="col">Name</th>
+              <td mat-cell *matCellDef="let row">
+                <a
+                  [routerLink]="objectLink(row)"
+                  (click)="$event.stopPropagation()">
+                  {{ row.stix.name || row.stix.id }}
+                </a>
+              </td>
+            </ng-container>
+            <ng-container matColumnDef="type">
+              <th mat-header-cell *matHeaderCellDef scope="col">Type</th>
+              <td mat-cell *matCellDef="let row">
+                {{ coverageObjectTypes[row.stix.type] || row.stix.type }}
+              </td>
+            </ng-container>
+            <ng-container matColumnDef="modified">
+              <th mat-header-cell *matHeaderCellDef scope="col">
+                Latest revision modified
+              </th>
+              <td mat-cell *matCellDef="let row">
+                {{
+                  row.stix.modified
+                    ? (row.stix.modified
+                      | date: "MMM d, y, HH:mm:ss 'UTC'" : 'UTC')
+                    : '—'
+                }}
+              </td>
+            </ng-container>
+            <ng-container matColumnDef="lastEnrolled">
+              <th mat-header-cell *matHeaderCellDef scope="col">
+                Last enrolled revision modified
+              </th>
+              <td mat-cell *matCellDef="let row">
+                {{
+                  row.last_enrolled_revision.modified
+                    | date: "MMM d, y, HH:mm:ss 'UTC'" : 'UTC'
+                }}
+                <span
+                  class="dq-version"
+                  *ngIf="row.last_enrolled_revision.x_mitre_version">
+                  Version {{ row.last_enrolled_revision.x_mitre_version }}
+                </span>
+              </td>
+            </ng-container>
+            <ng-container matColumnDef="releaseTracks">
+              <th mat-header-cell *matHeaderCellDef scope="col">
+                Release tracks
+              </th>
+              <td mat-cell *matCellDef="let row">
+                <ul class="dq-track-links">
+                  <li
+                    *ngFor="
+                      let track of row.last_enrolled_revision.release_tracks
+                    ">
+                    <a
+                      *ngIf="track.name; else unresolvedTrack"
+                      [routerLink]="['/dashboard/release-management', track.id]"
+                      (click)="$event.stopPropagation()">
+                      {{ track.name }}
+                    </a>
+                    <ng-template #unresolvedTrack>{{ track.id }}</ng-template>
+                  </li>
+                </ul>
+              </td>
+            </ng-container>
+            <ng-container matColumnDef="unenrolledCount">
+              <th mat-header-cell *matHeaderCellDef scope="col">
+                Unenrolled revisions
+              </th>
+              <td mat-cell *matCellDef="let row">
+                {{ row.unenrolled_revision_count }}
+              </td>
+            </ng-container>
+            <ng-container matColumnDef="enroll">
+              <th mat-header-cell *matHeaderCellDef scope="col">Enrollment</th>
+              <td
+                mat-cell
+                *matCellDef="let row"
+                (click)="$event.stopPropagation()"
+                (keydown)="$event.stopPropagation()">
+                <ng-container
+                  [ngTemplateOutlet]="candidateEnrollmentAction"
+                  [ngTemplateOutletContext]="{ $implicit: row }"></ng-container>
+              </td>
+            </ng-container>
+            <tr mat-header-row *matHeaderRowDef="untrackedColumns"></tr>
+            <tr
+              mat-row
+              *matRowDef="let row; columns: untrackedColumns"
+              class="element-row"
+              [routerLink]="objectLink(row)"></tr>
+          </table>
+        </div>
+        <mat-paginator
+          aria-label="Untracked latest revisions pages"
+          [length]="untrackedLatestRevisions.length"
+          [pageIndex]="untrackedPage.pageIndex"
+          [pageSize]="untrackedPage.pageSize"
+          [pageSizeOptions]="[5, 10, 25, 100]"
+          (page)="untrackedPage = $event"
+          showFirstLastButtons></mat-paginator>
       </mat-expansion-panel>
     </mat-accordion>
     <div *ngIf="untrackedLatestRevisionCount === 0">
@@ -173,13 +305,164 @@
             Never enrolled objects ({{ neverEnrolledObjectCount }})
           </mat-panel-title>
         </mat-expansion-panel-header>
-        <app-stix-list [config]="neverEnrolledObjectsConfig"></app-stix-list>
+        <div class="dq-coverage-table-wrapper">
+          <table
+            mat-table
+            class="dq-coverage-table"
+            aria-label="Never enrolled objects"
+            [dataSource]="
+              neverEnrolledObjects
+                | slice
+                  : neverEnrolledPage.pageIndex * neverEnrolledPage.pageSize
+                  : (neverEnrolledPage.pageIndex + 1) *
+                      neverEnrolledPage.pageSize
+            ">
+            <ng-container matColumnDef="attackID">
+              <th mat-header-cell *matHeaderCellDef scope="col">ATT&CK ID</th>
+              <td mat-cell *matCellDef="let row">
+                <a
+                  [routerLink]="objectLink(row)"
+                  (click)="$event.stopPropagation()">
+                  {{ row.workspace.attack_id || row.stix.id }}
+                </a>
+              </td>
+            </ng-container>
+            <ng-container matColumnDef="name">
+              <th mat-header-cell *matHeaderCellDef scope="col">Name</th>
+              <td mat-cell *matCellDef="let row">
+                <a
+                  [routerLink]="objectLink(row)"
+                  (click)="$event.stopPropagation()">
+                  {{ row.stix.name || row.stix.id }}
+                </a>
+              </td>
+            </ng-container>
+            <ng-container matColumnDef="type">
+              <th mat-header-cell *matHeaderCellDef scope="col">Type</th>
+              <td mat-cell *matCellDef="let row">
+                {{ coverageObjectTypes[row.stix.type] || row.stix.type }}
+              </td>
+            </ng-container>
+            <ng-container matColumnDef="created">
+              <th mat-header-cell *matHeaderCellDef scope="col">Created</th>
+              <td mat-cell *matCellDef="let row">
+                {{
+                  row.stix.created
+                    ? (row.stix.created
+                      | date: "MMM d, y, HH:mm:ss 'UTC'" : 'UTC')
+                    : '—'
+                }}
+              </td>
+            </ng-container>
+            <ng-container matColumnDef="modified">
+              <th mat-header-cell *matHeaderCellDef scope="col">Modified</th>
+              <td mat-cell *matCellDef="let row">
+                {{
+                  row.stix.modified
+                    ? (row.stix.modified
+                      | date: "MMM d, y, HH:mm:ss 'UTC'" : 'UTC')
+                    : '—'
+                }}
+              </td>
+            </ng-container>
+            <ng-container matColumnDef="version">
+              <th mat-header-cell *matHeaderCellDef scope="col">Version</th>
+              <td mat-cell *matCellDef="let row">
+                {{ row.stix.x_mitre_version || '—' }}
+              </td>
+            </ng-container>
+            <ng-container matColumnDef="enroll">
+              <th mat-header-cell *matHeaderCellDef scope="col">Enrollment</th>
+              <td
+                mat-cell
+                *matCellDef="let row"
+                (click)="$event.stopPropagation()"
+                (keydown)="$event.stopPropagation()">
+                <ng-container
+                  [ngTemplateOutlet]="candidateEnrollmentAction"
+                  [ngTemplateOutletContext]="{ $implicit: row }"></ng-container>
+              </td>
+            </ng-container>
+            <tr mat-header-row *matHeaderRowDef="neverEnrolledColumns"></tr>
+            <tr
+              mat-row
+              *matRowDef="let row; columns: neverEnrolledColumns"
+              class="element-row"
+              [routerLink]="objectLink(row)"></tr>
+          </table>
+        </div>
+        <mat-paginator
+          aria-label="Never enrolled objects pages"
+          [length]="neverEnrolledObjects.length"
+          [pageIndex]="neverEnrolledPage.pageIndex"
+          [pageSize]="neverEnrolledPage.pageSize"
+          [pageSizeOptions]="[5, 10, 25, 100]"
+          (page)="neverEnrolledPage = $event"
+          showFirstLastButtons></mat-paginator>
       </mat-expansion-panel>
     </mat-accordion>
     <div *ngIf="neverEnrolledObjectCount === 0">
       No objects without recorded release-track membership found.
     </div>
   </ng-container>
+
+  <ng-template #candidateEnrollmentAction let-row>
+    <button
+      *ngIf="canEnrollCandidates"
+      mat-stroked-button
+      [matMenuTriggerFor]="candidateTrackMenu"
+      [matMenuTriggerData]="{ row: row }"
+      (menuOpened)="loadCandidateTracks()"
+      [disabled]="
+        !!enrollingObjectId ||
+        loadingReleaseTrackCoverage ||
+        !!enrollmentRefreshError
+      "
+      [attr.aria-label]="
+        'Add ' +
+        (row.workspace.attack_id || row.stix.name || row.stix.id) +
+        ' as candidate'
+      ">
+      {{ enrollingObjectId === row.stix.id ? 'Adding…' : 'Add candidate' }}
+      <mat-icon aria-hidden="true">arrow_drop_down</mat-icon>
+    </button>
+    <div
+      *ngIf="enrollmentError?.objectId === row.stix.id"
+      class="error dq-enrollment-error"
+      role="alert">
+      {{ enrollmentError.message }}
+    </div>
+  </ng-template>
+
+  <mat-menu #candidateTrackMenu="matMenu">
+    <ng-template matMenuContent let-row="row">
+      <button mat-menu-item disabled *ngIf="loadingStandardTracks">
+        Loading standard tracks…
+      </button>
+      <ng-container *ngIf="!loadingStandardTracks">
+        <ng-container *ngIf="standardTracksError; else candidateTrackOptions">
+          <button mat-menu-item disabled>{{ standardTracksError }}</button>
+          <button
+            mat-menu-item
+            (click)="$event.stopPropagation(); loadCandidateTracks()">
+            Retry loading tracks
+          </button>
+        </ng-container>
+        <ng-template #candidateTrackOptions>
+          <button mat-menu-item disabled *ngIf="standardTracks.length === 0">
+            No standard release tracks available.
+          </button>
+          <button
+            mat-menu-item
+            *ngFor="let track of standardTracks"
+            [disabled]="!!enrollingObjectId"
+            (click)="enrollCandidate(row, track)">
+            {{ track.name }}
+          </button>
+        </ng-template>
+      </ng-container>
+    </ng-template>
+  </mat-menu>
 
   <!-- Missing Links Section -->
   <h1>Missing LinkByIds Status</h1>

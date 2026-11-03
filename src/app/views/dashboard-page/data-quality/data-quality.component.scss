@@ -1,4 +1,5 @@
 @use '../../../../style/globals';
+@use '../../../../style/colors';
 
 .data-quality-subheader {
   @extend .text-label;
@@ -27,6 +28,16 @@
   .dq-note {
     font-size: 0.9rem;
     opacity: 0.8;
+  }
+}
+
+.data-quality-container .dq-accordion .stix-list .table-container {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: none;
+
+  .mat-column-attackID {
+    width: 1%;
   }
 }
 
@@ -60,6 +71,96 @@
   .dq-object-name {
     display: block;
     opacity: 0.8;
+  }
+}
+
+.data-quality-container {
+  min-width: 0;
+  width: 100%;
+
+  .dq-coverage-table-wrapper {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: auto;
+  }
+
+  .dq-coverage-table {
+    width: 100%;
+
+    th,
+    td {
+      padding: 12px;
+      vertical-align: top;
+
+      .light & {
+        background: colors.color(light);
+        border-color: colors.border-color(light);
+      }
+      .dark & {
+        background: colors.color(dark);
+        border-color: colors.border-color(dark);
+      }
+    }
+
+    th {
+      @extend .text-label;
+    }
+
+    .mat-column-attackID,
+    .mat-column-type,
+    .mat-column-modified,
+    .mat-column-created,
+    .mat-column-lastEnrolled,
+    .mat-column-unenrolledCount,
+    .mat-column-enroll,
+    .mat-column-version {
+      width: 1%;
+      white-space: nowrap;
+    }
+
+    .mat-column-name {
+      min-width: 14rem;
+      overflow-wrap: anywhere;
+    }
+
+    .mat-column-releaseTracks {
+      min-width: 12rem;
+      overflow-wrap: anywhere;
+    }
+
+    .element-row {
+      cursor: pointer;
+
+      &:hover td {
+        .light & {
+          background: colors.color-alternate(light);
+        }
+        .dark & {
+          background: colors.color-alternate(dark);
+        }
+      }
+    }
+  }
+
+  .dq-version {
+    display: block;
+    @extend .text-deemphasis;
+  }
+
+  .dq-enrollment-error {
+    max-width: 18rem;
+    margin-top: 8px;
+    white-space: normal;
+  }
+
+  .dq-track-links {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+
+    li + li {
+      margin-top: 4px;
+    }
   }
 }
 

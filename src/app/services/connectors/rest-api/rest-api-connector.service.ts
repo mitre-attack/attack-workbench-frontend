@@ -61,13 +61,30 @@ export interface ReleaseTrackCoverageObject {
     id: string;
     type: string;
     name?: string;
+    created?: string;
     modified?: string;
+    x_mitre_version?: string;
   };
   workspace: { attack_id?: string };
 }
 
+export interface UntrackedLatestRevision extends ReleaseTrackCoverageObject {
+  last_enrolled_revision: {
+    modified: string;
+    x_mitre_version?: string;
+    release_tracks: {
+      id: string;
+      type: string;
+      tier: string;
+      status: string;
+      name?: string;
+    }[];
+  };
+  unenrolled_revision_count: number;
+}
+
 export interface ReleaseTrackCoverageReport {
-  untracked_latest_revisions: ReleaseTrackCoverageObject[];
+  untracked_latest_revisions: UntrackedLatestRevision[];
   never_enrolled_objects: ReleaseTrackCoverageObject[];
   summary: {
     untracked_latest_revision_count: number;

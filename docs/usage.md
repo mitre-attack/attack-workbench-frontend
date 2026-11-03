@@ -27,19 +27,51 @@ read-only release-track coverage reports:
   manual initial enrollment. Current records cannot distinguish membership
   that never existed from historical membership that was removed.
 
-Expand either list to see ATT&CK IDs and names, with STIX IDs used when those
-fields are absent. Select a row or its open-link control to visit the object's
-library page. Each object appears once, using its latest stored revision.
+Expand either list to see ATT&CK IDs, names, and object types, with STIX IDs
+used when IDs or names are absent. Select a row or its ID/name link to visit
+the object's library page. Each object appears once, using its latest stored
+revision.
+
+**Untracked Latest Revisions** also shows the latest revision's modified
+timestamp, the last enrolled revision's modified timestamp and optional version,
+the release tracks recorded on that last enrolled revision, and the number of
+unenrolled revisions since it. The last enrolled revision is the most recent
+stored revision with nonempty membership. The count includes only later stored
+revisions without nonempty membership; older gaps do not count after
+re-enrollment. All tracks on that revision are shown, using their current
+registry names and links to Release Management. If a track cannot be resolved,
+its ID remains visible without a link.
+
+**Never Enrolled Objects** also shows created and modified timestamps and the
+ATT&CK version. Dates include time in UTC; unavailable metadata is shown as an
+em dash. Timestamps describe stored revisions, not enrollment event times.
+Each table has its own paginator and fills the available accordion width,
+keeping metadata compact and leaving room for names. On narrow screens, scroll
+the table horizontally to see all columns.
 Both reports include inactive objects (revoked or deprecated) among the
 supported domain-bearing ATT&CK types: techniques, tactics, groups, software,
 mitigations, campaigns, data sources, data components, assets, matrices,
 detection strategies, and analytics. Relationships, identities, marking
 definitions, notes, and projected collections are outside these reports.
 
+Administrators and team leads can select **Add candidate** on either report's
+rows to open a list of existing standard release tracks. Selecting a track
+submits the object ID to its candidate-enrollment endpoint; no modified timestamp
+is supplied, so the reference follows the latest revision rather than pinning
+the revision displayed in the report. Previously associated tracks remain
+available for re-enrollment. Virtual tracks are not offered.
+
+While enrollment and the subsequent report refresh are pending, enrollment
+controls are disabled to prevent duplicate submissions. Successful requests
+refresh both reports without resetting unaffected pages or collapsing the
+remaining lists. The backend's enrollment policies still apply. A rejected
+request leaves the object visible and displays the error. If enrollment succeeds
+but refreshing fails, select **Refresh reports** before submitting another
+enrollment.
+
 Loading and retrieval failures are shown separately from successful empty
-results. The reports do not enroll objects, change release-track strategies,
-or repair membership automatically; any enrollment remains an explicit editor
-decision.
+results. Viewing a report does not enroll anything or change release-track
+strategies; enrollment only occurs after explicitly selecting a track.
 
 ## Exploring ATT&CK
 
