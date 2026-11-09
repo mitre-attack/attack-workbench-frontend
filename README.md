@@ -65,6 +65,8 @@ Refer to the official [Deployment Guide](https://github.com/mitre-attack/attack-
 
 > **Note:** Docker Compose is the **recommended** and **only officially supported** method for deploying Workbench.
 
+For source builds and corporate CA configuration, see the [container build guide](docs/developer/container-builds.md).
+
 ### Manual Installation
 
 Developers who prefer to run the Workbench frontend locally (outside of Docker) can follow the steps below.

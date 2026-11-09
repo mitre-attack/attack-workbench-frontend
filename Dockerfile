@@ -1,9 +1,16 @@
+# syntax=docker/dockerfile:1
+
 FROM node:22-alpine AS dev
 
 WORKDIR /workspace
 
 COPY package*.json ./
-RUN npm ci
+# Optional corporate CA trust is available only during this install.
+RUN --mount=type=secret,id=build_ca_cert \
+    if [ -s /run/secrets/build_ca_cert ]; then \
+        export NODE_EXTRA_CA_CERTS=/run/secrets/build_ca_cert; \
+    fi; \
+    npm ci
 
 COPY . .
 
@@ -32,7 +39,11 @@ ENV WORKBENCH_FRONTEND_APP_VERSION=${VERSION} \
     WORKBENCH_FRONTEND_BUILD_DATE=${BUILDTIME}
 
 # Install dependencies
-RUN npm install --cpu ${TARGETARCH} --os ${TARGETOS}
+RUN --mount=type=secret,id=build_ca_cert \
+    if [ -s /run/secrets/build_ca_cert ]; then \
+        export NODE_EXTRA_CA_CERTS=/run/secrets/build_ca_cert; \
+    fi; \
+    npm install --cpu ${TARGETARCH} --os ${TARGETOS}
 
 # Build the application
 RUN npm run build-prod -- --configuration-defaults-only
@@ -41,7 +52,12 @@ RUN npm run build-prod -- --configuration-defaults-only
 FROM nginx:stable-alpine-slim
 
 # Run the same public-configuration generator used by native development.
-RUN apk add --no-cache nodejs
+# apk uses a combined public + corporate CA bundle without persisting it.
+RUN --mount=type=secret,id=build_ca_cert,target=/etc/apk/ca.pem \
+    if [ -s /etc/apk/ca.pem ]; then \
+        export SSL_CERT_FILE=/etc/apk/ca.pem; \
+    fi; \
+    apk add --no-cache nodejs
 
 # Define build arguments
 ARG VERSION=dev
