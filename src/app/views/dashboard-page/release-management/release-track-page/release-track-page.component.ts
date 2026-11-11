@@ -1572,7 +1572,6 @@ export class ReleaseTrackPageComponent implements OnInit, OnDestroy {
 
   public onAddCandidate(): void {
     if (!this.releaseTrack) return;
-
     const selection = new SelectionModel<string>(true);
     const selectedObjectRefs = new Map<
       string,
@@ -1591,6 +1590,9 @@ export class ReleaseTrackPageComponent implements OnInit, OnDestroy {
         clearSelection: true,
         stixListConfig: {
           ...ALL_OBJECTS_STIX_LIST_CONFIG,
+          excludeIDs: this.candidates
+            .map(candidate => candidate.object_ref)
+            .filter((objectRef): objectRef is string => !!objectRef),
           select: 'many',
           selectionModel: selection,
           selectedObjectRefs,
