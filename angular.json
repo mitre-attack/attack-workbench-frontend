@@ -23,9 +23,7 @@
               "base": "dist/app"
             },
             "index": "src/index.html",
-            "polyfills": [
-              "src/polyfills.ts"
-            ],
+            "polyfills": ["src/polyfills.ts"],
             "tsConfig": "tsconfig.app.json",
             "assets": [
               {
@@ -34,7 +32,17 @@
                 "output": "/assets/docs"
               },
               "src/favicon.ico",
-              "src/assets"
+              {
+                "glob": "**/*",
+                "input": "src/assets",
+                "output": "/assets",
+                "ignore": ["config.json"]
+              },
+              {
+                "glob": "*.json",
+                "input": ".generated/assets",
+                "output": "/assets"
+              }
             ],
             "styles": [
               "node_modules/prismjs/themes/prism-twilight.css",
@@ -46,10 +54,7 @@
               "node_modules/prismjs/components/prism-json.min.js",
               "node_modules/prismjs/components/prism-python.min.js"
             ],
-            "allowedCommonJsDependencies": [
-              "moment",
-              "lodash"
-            ],
+            "allowedCommonJsDependencies": ["moment", "lodash"],
             "extractLicenses": false,
             "sourceMap": true,
             "optimization": false,
@@ -58,12 +63,6 @@
           },
           "configurations": {
             "production": {
-              "fileReplacements": [
-                {
-                  "replace": "src/environments/environment.ts",
-                  "with": "src/environments/environment.prod.ts"
-                }
-              ],
               "optimization": true,
               "outputHashing": "all",
               "sourceMap": false,
@@ -73,7 +72,7 @@
                 {
                   "type": "initial",
                   "maximumWarning": "3mb",
-                  "maximumError": "5mb"
+                  "maximumError": "6mb"
                 },
                 {
                   "type": "anyComponentStyle",
@@ -95,7 +94,8 @@
         "serve": {
           "builder": "@angular-devkit/build-angular:dev-server",
           "options": {
-            "buildTarget": "app:build"
+            "buildTarget": "app:build",
+            "proxyConfig": "proxy.conf.cjs"
           },
           "configurations": {
             "production": {
@@ -110,21 +110,7 @@
           }
         },
         "test": {
-          "builder": "@angular-devkit/build-angular:karma",
-          "options": {
-            "main": "src/test.ts",
-            "polyfills": "src/polyfills.ts",
-            "tsConfig": "tsconfig.spec.json",
-            "karmaConfig": "karma.conf.js",
-            "assets": [
-              "src/favicon.ico",
-              "src/assets"
-            ],
-            "styles": [
-              "src/style/theme.scss"
-            ],
-            "scripts": []
-          }
+          "builder": "@analogjs/vitest-angular:test"
         },
         "e2e": {
           "builder": "@angular-devkit/build-angular:protractor",
@@ -141,10 +127,7 @@
         "lint": {
           "builder": "@angular-eslint/builder:lint",
           "options": {
-            "lintFilePatterns": [
-              "src/**/*.ts",
-              "src/**/*.html"
-            ]
+            "lintFilePatterns": ["src/**/*.ts", "src/**/*.html"]
           }
         }
       }
@@ -152,8 +135,6 @@
   },
   "cli": {
     "analytics": false,
-    "schematicCollections": [
-      "angular-eslint"
-    ]
+    "schematicCollections": ["angular-eslint"]
   }
 }

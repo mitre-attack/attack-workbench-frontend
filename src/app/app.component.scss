@@ -5,6 +5,7 @@
   flex-direction: column;
   .app-body {
     flex: 1;
+    min-height: 0;
   }
   .mat-drawer {
     overflow-y: hidden;
@@ -18,15 +19,27 @@
     height: 100%;
     // overflow: auto;
   }
+  .app-nav-drawer {
+    width: 286px;
+    border-right: none !important;
+  }
   .app-content {
     display: flex;
     flex-direction: column;
-    .router-padding {
-      flex: 1;
-      box-sizing: border-box;
-      padding: 50px 50px;
-      overflow: auto;
-    }
+  }
+  .page-body {
+    flex: 1;
+    min-height: 0;
+  }
+  .page-content {
+    display: flex;
+    min-height: 0;
+  }
+  .router-padding {
+    flex: 1;
+    box-sizing: border-box;
+    padding: 24px;
+    overflow: auto;
   }
   mat-drawer {
     border-left: none !important;

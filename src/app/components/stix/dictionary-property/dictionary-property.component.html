@@ -1,0 +1,11 @@
+<div class="dictionary-property grow-to-row">
+  <app-dictionary-view
+    *ngIf="!config.mode || config.mode === 'view'"
+    [config]="config"></app-dictionary-view>
+  <app-dictionary-edit
+    *ngIf="config.mode === 'edit'"
+    [config]="config"></app-dictionary-edit>
+  <app-dictionary-diff
+    *ngIf="config.mode === 'diff'"
+    [config]="config"></app-dictionary-diff>
+</div>

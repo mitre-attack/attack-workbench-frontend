@@ -53,12 +53,4 @@
       border-left: 1px solid colors.border-color(light);
     }
   }
-
-  .admin-link {
-    margin-top: 40px;
-    .mat-badge-content.mat-badge-active {
-      color: colors.on-color(pending);
-      background-color: colors.color(pending);
-    }
-  }
 }

@@ -1,3 +1,4 @@
+import { NO_ERRORS_SCHEMA } from '@angular/core';
 import { ComponentFixture, TestBed, waitForAsync } from '@angular/core/testing';
 
 import { LoadingOverlayComponent } from './loading-overlay.component';
@@ -9,6 +10,7 @@ describe('LoadingOverlayComponent', () => {
   beforeEach(waitForAsync(() => {
     TestBed.configureTestingModule({
       declarations: [LoadingOverlayComponent],
+      schemas: [NO_ERRORS_SCHEMA],
     }).compileComponents();
   }));
 

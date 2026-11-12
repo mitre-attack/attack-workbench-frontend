@@ -1,0 +1,16 @@
+.snapshot-description-dialog {
+  width: min(88vw, 560px);
+
+  .snapshot-description-dialog-message {
+    margin: 0 0 18px;
+    line-height: 1.5;
+  }
+
+  .mat-mdc-form-field {
+    width: 100%;
+  }
+
+  textarea {
+    resize: vertical;
+  }
+}

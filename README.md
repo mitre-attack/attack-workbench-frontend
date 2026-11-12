@@ -65,6 +65,8 @@ Refer to the official [Deployment Guide](https://github.com/mitre-attack/attack-
 
 > **Note:** Docker Compose is the **recommended** and **only officially supported** method for deploying Workbench.
 
+For source builds and corporate CA configuration, see the [container build guide](docs/developer/container-builds.md).
+
 ### Manual Installation
 
 Developers who prefer to run the Workbench frontend locally (outside of Docker) can follow the steps below.
@@ -81,36 +83,27 @@ This step is only necessary if you're running the app locally using `ng serve` o
 
 #### Running Locally
 
-1. Run `ng serve`
+1. Run `npm start`
 2. Open your browser and navigate to `http://localhost:4200`
+
+For API routing, environment variables, build metadata, or frontend feature
+settings, see the [configuration guide](docs/admin/configuration.md).
+[template.env](template.env) provides the optional frontend variables.
 
 #### Building for Deployment
 
-1. Run `ng build`
+1. Run `npm run build`
 2. Copy the output from the `dist/` directory to your desired deployment location.
 
 To build the app for production, use:
 
 ```bash
-ng build --prod
-````
+npm run build-prod
+```
 
-This will compile the application using the production environment configuration.
-See [Modifying the Environment](#modifying-the-environment) for more information.
-
-
-#### Modifying the environment
-The ATT&CK Workbench Frontend is configured to connect to the REST API running under its default configuration. If the applications is configured to run on a different port, or if the application is to be hosted for access on multiple machines, the environment must be edited to reflect the URLs and port.
-
-These environment properties can be edited under `src/environments`:
-- [src/environments/environment.ts](app/src/environments/environment.ts) is the development environment with configurations for when it is hosted on a local machine or is being actively developed. This is the default environment file used when building the application.
-- [src/environments/environment.prod.ts](app/src/environments/environment.prod.ts) is the production environment for deployment inside of an organization or in cases where the user is not developing the application. When the application is built for production deployments (`ng build --prod`) this environment file is used.
-
-#### Setting the Default Landing Page
-To allow for additional customization, the ATT&CK Workbench enables users to set a default landing page for their instance of Workbench. To set the default landing page:
-- Open up the config file, found at `src/assets/config.ts`.
-- Set the `defaultLandingPage` variable to the url path you want to set as the default landing page
-  - You can set the default to a more general page, such as the tactic list view `"defaultLandingPage": "tactic"`, or to a specific page, such as a certain matrix `"defaultLandingPage": "matrix/x-mitre-matrix--eafc1b4c-5e56-4965-bd4e-66a6a89c88cc"`
+This uses the production Angular configuration and generates build metadata.
+See the [configuration guide](docs/admin/configuration.md) to change compiled
+settings or the default landing page.
 
 ### Developer Setup
 

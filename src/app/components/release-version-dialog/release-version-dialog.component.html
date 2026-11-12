@@ -1,0 +1,28 @@
+<h2 mat-dialog-title>Change release version</h2>
+
+<mat-dialog-content>
+  <p>
+    Change release {{ data.currentVersion }} without changing the snapshot it
+    identifies. The new version must remain between the adjacent releases.
+  </p>
+  <mat-form-field appearance="outline">
+    <mat-label>Release version</mat-label>
+    <input matInput [(ngModel)]="version" placeholder="1.2" />
+    <mat-hint>Use MAJOR.MINOR format.</mat-hint>
+    <mat-error *ngIf="isInvalid">Enter a version such as 1.2.</mat-error>
+  </mat-form-field>
+</mat-dialog-content>
+
+<mat-dialog-actions align="end">
+  <button mat-button type="button" [mat-dialog-close]="undefined">
+    Cancel
+  </button>
+  <button
+    mat-raised-button
+    type="button"
+    color="primary"
+    [disabled]="isInvalid || normalizedVersion === data.currentVersion"
+    (click)="save()">
+    Change version
+  </button>
+</mat-dialog-actions>

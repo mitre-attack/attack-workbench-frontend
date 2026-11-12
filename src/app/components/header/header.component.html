@@ -1,136 +1,42 @@
 <mat-toolbar class="header">
-  <!-- Title & Help -->
-  <div class="app-title">
-    <h1>
-      <a routerLink="">ATT&CK Workbench</a>
-    </h1>
-  </div>
-  <button mat-icon-button routerLink="/docs" matTooltip="help">
-    <mat-icon aria-label="help">help_outline</mat-icon>
-  </button>
   <div class="spacer"></div>
 
-  <!-- Stix Object Routes -->
-  <div
-    *ngIf="filteredRoutes.length > 0"
-    class="links"
-    #linkMenu
-    [ngClass]="{ 'pad-right': isLoggedIn }"
-    [ngStyle]="{ visibility: showHamburger ? 'hidden' : 'visible' }">
-    <!-- non-grouped routes -->
-    <button
-      mat-button
-      *ngFor="let stixRoute of filteredRoutes"
-      [disabled]="!isLoggedIn"
-      [routerLink]="stixRoute.path">
-      {{ stixRoute.data.breadcrumb }}
-    </button>
-
-    <!-- drop downs for grouped routes -->
-    <ng-container *ngFor="let section of groupedRoutes | keyvalue">
-      <button
-        mat-button
-        [matMenuTriggerFor]="menu"
-        [disabled]="!isLoggedIn"
-        (click)="setSectionDropdown(section)">
-        {{ section.key }}
-        <mat-icon>arrow_drop_down</mat-icon>
-      </button>
-      <!-- dynamic dropdown menus -->
-      <mat-menu #menu="matMenu" backdropClass="override-light">
-        <button
-          mat-menu-item
-          *ngFor="let stixRoute of currentDropdown?.value"
-          [ngClass]="{ 'text-deemphasis': stixRoute.data.deprecated }"
-          [disabled]="!isLoggedIn"
-          [routerLink]="stixRoute.path">
-          @if (stixRoute.data.deprecated) {
-            <mat-icon
-              style="margin-right: 6px"
-              [ngClass]="{ 'text-deemphasis': stixRoute.data.deprecated }"
-              >warning</mat-icon
-            >
-          }
-          {{ stixRoute.data.breadcrumb }}
-        </button>
-        <button *ngIf="section.key === 'more'" mat-menu-item routerLink="/docs">
-          documentation
-        </button>
-      </mat-menu>
-    </ng-container>
-  </div>
-
-  <!-- Hamburger Dropdown Menus -->
-  <div
-    class="hamburger"
-    [ngStyle]="{ visibility: showHamburger ? 'visible' : 'hidden' }">
-    <button
-      [matMenuTriggerFor]="navigation"
-      mat-icon-button
-      aria-label="navigation">
-      <mat-icon>menu</mat-icon>
-    </button>
-
-    <!-- Account Options Menu -->
-    <mat-menu #accountOptions="matMenu" backdropClass="override-light">
-      <button mat-menu-item routerLink="/profile">profile</button>
-      <button
-        *ngIf="isAdmin || isTeamLead"
-        mat-menu-item
-        routerLink="/dashboard">
-        dashboard
-      </button>
-      <button mat-menu-item (click)="logout()">logout</button>
-    </mat-menu>
-
-    <!-- Navigation Menu -->
-    <mat-menu #navigation="matMenu" backdropClass="override-light">
-      <button
-        mat-menu-item
-        *ngFor="let stixRoute of allRoutes"
-        [disabled]="!isLoggedIn"
-        [ngClass]="{ 'text-deemphasis': stixRoute.data.deprecated }"
-        [routerLink]="stixRoute.path">
-        @if (stixRoute.data.deprecated) {
-          <mat-icon
-            style="margin-right: 6px"
-            [ngClass]="{ 'text-deemphasis': stixRoute.data.deprecated }"
-            >warning</mat-icon
-          >
-        }
-        {{ stixRoute.data.breadcrumb }}
-      </button>
-      <button mat-menu-item routerLink="/docs">documentation</button>
-      <button mat-menu-item *ngIf="!isLoggedIn" (click)="login()">login</button>
-      <button
-        mat-menu-item
-        *ngIf="!isLoggedIn && authnType === 'oidc'"
-        (click)="register()">
-        register
-      </button>
-    </mat-menu>
-  </div>
-
-  <!-- Login/Register -->
-  <ng-container *ngIf="!isLoggedIn && !showHamburger">
+  <ng-container *ngIf="!isLoggedIn">
     <button mat-button class="login-register" (click)="login()">login</button>
     <button mat-button *ngIf="authnType === 'oidc'" (click)="register()">
       register
     </button>
   </ng-container>
 
-  <!-- Account Icon -->
   <ng-container *ngIf="isLoggedIn">
     <button
       class="account"
-      [ngClass]="{ 'pad-left': showHamburger }"
-      mat-icon-button
+      mat-button
       [matMenuTriggerFor]="accountOptions"
-      aria-label="account options">
-      <svg
-        [data-jdenticon-value]="username"
+      [attr.aria-label]="'account options for ' + username">
+      <app-user-avatar
+        [name]="username"
+        [size]="40"
         [matTooltip]="username"
-        matTooltipPosition="below"></svg>
+        matTooltipPosition="below"></app-user-avatar>
+      <span class="account-name">{{ username }}</span>
     </button>
   </ng-container>
+
+  <mat-menu
+    #accountOptions="matMenu"
+    backdropClass="override-light"
+    class="account-menu"
+    xPosition="before"
+    yPosition="below"
+    [overlapTrigger]="false">
+    <button mat-menu-item routerLink="/profile">
+      <mat-icon aria-hidden="true">person</mat-icon>
+      <span>view profile</span>
+    </button>
+    <button class="logout-menu-item" mat-menu-item (click)="logout()">
+      <mat-icon aria-hidden="true">logout</mat-icon>
+      <span>logout</span>
+    </button>
+  </mat-menu>
 </mat-toolbar>

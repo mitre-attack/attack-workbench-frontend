@@ -1,10 +1,25 @@
 .confirmation-dialog {
   margin: 0 24px;
   text-align: center;
+
+  &.simple-confirmation-dialog {
+    text-align: left;
+
+    markdown {
+      display: block;
+      font-size: 14px;
+      line-height: 20px;
+    }
+  }
+
   .buttons {
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
     margin: 18px 0;
+
     button + button {
-      margin-left: 10px;
+      margin-left: 0;
     }
   }
 }

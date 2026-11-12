@@ -1,0 +1,47 @@
+export enum SnapshotCreationCause {
+  Unknown = 'unknown',
+  TrackCreated = 'track_created',
+  ReleaseTagged = 'release_tagged',
+  TrackCloned = 'track_cloned',
+  BundleImported = 'bundle_imported',
+  MetadataUpdated = 'metadata_updated',
+  ConfigurationUpdated = 'configuration_updated',
+  CandidatesAdded = 'candidates_added',
+  CandidateRemoved = 'candidate_removed',
+  CandidatesReviewed = 'candidates_reviewed',
+  CandidatesPromoted = 'candidates_promoted',
+  CandidateVersionUpdated = 'candidate_version_updated',
+  StagedDemoted = 'staged_demoted',
+  CandidatesAutoPromoted = 'candidates_auto_promoted',
+  MemberSynced = 'member_synced',
+  CompositionUpdated = 'composition_updated',
+  ManualSnapshot = 'manual_snapshot',
+  ScheduledSnapshot = 'scheduled_snapshot',
+  QuarantinePromoted = 'quarantine_promoted',
+}
+
+export const SNAPSHOT_CREATION_CAUSE_LABELS: Record<
+  SnapshotCreationCause,
+  string
+> = {
+  [SnapshotCreationCause.Unknown]: 'Creation cause unavailable',
+  [SnapshotCreationCause.TrackCreated]: 'Track created',
+  [SnapshotCreationCause.ReleaseTagged]: 'Release tagged',
+  [SnapshotCreationCause.TrackCloned]: 'Track copied',
+  [SnapshotCreationCause.BundleImported]: 'Bundle imported',
+  [SnapshotCreationCause.MetadataUpdated]: 'Track details updated',
+  [SnapshotCreationCause.ConfigurationUpdated]: 'Configuration updated',
+  [SnapshotCreationCause.CandidatesAdded]: 'Candidates added',
+  [SnapshotCreationCause.CandidateRemoved]: 'Candidate removed',
+  [SnapshotCreationCause.CandidatesReviewed]: 'Candidates reviewed',
+  [SnapshotCreationCause.CandidatesPromoted]: 'Candidates promoted',
+  [SnapshotCreationCause.CandidateVersionUpdated]: 'Candidate version updated',
+  [SnapshotCreationCause.StagedDemoted]: 'Staged objects demoted',
+  [SnapshotCreationCause.CandidatesAutoPromoted]:
+    'Candidates automatically promoted',
+  [SnapshotCreationCause.MemberSynced]: 'Object changes synchronized',
+  [SnapshotCreationCause.CompositionUpdated]: 'Composition updated',
+  [SnapshotCreationCause.ManualSnapshot]: 'Manual snapshot',
+  [SnapshotCreationCause.ScheduledSnapshot]: 'Scheduled snapshot',
+  [SnapshotCreationCause.QuarantinePromoted]: 'Quarantined object promoted',
+};

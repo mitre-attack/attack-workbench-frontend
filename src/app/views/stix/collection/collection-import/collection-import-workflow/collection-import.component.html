@@ -112,7 +112,7 @@
       <ng-template #loadingStep2_marker>
         <app-loading-overlay
           *ngIf="loadingStep2"
-          message="importing collection"></app-loading-overlay>
+          [phaseProgress]="phaseProgress"></app-loading-overlay>
       </ng-template>
     </mat-step>
     <mat-step>

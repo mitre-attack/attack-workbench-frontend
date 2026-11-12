@@ -16,18 +16,17 @@ Before running the application locally, ensure you have the following set up:
 
     Follow the official [MongoDB installation guide](https://www.mongodb.com/docs/manual/installation/) to install MongoDB on your operating system.
 
-
 ## Configure and Run the REST API
 
-#### 1. Install dependencies
-    
+### 1. Install dependencies
+
 Navigate to the `attack-workbench-rest-api` directory and run
 
-```
+```sh
 npm install
 ```
 
-#### 2. Configure the system
+### 2. Configure the system
 
 Configure the application using environment variables, a configuration file, or a combination. Please refer to the documentation on how to [Configure the System](https://github.com/mitre-attack/attack-workbench-rest-api?tab=readme-ov-file#step-3-configure-the-system) for more details.
 
@@ -39,7 +38,7 @@ For example, you can use a custom configuration to adapt to your specific enviro
     export DATABASE_URL=mongodb://localhost/attack-workspace
     export JSON_CONFIG_PATH="resources/sample-configurations/multiple-apikey-services.json"
     export WB_REST_SERVICE_ACCOUNT_CHALLENGE_APIKEY_ENABLE=true
-    export NODE_EXTRA_CA_CERTS="path/to/cert.crt"    
+    export NODE_EXTRA_CA_CERTS="path/to/cert.crt"
     ```
 
 - Ensure this file is sourced when starting the backend:
@@ -48,38 +47,52 @@ For example, you can use a custom configuration to adapt to your specific enviro
     source .rest-api-env
     ```
 
-#### 3. Run the REST API
+### 3. Run the REST API
 
-```
+```sh
 node ./bin/www
 ```
 
 Or to run it in the background:
 
-```
+```sh
 node ./bin/www &
 ```
 
 ## Setting Up the Frontend
 
-#### 1. Install dependencies
+### 1. Install dependencies
 
 Navigate to the project's root directory and run
 
-```
+```sh
 npm install
 ```
 
-#### 2. Run the frontend locally
+### 2. Run the frontend locally
 
-```
-ng serve
+```sh
+npm start
 ```
 
 Open your browser and navigate to `http://localhost:4200`
 
+### Frontend configuration
 
-## Note: Recommended setup using Visual Studio Code Workspaces
+For API targets, environment settings, and build metadata, follow the
+[configuration guide](admin/configuration.md).
+
+### Snapshot preview
+
+```bash
+npm run preview:snapshots
+```
+
+Open <http://localhost:4300/dashboard/release-management/release-track--snapshot-preview>.
+The preview uses an in-memory fixture API with simulated data and operations.
+Stop with Ctrl+C; restarting resets the data.
+
+## Recommended setup using Visual Studio Code Workspaces
 
 To streamline your development workflow, you can configure a Visual Studio Code workspace for easier management of both the frontend and REST API repositories. Open VS Code in the `attack-workbench-frontend` directory, add the directory for the REST API repository, and save the workspace.
 
@@ -104,7 +117,7 @@ Example VS Code Workspace configuration:
             "DATABASE_URL": "mongodb://localhost/attack-workspace",
             "JSON_CONFIG_PATH": "resources/sample-configurations/multiple-apikey-services.json",
             "WB_REST_SERVICE_ACCOUNT_CHALLENGE_APIKEY_ENABLE": "true",
-            "NODE_EXTRA_CA_CERTS": "path/to/cert.crt" 
+            "NODE_EXTRA_CA_CERTS": "path/to/cert.crt"
         },
         "restoreTerminals.runOnStartup": true,
         "restoreTerminals.terminals": [
@@ -132,7 +145,7 @@ Example VS Code Workspace configuration:
                             "git checkout develop",
                             "git pull",
                             "npm ci",
-                            "ng serve --open"
+                            "npm start --open"
                         ]
                     }
                 ]

@@ -1,0 +1,33 @@
+<div class="snapshot-description-dialog">
+  <h2 mat-dialog-title>{{ data.title }}</h2>
+
+  <mat-dialog-content>
+    <p *ngIf="data.message" class="snapshot-description-dialog-message">
+      {{ data.message }}
+    </p>
+
+    <mat-form-field appearance="outline">
+      <mat-label>Snapshot notes</mat-label>
+      <textarea
+        matInput
+        [(ngModel)]="description"
+        [maxlength]="maxLength"
+        rows="7"
+        placeholder="Summarize the purpose, changes, or analyst context for this snapshot."></textarea>
+      <mat-hint align="start">Shown on this snapshot in history</mat-hint>
+      <mat-hint align="end">{{ description.length }}/{{ maxLength }}</mat-hint>
+    </mat-form-field>
+  </mat-dialog-content>
+
+  <mat-dialog-actions align="end">
+    <button mat-button type="button" (click)="cancel()">Cancel</button>
+    <button
+      mat-raised-button
+      type="button"
+      color="primary"
+      [disabled]="isInvalid"
+      (click)="save()">
+      {{ data.confirmLabel || 'Save notes' }}
+    </button>
+  </mat-dialog-actions>
+</div>

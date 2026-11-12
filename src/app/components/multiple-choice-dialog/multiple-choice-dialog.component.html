@@ -5,7 +5,7 @@
     <div
       class="choice"
       *ngFor="let choice of config.choices"
-      (click)="dialogRef.close(choice.label)">
+      (click)="dialogRef.close(choice.value || choice.label)">
       <h3>{{ choice.label }}</h3>
       <p *ngIf="choice.description">{{ choice.description }}</p>
     </div>

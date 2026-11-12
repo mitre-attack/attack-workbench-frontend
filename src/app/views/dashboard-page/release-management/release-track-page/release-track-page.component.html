@@ -1,0 +1,2110 @@
+<ng-template #cleanupNotification let-operation>
+  <div class="cleanup-notification" role="status">
+    <span>
+      Draft cleanup completed: {{ operation.deleted_count }} drafts deleted;
+      {{ operation.protected_count }} protected drafts and all tagged releases
+      preserved.
+    </span>
+    <button
+      mat-icon-button
+      type="button"
+      aria-label="Dismiss draft cleanup notification"
+      (click)="dismissCleanupNotification()">
+      <mat-icon>close</mat-icon>
+    </button>
+  </div>
+</ng-template>
+<div class="release-track-page">
+  <div class="release-track-header">
+    <h1>
+      {{ releaseTrackName }}
+    </h1>
+    <div
+      *ngIf="isVirtualReleaseTrack && !selectedSnapshotModified"
+      class="button-group release-track-actions">
+      <button
+        mat-raised-button
+        color="primary"
+        [disabled]="!canCreateDraft"
+        (click)="onDraft()">
+        <mat-spinner
+          *ngIf="isCreatingDraft"
+          class="snapshot-action-spinner"
+          diameter="18"></mat-spinner>
+        {{ isCreatingDraft ? 'Creating draft' : 'Create Draft' }}
+        <mat-icon *ngIf="!isCreatingDraft">local_see</mat-icon>
+      </button>
+    </div>
+  </div>
+  <div
+    *ngIf="activityMessage as message"
+    class="page-activity"
+    role="status"
+    aria-live="polite">
+    <mat-progress-bar
+      mode="indeterminate"
+      aria-hidden="true"></mat-progress-bar>
+    <p class="page-activity-message">
+      <mat-spinner diameter="16" aria-hidden="true"></mat-spinner>
+      {{ message }} Stay on this page until it finishes.
+    </p>
+  </div>
+  <section
+    *ngIf="
+      isVirtualReleaseTrack && (cleanupMessage || draftCleanupResults.length)
+    "
+    class="draft-cleanup-status"
+    aria-label="Draft cleanup operations">
+    <p *ngIf="cleanupMessage" role="status">{{ cleanupMessage }}</p>
+    <article
+      *ngFor="let operation of draftCleanupResults"
+      class="draft-cleanup-operation">
+      <div>
+        <strong
+          >{{
+            operation.kind === 'squash' ? 'Release-time' : 'Retention'
+          }}
+          cleanup: {{ operation.status }}</strong
+        >
+        <p>
+          {{ operation.deleted_count }} deleted of
+          {{ operation.eligible_count }} eligible drafts;
+          {{ operation.protected_count }} protected drafts preserved. Releases
+          are preserved.
+        </p>
+        <p *ngIf="operation.release_committed">
+          Release committed. Do not tag again to repair cleanup.
+        </p>
+        <p *ngIf="operation.error">{{ operation.error }}</p>
+        <small
+          >Operation: <code>{{ operation.operation_id }}</code></small
+        >
+      </div>
+      <button
+        *ngIf="canManageDraftLifecycle && operation.status !== 'completed'"
+        mat-stroked-button
+        [disabled]="retryingCleanup.has(operation.operation_id)"
+        (click)="retryDraftCleanup(operation)">
+        {{
+          retryingCleanup.has(operation.operation_id)
+            ? 'Repairing cleanup'
+            : 'Retry cleanup'
+        }}
+      </button>
+    </article>
+  </section>
+
+  <app-virtual-snapshot-contents
+    *ngIf="isVirtualReleaseTrack && selectedSnapshotModified"
+    [trackId]="id"
+    [modified]="selectedSnapshotModified"
+    [title]="selectedSnapshot?.title || 'Snapshot'"
+    [isLatest]="selectedSnapshot?.isLatest || false"
+    [canResolve]="canEditReleaseTrack"
+    (back)="onBackToReleases()"
+    (resolved)="onQuarantineResolved()"></app-virtual-snapshot-contents>
+
+  <app-stix-page-tabs
+    *ngIf="releaseTrack && !(isVirtualReleaseTrack && selectedSnapshotModified)"
+    [detailsTemplate]="isVirtualReleaseTrack ? historyTpl : detailsTpl"
+    [detailsLabel]="isVirtualReleaseTrack ? 'Releases' : 'Board'"
+    [showHistory]="false"
+    [showNotes]="false"
+    [showMembership]="false"
+    (selectedIndexChange)="onSelectedTabChange($event)"
+    [customTabs]="
+      isVirtualReleaseTrack
+        ? [{ label: 'Config', template: configTpl }]
+        : [
+            { label: 'Releases', template: historyTpl },
+            { label: 'Config', template: configTpl },
+          ]
+    "></app-stix-page-tabs>
+
+  <ng-template #detailsTpl>
+    <!-- stats summary -->
+    <div class="release-track-board">
+      <div class="labelled-box summary-frame">
+        <div
+          class="summary-overview content no-label"
+          aria-label="Release track summary">
+          <section class="summary-description">
+            <div class="summary-section-header">
+              <h2>Description</h2>
+              <button
+                *ngIf="!isEditingDescription"
+                class="description-edit-button"
+                mat-icon-button
+                type="button"
+                aria-label="Edit release track description"
+                (click)="onEditDescription()">
+                <mat-icon>edit</mat-icon>
+              </button>
+            </div>
+
+            <p
+              *ngIf="!isEditingDescription"
+              class="summary-description-text"
+              [ngClass]="{ empty: !releaseTrackDescription }">
+              {{ releaseTrackDescription || 'No description provided.' }}
+            </p>
+
+            <div *ngIf="isEditingDescription" class="description-editor">
+              <mat-form-field appearance="outline">
+                <textarea
+                  matInput
+                  rows="3"
+                  placeholder="Describe this release track..."
+                  [(ngModel)]="descriptionDraft"></textarea>
+              </mat-form-field>
+              <div class="small-buttons description-actions">
+                <button
+                  mat-stroked-button
+                  type="button"
+                  (click)="onCancelDescriptionEdit()">
+                  Cancel
+                </button>
+                <button
+                  mat-raised-button
+                  color="primary"
+                  type="button"
+                  [disabled]="isSavingDescription"
+                  (click)="onSaveDescription()">
+                  Save
+                </button>
+              </div>
+            </div>
+          </section>
+
+          <div class="summary-stats" aria-label="Release track object counts">
+            <div class="summary-metric candidates-summary">
+              <strong class="summary-count view-color">
+                {{ candidates.length || 0 }}
+              </strong>
+              <div class="summary-copy">
+                <strong class="summary-heading">Candidates</strong>
+                <span class="text-deemphasis">in this draft</span>
+              </div>
+            </div>
+
+            <div class="summary-metric staged-summary">
+              <strong class="summary-count promote-color">
+                {{ staged.length || 0 }}
+              </strong>
+              <div class="summary-copy">
+                <strong class="summary-heading">Staged</strong>
+                <span class="text-deemphasis">for next release</span>
+              </div>
+            </div>
+
+            <div class="summary-metric members-summary">
+              <strong class="summary-count">
+                {{ members.length || 0 }}
+              </strong>
+              <div class="summary-copy">
+                <strong class="summary-heading">Released Members</strong>
+                <span class="text-deemphasis">published</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <ng-container>
+        <div class="release-columns">
+          <div
+            class="release-column"
+            [ngClass]="{
+              'released-members-column': lane.isReleasedMembers,
+              'released-members-collapsed':
+                lane.isReleasedMembers && !showReleasedMembers,
+            }"
+            *ngFor="let lane of workspaceLanes; trackBy: trackByLaneKey">
+            <div
+              class="labelled-box track-panel"
+              [ngClass]="'track-panel-' + lane.modifier">
+              <button
+                *ngIf="
+                  lane.isReleasedMembers && !showReleasedMembers;
+                  else expandedLanePanel
+                "
+                class="released-members-rail"
+                type="button"
+                (click)="toggleReleasedMembers()">
+                <span class="released-members-label">
+                  Released Members ({{ lane.items.length }})
+                </span>
+              </button>
+
+              <ng-template #expandedLanePanel>
+                <div class="content no-label">
+                  <div class="card-header member-list">
+                    <h3
+                      [ngClass]="{
+                        'view-color': lane.modifier === 'candidates',
+                        'review-color': lane.modifier === 'awaiting-review',
+                        'promote-color': lane.modifier === 'staged',
+                      }">
+                      {{ lane.title }} ({{ lane.items.length }})
+                    </h3>
+                    <div class="small-buttons lane-actions">
+                      <button
+                        *ngIf="canReviewLane(lane)"
+                        class="review-color"
+                        mat-stroked-button
+                        type="button"
+                        (click)="onReviewAll(lane.items)">
+                        <mat-icon>fact_check</mat-icon>
+                        Review all
+                      </button>
+                      <button
+                        *ngIf="canReviewLane(lane)"
+                        class="review-color"
+                        mat-stroked-button
+                        type="button"
+                        (click)="onApproveAll(lane.items)">
+                        <mat-icon>done_all</mat-icon>
+                        Approve all
+                      </button>
+                      <button
+                        *ngIf="canAddCandidates(lane)"
+                        class="view-color"
+                        mat-stroked-button
+                        (click)="onAddCandidate()">
+                        <mat-icon>add</mat-icon>
+                        Add
+                      </button>
+                      <button
+                        *ngIf="lane.isReleasedMembers"
+                        mat-stroked-button
+                        type="button"
+                        (click)="toggleReleasedMembers()">
+                        <mat-icon>
+                          {{
+                            showReleasedMembers
+                              ? 'visibility_off'
+                              : 'visibility'
+                          }}
+                        </mat-icon>
+                        {{ showReleasedMembers ? 'Hide' : 'Show' }}
+                      </button>
+                    </div>
+                  </div>
+
+                  <mat-divider></mat-divider>
+
+                  <div class="card-body list">
+                    <div class="empty-state" *ngIf="!lane.items.length">
+                      {{ lane.emptyLabel }}
+                    </div>
+                    <div
+                      *ngFor="
+                        let item of lane.items;
+                        trackBy: trackByObjectRef
+                      ">
+                      <ng-container
+                        *ngTemplateOutlet="
+                          memberTpl;
+                          context: {
+                            $implicit: item,
+                            lane: lane,
+                          }
+                        "></ng-container>
+                    </div>
+                  </div>
+                </div>
+              </ng-template>
+            </div>
+          </div>
+        </div>
+      </ng-container>
+    </div>
+  </ng-template>
+
+  <ng-template #memberTpl let-item let-lane="lane">
+    <app-release-track-object-card
+      [item]="item"
+      [cardType]="lane.type"
+      [laneStatus]="getLaneStatus(item, lane)"
+      [showDescription]="shouldShowLaneDescription(lane)"
+      [showDiff]="!canReviewAndApprove(item, lane)"
+      [diffDisabled]="!shouldShowDiff(item)"
+      [diffDisabledMessage]="getDiffUnavailableMessage(item) || ''"
+      [showModifiedMeta]="true"
+      (viewObject)="onView($event.object_ref)"
+      (diffObject)="onDiff($event)">
+      <app-status-chip
+        card-header-action
+        [status]="getLaneStatus(item, lane)"></app-status-chip>
+
+      <div
+        *ngIf="
+          canReviewAndApprove(item, lane) ||
+          canManuallyPromote(lane) ||
+          canManuallyDemote(lane)
+        "
+        card-footer-action
+        class="small-buttons">
+        <button
+          *ngIf="canReviewAndApprove(item, lane)"
+          class="review-color"
+          mat-stroked-button
+          type="button"
+          (click)="onReviewAndApprove(item)">
+          <mat-icon>fact_check</mat-icon>
+          Review
+        </button>
+        <button
+          *ngIf="canManuallyPromote(lane)"
+          class="promote-color"
+          mat-stroked-button
+          type="button"
+          (click)="onPromote(item.object_ref)">
+          <mat-icon>arrow_forward</mat-icon>
+          Promote
+        </button>
+        <button
+          *ngIf="canManuallyDemote(lane)"
+          class="demote-color"
+          mat-stroked-button
+          type="button"
+          (click)="onDemote(item)">
+          <mat-icon>arrow_back</mat-icon>
+          Demote
+        </button>
+      </div>
+    </app-release-track-object-card>
+  </ng-template>
+
+  <ng-template #historyTpl>
+    <div class="history-tpl">
+      <section *ngIf="isVirtualReleaseTrack" class="virtual-releases-intro">
+        <div class="virtual-releases-heading">
+          <mat-icon aria-hidden="true">layers</mat-icon>
+          <div>
+            <h2>Virtual snapshots</h2>
+            <p *ngIf="!isEditingDescription">
+              {{
+                releaseTrackDescription ||
+                  'A release track composed from component snapshots.'
+              }}
+            </p>
+            <button
+              *ngIf="canEditReleaseTrack && !isEditingDescription"
+              mat-button
+              type="button"
+              (click)="onEditDescription()">
+              <mat-icon>edit</mat-icon>
+              Edit description
+            </button>
+            <div *ngIf="isEditingDescription" class="description-editor">
+              <mat-form-field appearance="outline">
+                <textarea
+                  matInput
+                  rows="3"
+                  aria-label="Release track description"
+                  [(ngModel)]="descriptionDraft"></textarea>
+              </mat-form-field>
+              <div class="small-buttons description-actions">
+                <button
+                  mat-stroked-button
+                  type="button"
+                  (click)="onCancelDescriptionEdit()">
+                  Cancel
+                </button>
+                <button
+                  mat-raised-button
+                  color="primary"
+                  type="button"
+                  [disabled]="isSavingDescription"
+                  (click)="onSaveDescription()">
+                  Save
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+        <p class="text-deemphasis">
+          Open a snapshot to explore its complete graph: objects, relationships,
+          and supporting content. Each snapshot preserves its own graph
+          selection.
+        </p>
+        <p *ngIf="hasRetiredComponentTracks" role="alert">
+          This configuration uses the retired members-only latest draft rule.
+          Edit Config and explicitly choose Latest preview or Latest tagged for
+          each retired rule before materializing again. Existing snapshots are
+          unchanged.
+        </p>
+      </section>
+      <div
+        *ngIf="isVirtualReleaseTrack"
+        class="draft-lifecycle-controls history-controls">
+        <mat-form-field appearance="outline" subscriptSizing="dynamic">
+          <mat-label>History view</mat-label>
+          <mat-select
+            [value]="historyFilter"
+            (selectionChange)="onHistoryFilterChange($event.value)">
+            <mat-option value="drafts">Drafts only</mat-option>
+            <mat-option value="releases">Releases only</mat-option>
+            <mat-option value="all">All releases</mat-option>
+          </mat-select>
+        </mat-form-field>
+      </div>
+      <p *ngIf="historyMessage" class="draft-lifecycle-message" role="alert">
+        {{ historyMessage }}
+      </p>
+      <div
+        *ngIf="isLoadingSnapshotHistory && !snapshotHistory.length"
+        class="empty-state">
+        Loading snapshots
+      </div>
+
+      <div
+        *ngIf="!isLoadingSnapshotHistory && !snapshotHistory.length"
+        class="empty-state">
+        {{
+          isVirtualReleaseTrack
+            ? 'No snapshots in this history view'
+            : 'No tagged releases or current draft snapshot'
+        }}
+      </div>
+
+      <div class="snapshot-history-summary">
+        <span>Tagged releases: {{ historyCounts.tagged }}</span>
+        <span>Drafts: {{ historyCounts.drafts }}</span>
+        <span>Total: {{ historyCounts.total }}</span>
+      </div>
+
+      <div *ngIf="snapshotHistory.length" class="snapshot-history-list">
+        <article
+          *ngFor="let item of snapshotHistory; trackBy: trackSnapshotHistory"
+          class="snapshot-history-entry">
+          <div
+            class="snapshot-history-marker"
+            [class.snapshot-history-marker-tagged]="item.isTagged">
+            <mat-icon>{{ item.isTagged ? 'sell' : 'schedule' }}</mat-icon>
+          </div>
+
+          <div
+            class="snapshot-history-card"
+            [class.snapshot-history-card-tagged]="item.isTagged">
+            <div class="snapshot-history-card-header">
+              <div class="snapshot-history-title">
+                <div class="snapshot-history-title-row">
+                  <h3 [class.promote-color]="item.isTagged">
+                    <ng-container *ngIf="item.isTagged; else draftTitle">
+                      {{ item.title }}
+                    </ng-container>
+                    <ng-template #draftTitle>
+                      <ng-container *ngIf="item.created; else unknownDate">
+                        {{ item.created | date: 'MMM d, y, h:mm:ss a' }}
+                      </ng-container>
+                    </ng-template>
+                  </h3>
+                  <app-workbench-chip
+                    *ngIf="item.isLatest"
+                    variant="latest"></app-workbench-chip>
+                  <div class="snapshot-history-chips">
+                    <span
+                      class="snapshot-creator"
+                      [matTooltip]="
+                        item.snapshot.creation_actor?.kind === 'user'
+                          ? 'Created by ' +
+                            getSnapshotCreatorName(item.snapshot.creation_actor)
+                          : getSnapshotCreatorName(item.snapshot.creation_actor)
+                      ">
+                      <app-user-avatar
+                        *ngIf="item.snapshot.creation_actor?.kind === 'user'"
+                        [name]="
+                          getSnapshotCreatorName(item.snapshot.creation_actor)
+                        "
+                        [size]="24">
+                      </app-user-avatar>
+                      <mat-icon
+                        *ngIf="item.snapshot.creation_actor?.kind === 'system'"
+                        aria-hidden="true"
+                        >schedule</mat-icon
+                      >
+                      <span>{{
+                        getSnapshotCreatorName(item.snapshot.creation_actor)
+                      }}</span>
+                    </span>
+                    <app-workbench-chip
+                      variant="standard"
+                      [label]="
+                        getSnapshotCreationCauseLabel(
+                          item.snapshot.creation_cause
+                        )
+                      "
+                      matTooltip="Operation that created this snapshot.">
+                    </app-workbench-chip>
+                    <app-workbench-chip
+                      [variant]="
+                        item.isTagged ? 'tagged' : 'draft'
+                      "></app-workbench-chip>
+                  </div>
+                </div>
+                <div *ngIf="item.isTagged" class="snapshot-history-dates">
+                  <span class="snapshot-history-date">
+                    <mat-icon aria-hidden="true">schedule</mat-icon>
+                    <span>Snapshot</span>
+                    <time
+                      *ngIf="item.modified; else unknownDate"
+                      [attr.datetime]="item.modified">
+                      {{ item.modified | date: 'MMM d, y, h:mm:ss a' }}
+                    </time>
+                  </span>
+                  <span *ngIf="item.taggedAt" class="snapshot-history-date">
+                    <mat-icon aria-hidden="true">sell</mat-icon>
+                    <span>Tagged</span>
+                    <time [attr.datetime]="item.taggedAt.toISOString()">
+                      {{ item.taggedAt | date: 'MMM d, y, h:mm:ss a' }}
+                    </time>
+                  </span>
+                </div>
+                <div
+                  *ngIf="item.snapshot.snapshot_description"
+                  class="snapshot-history-description">
+                  <mat-icon aria-hidden="true">notes</mat-icon>
+                  <p>{{ item.snapshot.snapshot_description }}</p>
+                </div>
+              </div>
+
+              <div class="snapshot-history-actions small-buttons">
+                <button
+                  *ngIf="isVirtualReleaseTrack"
+                  mat-flat-button
+                  color="primary"
+                  [disabled]="!item.modified"
+                  (click)="onOpenSnapshot(item)">
+                  <mat-icon>folder_open</mat-icon>
+                  Open Snapshot
+                </button>
+                <button
+                  *ngIf="canEditReleaseTrack && !item.isTagged"
+                  mat-stroked-button
+                  [disabled]="
+                    isUpdatingSnapshotDescription(item) || !item.modified
+                  "
+                  [attr.aria-label]="
+                    (item.snapshot.snapshot_description ? 'Edit' : 'Add') +
+                    ' notes for ' +
+                    item.title
+                  "
+                  (click)="onEditSnapshotDescription(item)">
+                  <mat-spinner
+                    *ngIf="isUpdatingSnapshotDescription(item)"
+                    class="snapshot-action-spinner"
+                    diameter="18"></mat-spinner>
+                  <mat-icon *ngIf="!isUpdatingSnapshotDescription(item)">
+                    edit_note
+                  </mat-icon>
+                  {{
+                    isUpdatingSnapshotDescription(item)
+                      ? 'Saving notes'
+                      : item.snapshot.snapshot_description
+                        ? 'Edit notes'
+                        : 'Add notes'
+                  }}
+                </button>
+                <button
+                  *ngIf="!item.isTagged"
+                  class="view-color"
+                  mat-stroked-button
+                  [disabled]="isReleasing || !item.modified"
+                  (click)="onTagSnapshot(item)">
+                  <mat-spinner
+                    *ngIf="isPreviewingSnapshot(item)"
+                    class="snapshot-action-spinner"
+                    diameter="18"></mat-spinner>
+                  <mat-icon *ngIf="!isPreviewingSnapshot(item)">sell</mat-icon>
+                  {{
+                    isPreviewingSnapshot(item)
+                      ? 'Preparing preview'
+                      : 'Preview & Tag'
+                  }}
+                </button>
+                <button
+                  mat-stroked-button
+                  [disabled]="!item.modified"
+                  matTooltip="Download this snapshot as a STIX 2.0 bundle, STIX 2.1 bundle, or Workbench JSON, or copy its summary."
+                  (click)="onExportSnapshot(item)">
+                  <mat-icon>cloud_download</mat-icon>
+                  Export&hellip;
+                </button>
+                <button
+                  *ngIf="item.isTagged && canManageTaggedReleases"
+                  mat-stroked-button
+                  [disabled]="isRetaggingRelease(item) || !item.modified"
+                  [attr.aria-label]="'Change version for ' + item.title"
+                  matTooltip="Change this release version while preserving its snapshot identity and semantic-version order."
+                  (click)="onRetagRelease(item)">
+                  <mat-spinner
+                    *ngIf="isRetaggingRelease(item)"
+                    class="snapshot-action-spinner"
+                    diameter="18"></mat-spinner>
+                  <mat-icon *ngIf="!isRetaggingRelease(item)">edit</mat-icon>
+                  {{
+                    isRetaggingRelease(item)
+                      ? 'Changing version'
+                      : 'Change version'
+                  }}
+                </button>
+                <button
+                  *ngIf="item.isLatestRelease && canManageTaggedReleases"
+                  color="warn"
+                  mat-stroked-button
+                  [disabled]="
+                    isConvertingRelease(item) ||
+                    isRetaggingRelease(item) ||
+                    !item.modified
+                  "
+                  [attr.aria-label]="'Convert ' + item.title + ' to draft'"
+                  matTooltip="Convert the most recent release back to a draft. Downstream virtual dependencies block conversion."
+                  (click)="onConvertReleaseToDraft(item)">
+                  <mat-spinner
+                    *ngIf="isConvertingRelease(item)"
+                    class="snapshot-action-spinner"
+                    color="warn"
+                    diameter="18"></mat-spinner>
+                  <mat-icon *ngIf="!isConvertingRelease(item)">undo</mat-icon>
+                  {{
+                    isConvertingRelease(item)
+                      ? 'Converting to draft'
+                      : 'Convert to draft'
+                  }}
+                </button>
+                <button
+                  *ngIf="
+                    item.isCurrentDraft && !item.isTagged && canEditReleaseTrack
+                  "
+                  color="warn"
+                  mat-stroked-button
+                  [disabled]="isDeletingDraft(item) || !item.modified"
+                  aria-label="Delete draft snapshot"
+                  matTooltip="Delete this draft and return to the previous snapshot. Protected drafts cannot be deleted."
+                  (click)="onDeleteDraft(item)">
+                  <mat-icon>delete</mat-icon>
+                  {{
+                    isDeletingDraft(item) ? 'Deleting draft' : 'Delete draft'
+                  }}
+                </button>
+              </div>
+            </div>
+
+            <div *ngIf="!isVirtualReleaseTrack" class="snapshot-history-stats">
+              <div
+                *ngFor="let stat of item.stats"
+                class="snapshot-history-stat">
+                <div
+                  class="snapshot-history-stat-value"
+                  [ngClass]="stat.modifier">
+                  {{ stat.value }}
+                </div>
+                <div class="snapshot-history-stat-label">{{ stat.label }}</div>
+              </div>
+            </div>
+
+            <details
+              *ngIf="item.snapshot.type === 'virtual'"
+              class="snapshot-provenance-disclosure">
+              <summary>Component provenance</summary>
+              <section
+                *ngIf="item.snapshot.type === 'virtual'"
+                class="snapshot-composition-resolution"
+                aria-label="Composition resolution provenance">
+                <div class="snapshot-composition-header">
+                  <div class="snapshot-composition-title">
+                    <mat-icon aria-hidden="true">account_tree</mat-icon>
+                    <span>Composition Resolution</span>
+                  </div>
+                  <span
+                    *ngIf="item.compositionResolvedAt"
+                    class="snapshot-composition-resolved-at">
+                    Resolved:
+                    {{
+                      item.compositionResolvedAt | date: 'MMM d, y, h:mm:ss a'
+                    }}
+                  </span>
+                </div>
+
+                <div
+                  *ngIf="!item.hasCompositionResolution"
+                  class="snapshot-composition-empty">
+                  This snapshot has not been materialized, so it has no
+                  component snapshot provenance yet.
+                </div>
+
+                <div
+                  *ngIf="item.hasCompositionResolution"
+                  class="snapshot-composition-components">
+                  <div
+                    *ngIf="!item.compositionResolutionRows.length"
+                    class="snapshot-composition-empty">
+                    No component snapshots were recorded.
+                  </div>
+
+                  <article
+                    *ngFor="
+                      let row of item.compositionResolutionRows;
+                      trackBy: trackByVirtualResolutionRow
+                    "
+                    class="snapshot-component-provenance">
+                    <header class="snapshot-component-identity">
+                      <button
+                        type="button"
+                        class="snapshot-component-track"
+                        (click)="onOpenComponentTrack(row)">
+                        <strong>{{ row.trackName }}</strong>
+                        <code>{{ row.trackId }}</code>
+                      </button>
+                      <span class="snapshot-component-version">
+                        {{ getVirtualResolvedVersion(row) }}
+                      </span>
+                    </header>
+
+                    <div class="snapshot-component-body">
+                      <dl class="snapshot-component-details">
+                        <div>
+                          <dt>Snapshot created</dt>
+                          <dd>
+                            <strong
+                              *ngIf="row.resolvedSnapshotId; else noSnapshot">
+                              {{
+                                row.resolvedSnapshotId
+                                  | date: 'MMM d, y, h:mm:ss a'
+                              }}
+                            </strong>
+                            <ng-template #noSnapshot>-</ng-template>
+                            <code *ngIf="row.resolvedSnapshotId">
+                              {{ row.resolvedSnapshotId }}
+                            </code>
+                          </dd>
+                        </div>
+                        <div>
+                          <dt>Resolution strategy</dt>
+                          <dd>
+                            <strong>{{
+                              formatConfigOption(row.strategy)
+                            }}</strong>
+                            <span *ngIf="row.filters?.length">
+                              Filters: {{ row.filters?.join(', ') }}
+                            </span>
+                          </dd>
+                        </div>
+                      </dl>
+
+                      <dl class="snapshot-component-metrics">
+                        <div>
+                          <dt>
+                            {{
+                              row.strategy === ResolutionStrategy.LatestPreview
+                                ? 'Preview members'
+                                : 'Source members'
+                            }}
+                          </dt>
+                          <dd>
+                            {{ getVirtualTierCount(row.totalObjectsInSource) }}
+                          </dd>
+                        </div>
+                        <div>
+                          <dt>After filters</dt>
+                          <dd>
+                            {{ getVirtualTierCount(row.objectsAfterFilter) }}
+                          </dd>
+                        </div>
+                        <div>
+                          <dt>Contributed</dt>
+                          <dd>
+                            {{ getVirtualTierCount(row.objectsContributed) }}
+                          </dd>
+                        </div>
+                      </dl>
+                    </div>
+                  </article>
+                </div>
+              </section>
+            </details>
+
+            <section
+              *ngIf="item.contentStats.length"
+              class="snapshot-graph-cache"
+              aria-label="Content statistics">
+              <div class="snapshot-graph-cache-header">
+                <div class="snapshot-graph-cache-title">
+                  <mat-icon aria-hidden="true">account_tree</mat-icon>
+                  <span>Content</span>
+                </div>
+                <span>{{ item.contentTotal }} objects</span>
+              </div>
+              <div class="snapshot-graph-cache-stats">
+                <div
+                  *ngFor="let stat of item.contentStats"
+                  class="snapshot-graph-cache-stat"
+                  [matTooltip]="stat.tooltip || ''"
+                  matTooltipPosition="above"
+                  tabindex="0">
+                  <div class="snapshot-graph-cache-stat-value">
+                    {{ stat.value }}
+                  </div>
+                  <div class="snapshot-history-stat-label">
+                    {{ stat.label }}
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <section
+              *ngIf="item.isTagged && item.snapshot.bundle_hashes"
+              class="snapshot-bundle-hashes"
+              aria-label="STIX bundle SHA-256 hashes">
+              <div class="snapshot-bundle-hashes-header">
+                <mat-icon aria-hidden="true">fingerprint</mat-icon>
+                <span>Bundle SHA-256</span>
+                <code
+                  *ngIf="item.snapshot.bundle_id"
+                  class="snapshot-bundle-id"
+                  matTooltip="Stable STIX bundle identifier assigned at release">
+                  {{ item.snapshot.bundle_id }}
+                </code>
+              </div>
+
+              <div class="snapshot-bundle-hash-row">
+                <span class="snapshot-bundle-hash-label">STIX 2.0</span>
+                <code *ngIf="getSnapshotBundleHash(item, '2.0') as hash">
+                  {{ hash }}
+                </code>
+                <span
+                  *ngIf="!getSnapshotBundleHash(item, '2.0')"
+                  class="snapshot-bundle-hash-error">
+                  Unavailable
+                </span>
+                <button
+                  mat-icon-button
+                  [disabled]="!getSnapshotBundleHash(item, '2.0')"
+                  aria-label="Copy STIX 2.0 bundle SHA-256"
+                  matTooltip="Copy STIX 2.0 bundle SHA-256"
+                  (click)="copySnapshotBundleHash(item, '2.0')">
+                  <mat-icon>content_copy</mat-icon>
+                </button>
+              </div>
+
+              <div class="snapshot-bundle-hash-row">
+                <span class="snapshot-bundle-hash-label">STIX 2.1</span>
+                <code *ngIf="getSnapshotBundleHash(item, '2.1') as hash">
+                  {{ hash }}
+                </code>
+                <span
+                  *ngIf="!getSnapshotBundleHash(item, '2.1')"
+                  class="snapshot-bundle-hash-error">
+                  Unavailable
+                </span>
+                <button
+                  mat-icon-button
+                  [disabled]="!getSnapshotBundleHash(item, '2.1')"
+                  aria-label="Copy STIX 2.1 bundle SHA-256"
+                  matTooltip="Copy STIX 2.1 bundle SHA-256"
+                  (click)="copySnapshotBundleHash(item, '2.1')">
+                  <mat-icon>content_copy</mat-icon>
+                </button>
+              </div>
+            </section>
+          </div>
+        </article>
+      </div>
+    </div>
+    <mat-paginator
+      *ngIf="isVirtualReleaseTrack"
+      aria-label="Snapshot history pages"
+      [length]="historyTotal"
+      [pageIndex]="historyPageIndex"
+      [pageSize]="historyPageSize"
+      [hidePageSize]="true"
+      [showFirstLastButtons]="true"
+      (page)="onHistoryPageChange($event)">
+    </mat-paginator>
+  </ng-template>
+
+  <ng-template #unknownDate> Unknown </ng-template>
+
+  <ng-template #configTpl>
+    <div class="config-tpl">
+      <div class="config-actions">
+        <button
+          *ngIf="!isEditingConfig"
+          mat-stroked-button
+          [disabled]="isLoadingConfig"
+          (click)="onEditConfig()">
+          Edit Config
+        </button>
+
+        <div *ngIf="isEditingConfig" class="small-buttons">
+          <button
+            mat-stroked-button
+            [disabled]="isSavingConfig"
+            (click)="onCancelConfigEdit()">
+            Cancel
+          </button>
+          <button
+            mat-raised-button
+            color="primary"
+            [disabled]="
+              isSavingConfig ||
+              (isVirtualReleaseTrack &&
+                (!isVirtualScheduleValid || !isVirtualCompositionValid))
+            "
+            (click)="onSaveConfig()">
+            Save Config
+          </button>
+        </div>
+      </div>
+
+      <form [formGroup]="configForm" class="config-card-list">
+        <section class="labelled-box config-card">
+          <div class="content no-label">
+            <h3>Address</h3>
+
+            <div class="config-row">
+              <div class="config-copy">
+                <div class="config-label">Alias</div>
+                <p>
+                  Optional short name accepted wherever the track ID is,
+                  including this page's URL and API paths. Lowercase letters,
+                  digits, and hyphens; unique across tracks.
+                </p>
+              </div>
+              <ng-container *ngIf="isEditingConfig; else aliasValue">
+                <mat-form-field appearance="outline" class="config-field">
+                  <mat-label>Alias</mat-label>
+                  <input
+                    matInput
+                    formControlName="alias"
+                    autocomplete="off"
+                    placeholder="enterprise-attack" />
+                  <mat-hint>{{ aliasUrlPreview }}</mat-hint>
+                  <mat-error>
+                    Use 2–64 lowercase letters, digits, or hyphens, starting and
+                    ending with a letter or digit.
+                  </mat-error>
+                </mat-form-field>
+              </ng-container>
+              <ng-template #aliasValue>
+                <code
+                  *ngIf="releaseTrack?.alias; else noAlias"
+                  class="config-value"
+                  >{{ releaseTrack.alias }}</code
+                >
+                <ng-template #noAlias>
+                  <span class="text-deemphasis">None</span>
+                </ng-template>
+              </ng-template>
+            </div>
+          </div>
+        </section>
+
+        <ng-container *ngIf="isVirtualReleaseTrack; else standardConfigTpl">
+          <section class="labelled-box config-card">
+            <div class="content no-label">
+              <h3>Composition</h3>
+
+              <div class="config-row">
+                <div class="config-copy">
+                  <div class="config-label">Component Tracks</div>
+                  <p>
+                    Latest tagged uses the newest published release. Latest
+                    preview uses the newest snapshot, draft or released. Draft
+                    previews include members plus staged objects under the
+                    source track's release conflict rules; released snapshots
+                    use their published members. Candidates are excluded.
+                    Revisions are frozen at materialization without tagging or
+                    changing the source track.
+                  </p>
+                </div>
+                <span class="config-value">
+                  {{ displayedVirtualConfigComponentTracks.length }}
+                </span>
+              </div>
+
+              <mat-divider></mat-divider>
+
+              <div
+                *ngIf="isEditingConfig"
+                class="virtual-component-track-picker">
+                <mat-form-field appearance="outline">
+                  <mat-label>Add component track</mat-label>
+                  <input
+                    matInput
+                    type="text"
+                    formControlName="virtualComponentTrackSearch"
+                    [matAutocomplete]="virtualComponentTrackAutocomplete"
+                    placeholder="Search standard tracks" />
+                  <mat-icon matSuffix>arrow_drop_down</mat-icon>
+                  <mat-autocomplete
+                    #virtualComponentTrackAutocomplete="matAutocomplete"
+                    class="virtual-component-track-autocomplete"
+                    [displayWith]="displayVirtualComponentTrackOption"
+                    (optionSelected)="selectVirtualComponentTrack($event)">
+                    <mat-option
+                      *ngFor="let track of filteredVirtualComponentTrackOptions"
+                      [value]="track">
+                      <span class="component-track-option-label">
+                        <span class="component-track-option-name">
+                          {{ track.name }}
+                        </span>
+                        <span class="component-track-option-meta">
+                          ({{ getVirtualComponentTrackSnapshotLabel(track) }})
+                        </span>
+                      </span>
+                    </mat-option>
+                    <mat-option
+                      *ngIf="!filteredVirtualComponentTrackOptions.length"
+                      disabled>
+                      No matching standard tracks
+                    </mat-option>
+                  </mat-autocomplete>
+                  <mat-hint>
+                    Select one or more standard tracks to include in this
+                    virtual track.
+                  </mat-hint>
+                </mat-form-field>
+              </div>
+
+              <div
+                *ngIf="
+                  displayedVirtualConfigComponentTracks.length;
+                  else noComponentTracks
+                "
+                class="config-component-list">
+                <article
+                  *ngFor="
+                    let track of displayedVirtualConfigComponentTracks;
+                    trackBy: trackByComponentTrack
+                  "
+                  class="config-component-row"
+                  [class.clickable-row]="!isEditingConfig"
+                  [class.config-component-row-editing]="isEditingConfig"
+                  [attr.role]="!isEditingConfig ? 'button' : null"
+                  [attr.tabindex]="!isEditingConfig ? 0 : null"
+                  (click)="!isEditingConfig && onOpenComponentTrack(track)"
+                  (keydown.enter)="
+                    !isEditingConfig && onOpenComponentTrack(track)
+                  "
+                  (keydown.space)="
+                    !isEditingConfig && onOpenComponentTrack(track);
+                    !isEditingConfig && $event.preventDefault()
+                  ">
+                  <div class="config-component-main">
+                    <div class="config-copy">
+                      <div class="config-label">
+                        {{ getComponentTrackLabel(track) }}
+                      </div>
+                      <p class="component-track-id">{{ track.track_id }}</p>
+                      <p
+                        *ngIf="getVirtualComponentTrackDescription(track)"
+                        class="config-component-description">
+                        {{ getVirtualComponentTrackDescription(track) }}
+                      </p>
+                    </div>
+                    <button
+                      *ngIf="isEditingConfig"
+                      mat-icon-button
+                      type="button"
+                      aria-label="Remove component track"
+                      (click)="removeVirtualComponentTrack(track)">
+                      <mat-icon>close</mat-icon>
+                    </button>
+                  </div>
+
+                  <div *ngIf="!isEditingConfig" class="config-value-list">
+                    <span class="config-value">
+                      {{ formatConfigOption(track.resolution_strategy) }}
+                    </span>
+                    <span class="config-value">
+                      priority
+                      {{ track.priority ?? 'not set' }}
+                    </span>
+                    <span
+                      *ngIf="getComponentTrackFilters(track).length"
+                      class="config-value">
+                      {{ getComponentTrackFilters(track).join(', ') }}
+                    </span>
+                  </div>
+                  <p *ngIf="isRetiredComponentTrack(track)" role="alert">
+                    Latest draft is retired and included members only.
+                    Explicitly choose Latest preview or Latest tagged before
+                    saving. Historical snapshots keep their original content.
+                  </p>
+
+                  <mat-form-field
+                    *ngIf="isEditingConfig"
+                    appearance="outline"
+                    class="config-component-filter">
+                    <mat-label>Priority</mat-label>
+                    <input
+                      matInput
+                      type="number"
+                      min="0"
+                      step="1"
+                      required
+                      [attr.aria-label]="
+                        'Priority for ' + getComponentTrackLabel(track)
+                      "
+                      [(ngModel)]="track.priority"
+                      [ngModelOptions]="{ standalone: true }"
+                      [errorStateMatcher]="componentPriorityErrorMatcher" />
+                    <mat-hint
+                      >Lower numbers have higher priority. Each value must be
+                      unique.</mat-hint
+                    >
+                    <mat-error>{{
+                      componentPriorityError(track.priority)
+                    }}</mat-error>
+                  </mat-form-field>
+
+                  <mat-form-field
+                    *ngIf="isEditingConfig"
+                    appearance="outline"
+                    class="config-component-filter">
+                    <mat-label>Resolve from</mat-label>
+                    <mat-select
+                      [value]="track.resolution_strategy"
+                      (selectionChange)="
+                        setVirtualComponentTrackResolution(track, $event.value)
+                      ">
+                      <mat-option [value]="ResolutionStrategy.LatestTagged">
+                        Latest tagged
+                      </mat-option>
+                      <mat-option [value]="ResolutionStrategy.LatestPreview">
+                        Latest preview
+                      </mat-option>
+                      <mat-option
+                        *ngIf="isRetiredComponentTrack(track)"
+                        value="latest_draft"
+                        disabled>
+                        Latest draft — retired, members only
+                      </mat-option>
+                      <mat-option
+                        *ngIf="
+                          track.resolution_strategy ===
+                          ResolutionStrategy.SpecificVersion
+                        "
+                        [value]="ResolutionStrategy.SpecificVersion">
+                        Specific version: {{ track.version }}
+                      </mat-option>
+                      <mat-option
+                        *ngIf="
+                          track.resolution_strategy ===
+                          ResolutionStrategy.SpecificSnapshot
+                        "
+                        [value]="ResolutionStrategy.SpecificSnapshot">
+                        Specific snapshot: {{ track.snapshot }}
+                      </mat-option>
+                    </mat-select>
+                  </mat-form-field>
+
+                  <mat-form-field
+                    *ngIf="isEditingConfig"
+                    appearance="outline"
+                    class="config-component-filter">
+                    <mat-label>Object type filter</mat-label>
+                    <mat-select
+                      multiple
+                      [value]="getVirtualComponentTrackObjectTypes(track)"
+                      (selectionChange)="
+                        setVirtualComponentTrackObjectTypes(track, $event.value)
+                      ">
+                      <mat-option
+                        *ngFor="let option of virtualObjectTypeOptions"
+                        [value]="option.value">
+                        {{ option.label }}
+                      </mat-option>
+                    </mat-select>
+                    <mat-hint>Leave empty to include all object types</mat-hint>
+                  </mat-form-field>
+
+                  <mat-form-field
+                    *ngIf="isEditingConfig"
+                    appearance="outline"
+                    class="config-component-filter">
+                    <mat-label>Domain filter</mat-label>
+                    <mat-select
+                      multiple
+                      [value]="getVirtualComponentTrackDomains(track)"
+                      (selectionChange)="
+                        setVirtualComponentTrackDomains(track, $event.value)
+                      ">
+                      <mat-option
+                        *ngFor="let domain of virtualDomainOptions"
+                        [value]="domain">
+                        {{ domain }}
+                      </mat-option>
+                    </mat-select>
+                    <mat-hint>Leave empty to include all domains</mat-hint>
+                  </mat-form-field>
+                </article>
+              </div>
+
+              <ng-template #noComponentTracks>
+                <div class="empty-state">No component tracks configured.</div>
+              </ng-template>
+            </div>
+          </section>
+
+          <section class="labelled-box config-card">
+            <div class="content no-label">
+              <h3>Object Deduplication</h3>
+
+              <div class="config-row">
+                <div class="config-copy">
+                  <div class="config-label">Strategy</div>
+                  <p>Determines which object wins when components overlap.</p>
+                </div>
+                <ng-container
+                  *ngIf="isEditingConfig; else virtualDeduplicationValue">
+                  <mat-form-field appearance="outline" class="config-field">
+                    <mat-label>Strategy</mat-label>
+                    <mat-select formControlName="virtualDeduplicationStrategy">
+                      <mat-option
+                        *ngFor="let option of virtualDeduplicationOptions"
+                        [value]="option">
+                        {{ formatConfigOption(option) }}
+                      </mat-option>
+                    </mat-select>
+                  </mat-form-field>
+                </ng-container>
+                <ng-template #virtualDeduplicationValue>
+                  <span class="config-value">
+                    {{
+                      formatConfigOption(
+                        configForm.get('virtualDeduplicationStrategy')?.value
+                      )
+                    }}
+                  </span>
+                </ng-template>
+              </div>
+            </div>
+          </section>
+
+          <section class="labelled-box config-card">
+            <div class="content no-label">
+              <h3>Snapshot Schedule</h3>
+
+              <div class="config-row">
+                <div class="config-copy">
+                  <div class="config-label">Mode</div>
+                  <p>Controls how draft snapshots are scheduled.</p>
+                </div>
+                <ng-container *ngIf="isEditingConfig; else scheduleModeValue">
+                  <mat-form-field appearance="outline" class="config-field">
+                    <mat-label>Schedule mode</mat-label>
+                    <mat-select formControlName="virtualSnapshotScheduleMode">
+                      <mat-option
+                        *ngFor="
+                          let option of virtualSnapshotScheduleModeOptions
+                        "
+                        [value]="option">
+                        {{ getVirtualScheduleModeLabel(option) }}
+                      </mat-option>
+                    </mat-select>
+                  </mat-form-field>
+                </ng-container>
+                <ng-template #scheduleModeValue>
+                  <span class="config-value">
+                    {{
+                      getVirtualScheduleModeLabel(
+                        configForm.get('virtualSnapshotScheduleMode')?.value
+                      )
+                    }}
+                  </span>
+                </ng-template>
+              </div>
+
+              <ng-container
+                *ngIf="
+                  configForm.get('virtualSnapshotScheduleMode')?.value ===
+                  'cron'
+                ">
+                <mat-divider></mat-divider>
+
+                <div class="config-copy">
+                  <div class="config-label">Recurring schedule</div>
+                  <p>Choose a recurrence and time. All times are UTC.</p>
+                </div>
+
+                <ng-container *ngIf="isEditingConfig; else cronScheduleValue">
+                  <mat-form-field
+                    appearance="outline"
+                    subscriptSizing="dynamic"
+                    class="schedule-wide-field">
+                    <mat-label>Find a schedule</mat-label>
+                    <input
+                      matInput
+                      formControlName="virtualScheduleSearch"
+                      [matAutocomplete]="scheduleAutocomplete"
+                      placeholder="Try hourly, every 15, or weekdays" />
+                    <mat-autocomplete
+                      #scheduleAutocomplete="matAutocomplete"
+                      [displayWith]="displaySchedulePreset"
+                      [requireSelection]="true"
+                      [autoActiveFirstOption]="true"
+                      (optionSelected)="
+                        selectSchedulePreset($event.option.value)
+                      ">
+                      <mat-option
+                        *ngFor="let preset of filteredSchedulePresets"
+                        [value]="preset">
+                        {{ preset.label }}
+                      </mat-option>
+                      <mat-option
+                        *ngIf="!filteredSchedulePresets.length"
+                        disabled>
+                        No matching schedule. Use the controls below.
+                      </mat-option>
+                    </mat-autocomplete>
+                    <mat-hint
+                      >Select a suggestion to apply it, or customize below. All
+                      times are UTC.</mat-hint
+                    >
+                  </mat-form-field>
+                  <div
+                    *ngIf="virtualCronUsesExistingExpression"
+                    class="schedule-existing-warning">
+                    <div>
+                      This track uses an existing expression that the guided
+                      editor cannot represent:
+                      <code>{{ virtualCronExpression }}</code>
+                    </div>
+                    <button
+                      mat-stroked-button
+                      type="button"
+                      (click)="replaceExistingCronExpression()">
+                      Replace with guided schedule
+                    </button>
+                  </div>
+
+                  <div
+                    *ngIf="!virtualCronUsesExistingExpression"
+                    class="schedule-editor-grid">
+                    <mat-form-field appearance="outline">
+                      <mat-label>Repeats</mat-label>
+                      <mat-select formControlName="virtualCronCadence">
+                        <mat-option
+                          *ngFor="let option of virtualCronCadenceOptions"
+                          [value]="option.value">
+                          {{ option.label }}
+                        </mat-option>
+                      </mat-select>
+                    </mat-form-field>
+
+                    <mat-form-field
+                      appearance="outline"
+                      *ngIf="
+                        configForm.get('virtualCronCadence')?.value !==
+                          'hourly' &&
+                        configForm.get('virtualCronCadence')?.value !==
+                          'interval'
+                      ">
+                      <mat-label>Hour (UTC)</mat-label>
+                      <mat-select formControlName="virtualCronHour">
+                        <mat-option
+                          *ngFor="let hour of virtualHourOptions"
+                          [value]="hour">
+                          {{ formatTwoDigit(hour) }}
+                        </mat-option>
+                      </mat-select>
+                    </mat-form-field>
+
+                    <mat-form-field
+                      appearance="outline"
+                      *ngIf="
+                        configForm.get('virtualCronCadence')?.value !==
+                        'interval'
+                      ">
+                      <mat-label>Minute</mat-label>
+                      <mat-select formControlName="virtualCronMinute">
+                        <mat-option
+                          *ngFor="let minute of virtualMinuteOptions"
+                          [value]="minute">
+                          {{ formatTwoDigit(minute) }}
+                        </mat-option>
+                      </mat-select>
+                    </mat-form-field>
+
+                    <mat-form-field
+                      appearance="outline"
+                      *ngIf="
+                        configForm.get('virtualCronCadence')?.value ===
+                        'interval'
+                      ">
+                      <mat-label>Interval</mat-label>
+                      <mat-select formControlName="virtualCronInterval">
+                        <mat-option [value]="15">Every 15 minutes</mat-option>
+                        <mat-option [value]="30">Every 30 minutes</mat-option>
+                      </mat-select>
+                    </mat-form-field>
+
+                    <mat-form-field
+                      *ngIf="
+                        configForm.get('virtualCronCadence')?.value === 'weekly'
+                      "
+                      appearance="outline"
+                      class="schedule-wide-field">
+                      <mat-label>Days of week</mat-label>
+                      <mat-select
+                        formControlName="virtualCronWeekdays"
+                        multiple>
+                        <mat-option
+                          *ngFor="let day of virtualWeekdayOptions"
+                          [value]="day.value">
+                          {{ day.label }}
+                        </mat-option>
+                      </mat-select>
+                    </mat-form-field>
+
+                    <mat-form-field
+                      *ngIf="
+                        configForm.get('virtualCronCadence')?.value ===
+                          'monthly' ||
+                        configForm.get('virtualCronCadence')?.value === 'yearly'
+                      "
+                      appearance="outline">
+                      <mat-label>Day of month</mat-label>
+                      <mat-select formControlName="virtualCronMonthDay">
+                        <mat-option
+                          *ngFor="let day of virtualMonthDayOptions"
+                          [value]="day">
+                          {{ day }}
+                        </mat-option>
+                      </mat-select>
+                    </mat-form-field>
+
+                    <mat-form-field
+                      *ngIf="
+                        configForm.get('virtualCronCadence')?.value === 'yearly'
+                      "
+                      appearance="outline"
+                      class="schedule-wide-field">
+                      <mat-label>Months</mat-label>
+                      <mat-select formControlName="virtualCronMonths" multiple>
+                        <mat-option
+                          *ngFor="let month of virtualMonthOptions"
+                          [value]="month.value">
+                          {{ month.label }}
+                        </mat-option>
+                      </mat-select>
+                    </mat-form-field>
+                  </div>
+
+                  <div class="schedule-expression-preview">
+                    Generated expression:
+                    <code>{{ virtualCronExpression }}</code>
+                  </div>
+                </ng-container>
+                <ng-template #cronScheduleValue>
+                  <code class="config-value schedule-read-value">{{
+                    getVirtualScheduleValue('cron')
+                  }}</code>
+                </ng-template>
+                <div class="recurring-retention">
+                  <h4>Recurring draft retention</h4>
+                  <p>
+                    Applies only after scheduled recurring snapshots. Counts all
+                    drafts across this track, regardless of how they were
+                    created. Older eligible drafts and their notes are
+                    permanently deleted; tagged releases and protected drafts
+                    are preserved. Protected drafts may exceed the limit. Saving
+                    the policy creates no snapshot and deletes nothing
+                    immediately.
+                  </p>
+                  <div
+                    *ngIf="
+                      isEditingConfig && canManageDraftLifecycle;
+                      else retentionValue
+                    "
+                    [formGroup]="retentionForm"
+                    class="draft-lifecycle-controls">
+                    <mat-slide-toggle formControlName="enabled">
+                      Limit retained drafts
+                    </mat-slide-toggle>
+                    <mat-form-field
+                      *ngIf="retentionForm.get('enabled')?.value"
+                      appearance="outline">
+                      <mat-label>Maximum retained drafts</mat-label>
+                      <input
+                        matInput
+                        type="number"
+                        min="1"
+                        step="1"
+                        formControlName="maxDrafts" />
+                      <mat-hint>Positive whole number; suggested: 10.</mat-hint>
+                    </mat-form-field>
+                    <p *ngIf="!isRetentionValid" role="alert">
+                      Enter a positive safe whole number.
+                    </p>
+                  </div>
+                  <ng-template #retentionValue>
+                    <p>
+                      {{
+                        (virtualSnapshotSchedule.draft_retention?.max_drafts ??
+                          null) === null
+                          ? 'Disabled (unlimited drafts)'
+                          : 'Keep newest ' +
+                            virtualSnapshotSchedule.draft_retention.max_drafts +
+                            ' drafts'
+                      }}
+                    </p>
+                    <p *ngIf="isEditingConfig && !canManageDraftLifecycle">
+                      Only application administrators can change draft
+                      retention.
+                    </p>
+                  </ng-template>
+                </div>
+              </ng-container>
+
+              <ng-container
+                *ngIf="
+                  configForm.get('virtualSnapshotScheduleMode')?.value ===
+                  'dates'
+                ">
+                <mat-divider></mat-divider>
+
+                <div class="config-copy">
+                  <div class="config-label">Specific dates</div>
+                  <p>
+                    Create one draft at each selected future date. All times are
+                    UTC and survive server restarts.
+                  </p>
+                </div>
+
+                <div *ngIf="isEditingConfig" class="schedule-date-editor">
+                  <div class="schedule-date-controls">
+                    <mat-form-field appearance="outline">
+                      <mat-label>Date</mat-label>
+                      <input
+                        matInput
+                        type="date"
+                        formControlName="virtualScheduleDateDraft"
+                        [min]="virtualScheduleDateMin" />
+                    </mat-form-field>
+                    <mat-form-field appearance="outline">
+                      <mat-label>Hour (UTC)</mat-label>
+                      <mat-select formControlName="virtualScheduleDateHour">
+                        <mat-option
+                          *ngFor="let hour of virtualHourOptions"
+                          [value]="hour">
+                          {{ formatTwoDigit(hour) }}
+                        </mat-option>
+                      </mat-select>
+                    </mat-form-field>
+                    <mat-form-field appearance="outline">
+                      <mat-label>Minute</mat-label>
+                      <mat-select formControlName="virtualScheduleDateMinute">
+                        <mat-option
+                          *ngFor="let minute of virtualMinuteOptions"
+                          [value]="minute">
+                          {{ formatTwoDigit(minute) }}
+                        </mat-option>
+                      </mat-select>
+                    </mat-form-field>
+                    <button
+                      mat-stroked-button
+                      type="button"
+                      [disabled]="!canAddVirtualScheduleDate"
+                      (click)="addVirtualScheduleDate()">
+                      Add date
+                    </button>
+                  </div>
+                </div>
+
+                <div
+                  *ngIf="virtualScheduleDates.length; else noScheduleDates"
+                  class="schedule-date-list">
+                  <div *ngFor="let date of virtualScheduleDates">
+                    <span
+                      >{{ date | date: 'MMM d, y, HH:mm' : 'UTC' }} UTC</span
+                    >
+                    <button
+                      *ngIf="isEditingConfig"
+                      mat-icon-button
+                      type="button"
+                      aria-label="Remove scheduled date"
+                      (click)="removeVirtualScheduleDate(date)">
+                      <mat-icon>close</mat-icon>
+                    </button>
+                  </div>
+                </div>
+                <ng-template #noScheduleDates>
+                  <p class="schedule-validation-message">
+                    Add at least one future date to save this schedule.
+                  </p>
+                </ng-template>
+              </ng-container>
+            </div>
+          </section>
+        </ng-container>
+
+        <ng-template #standardConfigTpl>
+          <section class="labelled-box config-card">
+            <div class="content no-label">
+              <h3>Promotion Policy</h3>
+
+              <div class="config-row">
+                <div class="config-copy">
+                  <div class="config-label">Auto-promote Candidates</div>
+                  <p>
+                    Automatically promote candidates to Staged when they meet
+                    the configured workflow threshold.
+                  </p>
+                </div>
+                <ng-container *ngIf="isEditingConfig; else autoPromoteStatus">
+                  <mat-slide-toggle
+                    aria-label="Auto-promote candidates"
+                    formControlName="autoPromote"></mat-slide-toggle>
+                </ng-container>
+                <ng-template #autoPromoteStatus>
+                  <span
+                    class="config-state"
+                    [class.config-state-on]="
+                      configForm.get('autoPromote')?.value
+                    ">
+                    {{ configForm.get('autoPromote')?.value ? 'ON' : 'OFF' }}
+                  </span>
+                </ng-template>
+              </div>
+
+              <mat-divider></mat-divider>
+
+              <div
+                class="config-row"
+                [class.config-row-disabled]="
+                  !configForm.get('autoPromote')?.value
+                ">
+                <div class="config-copy">
+                  <div class="config-label">Candidacy Threshold</div>
+                  <p>
+                    Defines the minimum workflow state required for a candidate
+                    to be promoted to Staged.
+                  </p>
+                </div>
+                <ng-container *ngIf="isEditingConfig; else thresholdValue">
+                  <mat-form-field appearance="outline" class="config-field">
+                    <mat-label>Candidacy Threshold</mat-label>
+                    <mat-select formControlName="candidacyThreshold">
+                      <mat-option
+                        *ngFor="let option of candidacyOptions"
+                        [value]="option">
+                        {{ formatConfigOption(option) }}
+                      </mat-option>
+                    </mat-select>
+                  </mat-form-field>
+                </ng-container>
+                <ng-template #thresholdValue>
+                  <span
+                    class="config-value"
+                    [class.config-value-disabled]="
+                      !configForm.get('autoPromote')?.value
+                    ">
+                    {{
+                      formatConfigOption(
+                        configForm.get('candidacyThreshold')?.value
+                      )
+                    }}
+                  </span>
+                </ng-template>
+              </div>
+            </div>
+          </section>
+
+          <section class="labelled-box config-card">
+            <div class="content no-label">
+              <h3>Lifecycle Settings</h3>
+
+              <div class="config-row">
+                <div class="config-copy">
+                  <div class="config-label">Member Sync Strategy</div>
+                  <p>
+                    Determines if new revisions to existing member objects are
+                    automatically added as candidates.
+                  </p>
+                </div>
+                <ng-container *ngIf="isEditingConfig; else memberSyncValue">
+                  <mat-form-field appearance="outline" class="config-field">
+                    <mat-label>Member Sync Strategy</mat-label>
+                    <mat-select formControlName="memberSyncStrategy">
+                      <mat-option
+                        *ngFor="let option of memberSyncStrategyOptions"
+                        [value]="option">
+                        {{ formatConfigOption(option) }}
+                      </mat-option>
+                    </mat-select>
+                  </mat-form-field>
+                </ng-container>
+                <ng-template #memberSyncValue>
+                  <span class="config-value">
+                    {{
+                      formatConfigOption(
+                        configForm.get('memberSyncStrategy')?.value
+                      )
+                    }}
+                  </span>
+                </ng-template>
+              </div>
+
+              <mat-divider></mat-divider>
+
+              <div class="config-row">
+                <div class="config-copy">
+                  <div class="config-label">Supplant Behavior</div>
+                  <p>
+                    Controls how a new version is handled when the object is
+                    already tracked by this release track.
+                  </p>
+                </div>
+                <ng-container
+                  *ngIf="isEditingConfig; else supplantBehaviorValue">
+                  <mat-form-field appearance="outline" class="config-field">
+                    <mat-label>Supplant Behavior</mat-label>
+                    <mat-select formControlName="memberSyncSupplantBehavior">
+                      <mat-option
+                        *ngFor="let option of memberSyncBehaviorOptions"
+                        [value]="option">
+                        {{ formatConfigOption(option) }}
+                      </mat-option>
+                    </mat-select>
+                  </mat-form-field>
+                </ng-container>
+                <ng-template #supplantBehaviorValue>
+                  <span class="config-value">
+                    {{
+                      formatConfigOption(
+                        configForm.get('memberSyncSupplantBehavior')?.value
+                      )
+                    }}
+                  </span>
+                </ng-template>
+              </div>
+
+              <mat-divider></mat-divider>
+
+              <div class="config-row">
+                <div class="config-copy">
+                  <div class="config-label">Supplant Status Policy</div>
+                  <p>
+                    Sets whether a queued replacement keeps or resets the
+                    tracked workflow status.
+                  </p>
+                </div>
+                <ng-container *ngIf="isEditingConfig; else supplantStatusValue">
+                  <mat-form-field appearance="outline" class="config-field">
+                    <mat-label>Supplant Status Policy</mat-label>
+                    <mat-select
+                      formControlName="memberSyncSupplantStatusPolicy">
+                      <mat-option
+                        *ngFor="let option of memberSyncStatusPolicyOptions"
+                        [value]="option">
+                        {{ formatConfigOption(option) }}
+                      </mat-option>
+                    </mat-select>
+                  </mat-form-field>
+                </ng-container>
+                <ng-template #supplantStatusValue>
+                  <span class="config-value">
+                    {{
+                      formatConfigOption(
+                        configForm.get('memberSyncSupplantStatusPolicy')?.value
+                      )
+                    }}
+                  </span>
+                </ng-template>
+              </div>
+            </div>
+          </section>
+
+          <section class="labelled-box config-card">
+            <div class="content no-label">
+              <h3>Conflict Resolution</h3>
+
+              <div class="config-row">
+                <div class="config-copy">
+                  <div class="config-label">Candidates to Staged</div>
+                  <p>
+                    Decides what happens when a candidate conflicts with another
+                    version already staged.
+                  </p>
+                </div>
+                <ng-container
+                  *ngIf="isEditingConfig; else candidatesConflictValue">
+                  <mat-form-field appearance="outline" class="config-field">
+                    <mat-label>Candidates to Staged</mat-label>
+                    <mat-select formControlName="candidatesToStagedConflict">
+                      <mat-option
+                        *ngFor="let option of candidatesToStagedConflictOptions"
+                        [value]="option">
+                        {{ formatConfigOption(option) }}
+                      </mat-option>
+                    </mat-select>
+                  </mat-form-field>
+                </ng-container>
+                <ng-template #candidatesConflictValue>
+                  <span class="config-value">
+                    {{
+                      formatConfigOption(
+                        configForm.get('candidatesToStagedConflict')?.value
+                      )
+                    }}
+                  </span>
+                </ng-template>
+              </div>
+
+              <mat-divider></mat-divider>
+
+              <div class="config-row">
+                <div class="config-copy">
+                  <div class="config-label">Staged to Members</div>
+                  <p>
+                    Decides whether release tagging can continue when staged
+                    objects conflict with released member versions.
+                  </p>
+                </div>
+                <ng-container *ngIf="isEditingConfig; else stagedConflictValue">
+                  <mat-form-field appearance="outline" class="config-field">
+                    <mat-label>Staged to Members</mat-label>
+                    <mat-select formControlName="stagedToMembersConflict">
+                      <mat-option
+                        *ngFor="let option of stagedToMembersConflictOptions"
+                        [value]="option">
+                        {{ formatConfigOption(option) }}
+                      </mat-option>
+                    </mat-select>
+                  </mat-form-field>
+                </ng-container>
+                <ng-template #stagedConflictValue>
+                  <span class="config-value">
+                    {{
+                      formatConfigOption(
+                        configForm.get('stagedToMembersConflict')?.value
+                      )
+                    }}
+                  </span>
+                </ng-template>
+              </div>
+            </div>
+          </section>
+        </ng-template>
+
+        <section
+          class="labelled-box config-card"
+          aria-label="Publication metadata">
+          <div class="content no-label">
+            <h3>Publication</h3>
+            <p class="config-section-intro">
+              Metadata for the <code>x-mitre-collection</code> object emitted in
+              STIX 2.1 bundles. Each value inherits the organization settings
+              unless overridden for this track. Values are frozen on every
+              released snapshot.
+            </p>
+
+            <div class="config-row">
+              <div class="config-copy">
+                <div class="config-label">Publishing Identity</div>
+                <p>
+                  Becomes <code>created_by_ref</code> on the collection object
+                  and ships in the bundle as a supporting identity.
+                </p>
+                <p *ngIf="publicationResolved" class="config-source">
+                  {{
+                    formatPublicationSource(
+                      publicationResolved.sources.created_by_ref
+                    )
+                  }}
+                </p>
+              </div>
+              <ng-container *ngIf="isEditingConfig; else identityValue">
+                <div class="config-inherit-editor">
+                  <mat-slide-toggle
+                    aria-label="Inherit publishing identity"
+                    formControlName="publicationIdentityInherit">
+                    Inherit organization identity
+                  </mat-slide-toggle>
+                  <mat-form-field
+                    *ngIf="!configForm.get('publicationIdentityInherit')?.value"
+                    appearance="outline"
+                    class="config-field">
+                    <mat-label>Identity</mat-label>
+                    <mat-select formControlName="publicationIdentityValue">
+                      <mat-option
+                        *ngFor="let option of publicationIdentityOptions"
+                        [value]="option.id">
+                        {{ option.label }}
+                      </mat-option>
+                    </mat-select>
+                  </mat-form-field>
+                </div>
+              </ng-container>
+              <ng-template #identityValue>
+                <span class="config-value">{{ publicationIdentityLabel }}</span>
+              </ng-template>
+            </div>
+
+            <mat-divider></mat-divider>
+
+            <div class="config-row">
+              <div class="config-copy">
+                <div class="config-label">Collection Markings</div>
+                <p>
+                  Becomes <code>object_marking_refs</code> on the collection
+                  object. When neither scope configures markings, the object
+                  carries the markings referenced by its contents.
+                </p>
+                <p *ngIf="publicationResolved" class="config-source">
+                  {{
+                    formatPublicationSource(
+                      publicationResolved.sources.object_marking_refs
+                    )
+                  }}
+                </p>
+              </div>
+              <ng-container *ngIf="isEditingConfig; else markingValue">
+                <div class="config-inherit-editor">
+                  <mat-slide-toggle
+                    aria-label="Inherit collection markings"
+                    formControlName="publicationMarkingsInherit">
+                    Inherit default markings
+                  </mat-slide-toggle>
+                  <mat-form-field
+                    *ngIf="!configForm.get('publicationMarkingsInherit')?.value"
+                    appearance="outline"
+                    class="config-field">
+                    <mat-label>Marking definitions</mat-label>
+                    <mat-select
+                      formControlName="publicationMarkingsValue"
+                      multiple>
+                      <mat-option
+                        *ngFor="let option of publicationMarkingOptions"
+                        [value]="option.id">
+                        {{ option.label }}
+                      </mat-option>
+                    </mat-select>
+                  </mat-form-field>
+                </div>
+              </ng-container>
+              <ng-template #markingValue>
+                <span class="config-value">
+                  <ng-container
+                    *ngIf="publicationMarkingLabels.length; else noMarkings">
+                    {{ publicationMarkingLabels.join(', ') }}
+                  </ng-container>
+                  <ng-template #noMarkings>Derived from contents</ng-template>
+                </span>
+              </ng-template>
+            </div>
+
+            <mat-divider></mat-divider>
+
+            <div class="config-row">
+              <div class="config-copy">
+                <div class="config-label">Collection ID</div>
+                <p>
+                  Stable identifier of the collection object across every
+                  snapshot of this track. Set the canonical ATT&amp;CK value
+                  before the first release when this track replaces a legacy
+                  domain bundle; it cannot change afterwards.
+                </p>
+                <p *ngIf="publicationResolved" class="config-source">
+                  {{
+                    formatPublicationSource(
+                      publicationResolved.sources.collection_id
+                    )
+                  }}
+                </p>
+              </div>
+              <ng-container
+                *ngIf="
+                  isEditingConfig && !hasTaggedRelease;
+                  else collectionIdValue
+                ">
+                <mat-form-field appearance="outline" class="config-field">
+                  <mat-label>Collection ID</mat-label>
+                  <input
+                    matInput
+                    formControlName="publicationCollectionId"
+                    placeholder="x-mitre-collection--uuid" />
+                </mat-form-field>
+              </ng-container>
+              <ng-template #collectionIdValue>
+                <code class="config-value">{{
+                  publicationResolved?.collection_id
+                }}</code>
+              </ng-template>
+            </div>
+
+            <mat-divider></mat-divider>
+
+            <div class="config-row">
+              <div class="config-copy">
+                <div class="config-label">Collection Created</div>
+                <p>
+                  The collection object's <code>created</code> timestamp.
+                  Defaults to when this track was created and cannot change
+                  after the first release.
+                </p>
+                <p *ngIf="publicationResolved" class="config-source">
+                  {{
+                    formatPublicationSource(publicationResolved.sources.created)
+                  }}
+                </p>
+              </div>
+              <ng-container
+                *ngIf="isEditingConfig && !hasTaggedRelease; else createdValue">
+                <mat-form-field appearance="outline" class="config-field">
+                  <mat-label>Created (ISO 8601)</mat-label>
+                  <input
+                    matInput
+                    formControlName="publicationCreated"
+                    placeholder="2018-01-17T12:56:55.080Z" />
+                </mat-form-field>
+              </ng-container>
+              <ng-template #createdValue>
+                <span class="config-value">
+                  <ng-container
+                    *ngIf="publicationResolved?.created; else unknownDate">
+                    {{
+                      publicationResolved?.created | date: 'MMM d, y, h:mm:ss a'
+                    }}
+                  </ng-container>
+                </span>
+              </ng-template>
+            </div>
+          </div>
+        </section>
+      </form>
+
+      <section
+        *ngIf="canEditReleaseTrack"
+        class="labelled-box config-card danger-zone"
+        aria-label="Danger zone">
+        <div class="content no-label">
+          <h3>Danger zone</h3>
+          <div class="config-row">
+            <div class="config-copy">
+              <div class="config-label">Delete this release track</div>
+              <p>
+                Permanently deletes the track with every snapshot and release in
+                its history. You will be asked to type the track ID to confirm.
+              </p>
+            </div>
+            <button
+              mat-stroked-button
+              color="warn"
+              type="button"
+              [disabled]="!id || isDeleting"
+              (click)="onDeleteReleaseTrack()">
+              <mat-icon>delete_forever</mat-icon>
+              Delete release track
+            </button>
+          </div>
+        </div>
+      </section>
+    </div>
+  </ng-template>
+</div>

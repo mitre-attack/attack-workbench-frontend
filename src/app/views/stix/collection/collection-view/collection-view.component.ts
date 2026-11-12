@@ -40,7 +40,7 @@ import { AuthenticationService } from 'src/app/services/connectors/authenticatio
 import { StreamProgress } from 'src/app/services/connectors/collection-stream.service';
 import { RestApiConnectorService } from 'src/app/services/connectors/rest-api/rest-api-connector.service';
 import { EditorService } from 'src/app/services/editor/editor.service';
-import { environment } from '../../../../../environments/environment';
+import { getRuntimeConfiguration } from 'src/configuration/runtime-configuration';
 import { logger } from '../../../../utils/logger';
 import { ChangelogCategory } from 'src/app/utils/types';
 import { AttackTypeToPlural } from 'src/app/utils/type-mappings';
@@ -87,7 +87,7 @@ export class CollectionViewComponent extends StixViewPage implements OnInit {
   };
 
   public get collectionDownloadURL() {
-    return `${environment.integrations.rest_api.url}/collection-bundles/?collectionId=${this.collection.stixID}&collectionModified=${this.collection.modified.toISOString()}${this.includeNotes ? '&includeNotes=true' : ''}`;
+    return `${getRuntimeConfiguration().apiUrl}/collection-bundles/?collectionId=${this.collection.stixID}&collectionModified=${this.collection.modified.toISOString()}${this.includeNotes ? '&includeNotes=true' : ''}`;
   }
 
   public get hasTechniques() {

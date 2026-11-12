@@ -28,27 +28,6 @@ export class AnalyticViewComponent extends StixViewPage implements OnInit {
   ngOnInit(): void {
     if (this.analytic.firstInitialized) {
       this.analytic.setDefaultMarkingDefinitions(this.apiService);
-      this.generateAttackId();
-    }
-  }
-
-  private generateAttackId(): void {
-    const sub = this.analytic.generateAttackId(this.apiService).subscribe({
-      next: val => {
-        this.analytic.attackID = val;
-        this.setNameFromAttackId();
-      },
-      complete: () => sub.unsubscribe(),
-    });
-  }
-
-  public setNameFromAttackId(): void {
-    if (this.analytic.attackID) {
-      const regex = /\d+$/;
-      const match = regex.exec(this.analytic.attackID);
-      if (match) {
-        this.analytic.name = `Analytic ${match[0]}`;
-      }
     }
   }
 }

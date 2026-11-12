@@ -4,7 +4,14 @@ dist
 .husky
 .github
 .angular
-docker/
+.generated
 .nvmrc
 .releaserc
 commitlint.config.cjs
+.git
+.env
+.env.*
+.claude
+.nocommit
+coverage
+**/.DS_Store

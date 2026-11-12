@@ -3,7 +3,7 @@ import { MatStepper } from '@angular/material/stepper';
 import { CollectionIndex } from 'src/app/classes/collection-index';
 import { RestApiConnectorService } from 'src/app/services/connectors/rest-api/rest-api-connector.service';
 import { MatSnackBar } from '@angular/material/snack-bar';
-import { environment } from '../../../../../../environments/environment';
+import { getRuntimeConfiguration } from 'src/configuration/runtime-configuration';
 import { logger } from '../../../../../utils/logger';
 @Component({
   selector: 'app-collection-index-import',
@@ -26,7 +26,7 @@ export class CollectionIndexImportComponent implements OnInit {
 
   public url = '';
   public get recommended_indexes() {
-    return environment.recommended_indexes;
+    return getRuntimeConfiguration().recommendedIndexes;
   }
 
   public index: CollectionIndex = null;

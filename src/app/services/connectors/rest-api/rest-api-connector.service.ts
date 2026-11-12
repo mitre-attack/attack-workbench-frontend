@@ -47,13 +47,50 @@ import {
 } from 'src/app/utils/class-mappings';
 import { AttackTypeToPlural } from 'src/app/utils/type-mappings';
 import { AttackType } from 'src/app/utils/types';
-import { environment } from '../../../../environments/environment';
+import { getRuntimeConfiguration } from 'src/configuration/runtime-configuration';
 import { logger } from '../../../utils/logger';
+import { serializeJsonForDownload } from '../../../utils/json-download';
 import { ApiConnector } from '../api-connector';
 import {
   CollectionStreamService,
   StreamProgress,
 } from '../collection-stream.service';
+
+export interface ReleaseTrackCoverageObject {
+  stix: {
+    id: string;
+    type: string;
+    name?: string;
+    created?: string;
+    modified?: string;
+    x_mitre_version?: string;
+  };
+  workspace: { attack_id?: string };
+}
+
+export interface UntrackedLatestRevision extends ReleaseTrackCoverageObject {
+  last_enrolled_revision: {
+    modified: string;
+    x_mitre_version?: string;
+    release_tracks: {
+      id: string;
+      type: string;
+      tier: string;
+      status: string;
+      name?: string;
+    }[];
+  };
+  unenrolled_revision_count: number;
+}
+
+export interface ReleaseTrackCoverageReport {
+  untracked_latest_revisions: UntrackedLatestRevision[];
+  never_enrolled_objects: ReleaseTrackCoverageObject[];
+  summary: {
+    untracked_latest_revision_count: number;
+    never_enrolled_object_count: number;
+  };
+}
 
 export interface Paginated<T> {
   data: T[];
@@ -64,9 +101,87 @@ export interface Paginated<T> {
   };
 }
 
+export interface DeprecationBlockers {
+  sros: {
+    stix_id: string;
+    modified: string;
+    relationship_type: string;
+    direction: 'inbound' | 'outbound';
+  }[];
+  embedded: {
+    source_ref: string;
+    target_ref: string;
+    path: string;
+    direction: 'inbound' | 'outbound';
+  }[];
+}
+
+export interface DeprecationCheck {
+  stix_id: string;
+  can_deprecate: boolean;
+  blockers: DeprecationBlockers;
+}
+
 export interface Namespace {
   prefix: string;
   range_start: string;
+}
+
+export interface ValidationBypassRule {
+  _id?: string;
+  id?: string;
+  fieldPath: string[];
+  errorCode: string;
+  stixType: string;
+  suppressError: boolean;
+  autoCreated?: boolean;
+  autoCreatedReason?: string | null;
+  triggerEvent?: string | null;
+  warningMessage?: string | null;
+  __v?: number;
+}
+
+export interface AllowedValueOption {
+  value: string;
+  enabled: boolean;
+  objectTypes: string[];
+}
+
+export interface AllowedValueRule {
+  propertyName: string;
+  domainName: string;
+  objectTypes: string[];
+  values: AllowedValueOption[];
+  invalidValues: (AllowedValueOption & { reason: string })[];
+}
+
+export interface AllowedValueDefinition {
+  propertyName: string;
+  domainName: string;
+  objectTypes: string[];
+  valueType: 'enum' | 'formatted';
+  choices: { value: string; objectTypes: string[] }[];
+  description: string;
+}
+
+export interface AllowedValueCatalog {
+  admVersion: string;
+  rules: AllowedValueDefinition[];
+}
+
+export interface AllowedValues {
+  objectType: string;
+  properties: {
+    propertyName: string;
+    domains: {
+      domainName: string;
+      allowedValues: string[];
+    }[];
+  }[];
+}
+
+export interface MitreIdentityWrites {
+  enabled: boolean;
 }
 
 @Injectable({
@@ -74,7 +189,7 @@ export interface Namespace {
 })
 export class RestApiConnectorService extends ApiConnector {
   private get apiUrl(): string {
-    return environment.integrations.rest_api.url;
+    return getRuntimeConfiguration().apiUrl;
   }
 
   constructor(
@@ -83,6 +198,13 @@ export class RestApiConnectorService extends ApiConnector {
     private collectionStreamService: CollectionStreamService
   ) {
     super(snackbar);
+  }
+
+  /** Check authoritative latest references; never substitute cached workspace data. */
+  public getDeprecationCheck(stixId: string): Observable<DeprecationCheck> {
+    return this.http.get<DeprecationCheck>(
+      `${this.apiUrl}/attack-objects/${encodeURIComponent(stixId)}/deprecation-check`
+    );
   }
 
   /**
@@ -513,6 +635,7 @@ export class RestApiConnectorService extends ApiConnector {
     revoked?: boolean;
     deprecated?: boolean;
     deserialize?: boolean;
+    versions?: 'all' | 'latest';
     lastUpdatedBy?: string[];
     search?: string;
   }) {
@@ -536,6 +659,7 @@ export class RestApiConnectorService extends ApiConnector {
         'includeDeprecated',
         options.deprecated ? 'true' : 'false'
       );
+    if (options?.versions) query = query.set('versions', options.versions);
     // searching
     if (options?.search) query = query.set('search', options.search);
     // lastUpdatedBy
@@ -1092,6 +1216,10 @@ export class RestApiConnectorService extends ApiConnector {
     return this.getStixObjectFactory<MarkingDefinition>('marking-definition');
   }
 
+  public get getRelationship() {
+    return this.getStixObjectFactory<Relationship>('relationship');
+  }
+
   /**
    * Factory to create a new STIX object creator (POST) function
    * @template T the type to create
@@ -1103,8 +1231,23 @@ export class RestApiConnectorService extends ApiConnector {
     const plural = AttackTypeToPlural[attackType];
     return function <P extends T>(object: P): Observable<P> {
       const url = `${this.apiUrl}/${plural}`;
+      let params = new HttpParams();
+
+      // add parentTechniqueId for sub-techniques
+      if (attackType == 'technique') {
+        const technique = object as StixObject as Technique;
+        if (technique.is_subtechnique && technique.parentTechnique) {
+          params = params.set(
+            'parentTechniqueId',
+            technique.parentTechnique.attackID
+          );
+        }
+      }
       return this.http
-        .post(url, object.serialize(), { headers: this.headers })
+        .post(url, object.serialize(), {
+          headers: this.headers,
+          params: params,
+        })
         .pipe(
           tap(this.handleSuccess(`${this.getObjectName(object)} saved`)),
           map(result => {
@@ -1119,6 +1262,68 @@ export class RestApiConnectorService extends ApiConnector {
     };
   }
 
+  /**
+   * Factory to create a STIX object validator via dryRun POST.
+   *
+   * Posts the serialized object to its type-specific endpoint with ?dryRun=true,
+   * which runs the full create pipeline (compose, validate) without persisting.
+   * Normalizes the response into { errors, warnings } for the caller.
+   *
+   * @template T the type to validate
+   * @returns validator function
+   */
+  public validateStixObject<T extends StixObject>() {
+    return <P extends T>(object: P): Observable<any> => {
+      const plural = AttackTypeToPlural[object.attackType];
+      const url = `${this.apiUrl}/${plural}`;
+      let params = new HttpParams().set('dryRun', 'true');
+
+      // add parentTechniqueId for sub-techniques
+      if (object.attackType == 'technique') {
+        const technique = object as StixObject as Technique;
+        if (technique.is_subtechnique && technique.parentTechnique) {
+          params = params.set(
+            'parentTechniqueId',
+            technique.parentTechnique.attackID
+          );
+        }
+      }
+
+      return this.http.post(url, object.serialize(), { params }).pipe(
+        // Success (200): validation passed, extract warnings only
+        map(result => ({
+          errors: [],
+          warnings: (result as any).warnings || [],
+        })),
+        catchError((error: any) => {
+          // Validation failure (400): normalize errors and warnings into expected shape
+          if (error.status === 400 && error.error?.details) {
+            return of({
+              errors: error.error.details,
+              warnings: error.error.warnings || [],
+            });
+          }
+          if (error.status === 400) {
+            return of({
+              errors: [
+                {
+                  path: ['request'],
+                  message:
+                    typeof error.error === 'string'
+                      ? error.error
+                      : error.error?.message || 'Validation failed.',
+                },
+              ],
+              warnings: [],
+            });
+          }
+          // Non-validation errors: re-raise
+          return throwError(error);
+        }),
+        share()
+      );
+    };
+  }
   /**
    * POST (create) a new technique
    * @param {Technique} object the object to create
@@ -1431,6 +1636,23 @@ export class RestApiConnectorService extends ApiConnector {
     };
   }
 
+  private revokeStixObjectFactory(attackType: AttackType) {
+    const plural = AttackTypeToPlural[attackType];
+    return function (
+      id: string,
+      revokingObject: { revoking: { stixId: string; modified: string } },
+      preserveRelationships = false
+    ): Observable<{}> {
+      const url = `${this.apiUrl}/${plural}/${id}/revoke`;
+      const params = { preserveRelationships };
+      return this.http.post(url, revokingObject, { params }).pipe(
+        tap(this.handleSuccess(`${attackType} revoked`)),
+        catchError(this.handleError_raise()),
+        share() // multicast so that multiple subscribers don't trigger the call twice. THIS MUST BE THE LAST LINE OF THE PIPE
+      );
+    };
+  }
+
   /**
    * DELETE a technique
    * @param {string} id the STIX ID of the object to delete
@@ -1526,6 +1748,94 @@ export class RestApiConnectorService extends ApiConnector {
    */
   public get deleteMatrix() {
     return this.deleteStixObjectFactory('matrix');
+  }
+  /**
+   * DELETE an identity
+   * @param {string} id the STIX ID of the object to delete
+   * @returns {Observable<{}>} observable of the response body
+   */
+  public get deleteIdentity() {
+    return this.deleteStixObjectFactory('identity');
+  }
+  /**
+   * REVOKE a technique
+   * @param {string} id the STIX ID of the object to revoke
+   * @returns {Observable<{}>} observable of the response body
+   */
+  public get revokeTechnique() {
+    return this.revokeStixObjectFactory('technique');
+  }
+  /**
+   * REVOKE a tactic
+   * @param {string} id the STIX ID of the object to revoke
+   * @returns {Observable<{}>} observable of the response body
+   */
+  public get revokeTactic() {
+    return this.revokeStixObjectFactory('tactic');
+  }
+  /**
+   * REVOKE a group
+   * @param {string} id the STIX ID of the object to revoke
+   * @returns {Observable<{}>} observable of the response body
+   */
+  public get revokeGroup() {
+    return this.revokeStixObjectFactory('group');
+  }
+  /**
+   * REVOKE a matrix
+   * @param {string} id the STIX ID of the object to revoke
+   * @returns {Observable<{}>} observable of the response body
+   */
+  public get revokeMatrix() {
+    return this.revokeStixObjectFactory('matrix');
+  }
+  /**
+   * REVOKE a campaign
+   * @param {string} id the STIX ID of the object to revoke
+   * @returns {Observable<{}>} observable of the response body
+   */
+  public get revokeCampaign() {
+    return this.revokeStixObjectFactory('campaign');
+  }
+  /**
+   * REVOKE an asset
+   * @param {string} id the STIX ID of the object to revoke
+   * @returns {Observable<{}>} observable of the response body
+   */
+  public get revokeAsset() {
+    return this.revokeStixObjectFactory('asset');
+  }
+  /**
+   * REVOKE a software
+   * @param {string} id the STIX ID of the object to revoke
+   * @returns {Observable<{}>} observable of the response body
+   */
+  public get revokeSoftware() {
+    return this.revokeStixObjectFactory('software');
+  }
+  /**
+   * REVOKE a mitigation
+   * @param {string} id the STIX ID of the object to revoke
+   * @returns {Observable<{}>} observable of the response body
+   */
+  public get revokeMitigation() {
+    return this.revokeStixObjectFactory('mitigation');
+  }
+  /**
+   * REVOKE a data source
+   * @param {string} id the STIX ID of the object to revoke
+   * @returns {Observable<{}>} observable of the response body
+   */
+  public get revokeDataSource() {
+    return this.revokeStixObjectFactory('data-source');
+  }
+  /**
+   * REVOKE a data component
+   * @param {string} id the STIX ID of the object to revoke
+   * @returns {Observable<{}>} observable of the response body
+   */
+  public get revokeDataComponent() {
+    return this.revokeStixObjectFactory('data-component');
   }
   /**
    * DELETE a collection
@@ -1981,6 +2291,101 @@ export class RestApiConnectorService extends ApiConnector {
   }
 
   /**
+   * Stream collection bundle import with progress updates using Server-Sent Events
+   * @param collectionBundle the STIX bundle to import
+   * @param force whether to force import despite warnings
+   * @returns Observable that emits progress events and final collection
+   */
+  public streamCollectionBundleImport(
+    collectionBundle: any,
+    force = false
+  ): Observable<{ type: string; data: any }> {
+    return new Observable(observer => {
+      let query = new HttpParams();
+      query = query.set('stream', 'true');
+      if (force) query = query.set('forceImport', 'all');
+
+      const url = `${this.apiUrl}/collection-bundles?${query.toString()}`;
+
+      // Note: EventSource doesn't support POST with body, so we need to use fetch
+      // with SSE streaming instead
+      fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'text/event-stream',
+        },
+        credentials: 'include',
+        body: JSON.stringify(collectionBundle),
+      })
+        .then(async response => {
+          if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+          }
+
+          const reader = response.body?.getReader();
+          const decoder = new TextDecoder();
+
+          if (!reader) {
+            throw new Error('No response body');
+          }
+
+          let buffer = '';
+
+          while (true) {
+            const { done, value } = await reader.read();
+
+            if (done) {
+              observer.complete();
+              break;
+            }
+
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split('\n\n');
+            buffer = lines.pop() || '';
+
+            for (const line of lines) {
+              if (line.trim() === '' || line.startsWith(':')) continue;
+
+              const eventMatch = line.match(/^event: (\w+)\n/);
+              const dataMatch = line.match(/data: (.+)$/m);
+
+              if (dataMatch) {
+                try {
+                  const data = JSON.parse(dataMatch[1]);
+                  const eventType = eventMatch ? eventMatch[1] : 'message';
+
+                  if (eventType === 'error') {
+                    observer.error(data);
+                    return;
+                  }
+
+                  observer.next({ type: eventType, data });
+
+                  if (eventType === 'complete') {
+                    observer.complete();
+                    return;
+                  }
+                } catch (e) {
+                  logger.error('Error parsing SSE data:', e);
+                }
+              }
+            }
+          }
+        })
+        .catch(err => {
+          logger.error('Stream error:', err);
+          observer.error(err);
+        });
+
+      // Cleanup
+      return () => {
+        // EventSource cleanup if needed
+      };
+    });
+  }
+
+  /**
    * Preview a collection bundle.
    * POST the collection bundle to the back end to retrieve a preview of the import results. A second POST
    * call will occur (with ?forceImport='all') if the first POST call results in an overridable import error.
@@ -2183,30 +2588,79 @@ export class RestApiConnectorService extends ApiConnector {
 
   /**
    * Get all allowed values
-   * @returns {Observable<any>} all allowed values
+   * @returns enabled choices, grouped by supported object type, property, and domain
    */
-  private allowedValues;
-  public getAllAllowedValues(): Observable<any> {
-    if (this.allowedValues) {
-      return of(this.allowedValues);
-    }
-
-    const data$ = this.http
-      .get<any>(`${this.apiUrl}/config/allowed-values`)
+  public getAllAllowedValues(): Observable<AllowedValues[]> {
+    return this.http
+      .get<AllowedValues[]>(`${this.apiUrl}/config/allowed-values`)
       .pipe(
-        tap(_ => logger.log('retrieved allowed values')),
-        map(result => result as any),
-        catchError(this.handleError_continue<string[]>([]))
+        tap(() => logger.log('retrieved allowed values')),
+        catchError(this.handleError_continue<AllowedValues[]>([]))
       );
-    const subscription = data$.subscribe({
-      next: data => {
-        this.allowedValues = data;
-      },
-      complete: () => {
-        subscription.unsubscribe();
-      },
-    });
-    return data$;
+  }
+
+  public getAllowedValueRules(): Observable<AllowedValueRule[]> {
+    return this.http
+      .get<AllowedValueRule[]>(`${this.apiUrl}/config/allowed-values/rules`)
+      .pipe(catchError(this.handleError_raise<AllowedValueRule[]>()));
+  }
+
+  public getAllowedValueCatalog(): Observable<AllowedValueCatalog> {
+    return this.http
+      .get<AllowedValueCatalog>(`${this.apiUrl}/config/allowed-values/catalog`)
+      .pipe(catchError(this.handleError_raise<AllowedValueCatalog>()));
+  }
+
+  public postAllowedValueRule(
+    propertyName: string,
+    domainName: string,
+    values: AllowedValueOption[]
+  ): Observable<AllowedValueRule> {
+    return this.http
+      .post<AllowedValueRule>(`${this.apiUrl}/config/allowed-values/rules`, {
+        propertyName,
+        domainName,
+        values,
+      })
+      .pipe(
+        tap(this.handleSuccess('allowed values created')),
+        catchError(this.handleError_raise<AllowedValueRule>())
+      );
+  }
+
+  public validateAllowedValue(
+    propertyName: string,
+    domainName: string,
+    objectTypes: string[],
+    value: string
+  ): Observable<{ value: string }> {
+    return this.http
+      .post<{ value: string }>(
+        `${this.apiUrl}/config/allowed-values/validate`,
+        {
+          propertyName,
+          domainName,
+          objectTypes,
+          value,
+        }
+      )
+      .pipe(catchError(this.handleError_raise<{ value: string }>()));
+  }
+
+  public putAllowedValueRule(
+    propertyName: string,
+    domainName: string,
+    values: AllowedValueOption[]
+  ): Observable<AllowedValueRule> {
+    return this.http
+      .put<AllowedValueRule>(
+        `${this.apiUrl}/config/allowed-values/rules/${encodeURIComponent(propertyName)}/${encodeURIComponent(domainName)}`,
+        { values }
+      )
+      .pipe(
+        tap(this.handleSuccess('allowed values updated')),
+        catchError(this.handleError_raise<AllowedValueRule>())
+      );
   }
 
   /**
@@ -2288,6 +2742,21 @@ export class RestApiConnectorService extends ApiConnector {
   }
 
   /**
+   * Set the organization identity to an existing identity object.
+   * @param identityId the STIX ID of the identity to use as the organization identity
+   * @returns {Observable<any>} the update response
+   */
+  public setOrganizationIdentityRef(identityId: string): Observable<any> {
+    return this.http
+      .post(`${this.apiUrl}/config/organization-identity`, { id: identityId })
+      .pipe(
+        tap(this.handleSuccess('Organization Identity Updated')),
+        catchError(this.handleError_raise<any>()),
+        share()
+      );
+  }
+
+  /**
    * Get the organization namespace configurations
    * @returns {Observable<Namespace>} the organization namespace configurations
    */
@@ -2327,6 +2796,152 @@ export class RestApiConnectorService extends ApiConnector {
         }),
         catchError(this.handleError_raise<any>()),
         share() // multicast so that multiple subscribers don't trigger the call twice. THIS MUST BE THE LAST LINE OF THE PIPE
+      );
+  }
+
+  /**
+   * Get whether protected MITRE identity writes are enabled.
+   * @returns {Observable<MitreIdentityWrites>} the MITRE identity write setting
+   */
+  public getMitreIdentityWrites(): Observable<MitreIdentityWrites> {
+    return this.http
+      .get<MitreIdentityWrites>(`${this.apiUrl}/config/mitre-identity-writes`)
+      .pipe(
+        tap(() => logger.log('retrieved MITRE identity write setting')),
+        catchError(
+          this.handleError_continue<MitreIdentityWrites>({ enabled: false })
+        ),
+        share()
+      );
+  }
+
+  /**
+   * Set whether protected MITRE identity writes are enabled.
+   * @param enabled true if protected MITRE identity writes should be enabled
+   * @returns {Observable<any>} the update response
+   */
+  public setMitreIdentityWrites(enabled: boolean): Observable<any> {
+    return this.http
+      .post(`${this.apiUrl}/config/mitre-identity-writes`, { enabled })
+      .pipe(
+        tap(this.handleSuccess('MITRE Identity Write Setting Updated')),
+        catchError(this.handleError_raise<any>()),
+        share()
+      );
+  }
+
+  /**
+   * Get all ADM validation bypass rules.
+   * @returns {Observable<ValidationBypassRule[]>} validation bypass rules
+   */
+  public getValidationBypassRules(): Observable<ValidationBypassRule[]> {
+    return this.http
+      .get<ValidationBypassRule[]>(`${this.apiUrl}/config/validation-bypasses`)
+      .pipe(
+        tap(() => logger.log('retrieved validation bypass rules')),
+        catchError(this.handleError_continue<ValidationBypassRule[]>([])),
+        share()
+      );
+  }
+
+  /**
+   * Get one ADM validation bypass rule.
+   * @param id validation bypass rule id
+   * @returns {Observable<ValidationBypassRule>} validation bypass rule
+   */
+  public getValidationBypassRule(id: string): Observable<ValidationBypassRule> {
+    return this.http
+      .get<ValidationBypassRule>(
+        `${this.apiUrl}/config/validation-bypasses/${id}`
+      )
+      .pipe(
+        tap(() => logger.log('retrieved validation bypass rule')),
+        catchError(this.handleError_continue<ValidationBypassRule>()),
+        share()
+      );
+  }
+
+  /**
+   * Create an ADM validation bypass rule.
+   * @param rule validation bypass rule to create
+   * @returns {Observable<ValidationBypassRule>} created validation bypass rule
+   */
+  public postValidationBypassRule(
+    rule: ValidationBypassRule
+  ): Observable<ValidationBypassRule> {
+    return this.http
+      .post<ValidationBypassRule>(
+        `${this.apiUrl}/config/validation-bypasses`,
+        rule
+      )
+      .pipe(
+        tap(this.handleSuccess('validation bypass rule saved')),
+        catchError(this.handleError_raise<ValidationBypassRule>()),
+        share()
+      );
+  }
+
+  /**
+   * Update an ADM validation bypass rule.
+   * @param id validation bypass rule id
+   * @param rule validation bypass rule updates
+   * @returns {Observable<ValidationBypassRule>} updated validation bypass rule
+   */
+  public putValidationBypassRule(
+    id: string,
+    rule: ValidationBypassRule
+  ): Observable<ValidationBypassRule> {
+    return this.http
+      .put<ValidationBypassRule>(
+        `${this.apiUrl}/config/validation-bypasses/${id}`,
+        rule
+      )
+      .pipe(
+        tap(this.handleSuccess('validation bypass rule saved')),
+        catchError(this.handleError_raise<ValidationBypassRule>()),
+        share()
+      );
+  }
+
+  /**
+   * Delete an ADM validation bypass rule.
+   * @param id validation bypass rule id
+   * @returns {Observable<object>} observable of the response body
+   */
+  public deleteValidationBypassRule(id: string): Observable<object> {
+    return this.http
+      .delete<object>(`${this.apiUrl}/config/validation-bypasses/${id}`)
+      .pipe(
+        tap(this.handleSuccess('validation bypass rule deleted')),
+        catchError(this.handleError_raise<object>()),
+        share()
+      );
+  }
+
+  /**
+   * Get the next available ATT&CK ID for a given STIX type
+   * @param {string} stixType the STIX type (e.g., 'attack-pattern', 'x-mitre-tactic')
+   * @param {string} [parentRef] optional parent technique STIX ID for subtechniques
+   * @returns {Observable<string>} the next available ATT&CK ID
+   */
+  public getNextAttackId(
+    stixType: string,
+    parentRef?: string
+  ): Observable<string> {
+    let params = new HttpParams().set('type', stixType);
+    if (parentRef) {
+      params = params.set('parentRef', parentRef);
+    }
+
+    return this.http
+      .get<{
+        attack_id: string;
+      }>(`${this.apiUrl}/attack-objects/attack-id/next`, { params })
+      .pipe(
+        tap(_ => logger.log(`retrieved next ATT&CK ID for ${stixType}`)),
+        map(result => result.attack_id),
+        catchError(this.handleError_continue<string>()),
+        share()
       );
   }
 
@@ -2592,7 +3207,7 @@ export class RestApiConnectorService extends ApiConnector {
    */
   public triggerBrowserDownload(data: any, filename: string) {
     const url = URL.createObjectURL(
-      new Blob([JSON.stringify(data, null, 4)], { type: 'text/json' })
+      new Blob([serializeJsonForDownload(data)], { type: 'text/json' })
     );
     const downloadLink = document.createElement('a');
     downloadLink.href = url;
@@ -2661,6 +3276,70 @@ export class RestApiConnectorService extends ApiConnector {
       },
     });
     return getter;
+  }
+
+  //   ___                      _
+  //  | _ \___ _ __  ___ _ _ __| |_ ___
+  //  |   / -_) '_ \/ _ \ '_/ _|  _(_-<
+  //  |_|_\___| .__/\___/_| \__|\__/__/
+  //          |_|
+
+  /**
+   * Retrieve objects which have unresolved link-by-id references
+   */
+  public getMissingLinkById(): Observable<any> {
+    const url = `${this.apiUrl}/reports/link-by-id/missing`;
+    return this.http.get(url).pipe(
+      tap(results =>
+        logger.log('retrieved missing link-by-id report', results)
+      ),
+      catchError(this.handleError_continue([])), // on error, trigger the error notification and continue operation without crashing (returns empty item)
+      share() // multicast so that multiple subscribers don't trigger the call twice. THIS MUST BE THE LAST LINE OF THE PIPE
+    );
+  }
+  /**
+   * Retrieve relationships whose endpoints share no domain and objects that
+   * declare no domain
+   */
+  public getDomainConsistencyReport(): Observable<any> {
+    const url = `${this.apiUrl}/reports/domain-consistency`;
+    return this.http.get(url).pipe(
+      tap(results =>
+        logger.log('retrieved domain consistency report', results)
+      ),
+      catchError(
+        this.handleError_continue({
+          cross_domain_relationships: [],
+          objects_without_domains: [],
+        })
+      ),
+      share() // multicast so that multiple subscribers don't trigger the call twice. THIS MUST BE THE LAST LINE OF THE PIPE
+    );
+  }
+
+  /** Retrieve recorded release-track coverage without changing enrollment. */
+  public getReleaseTrackCoverageReport(): Observable<ReleaseTrackCoverageReport> {
+    const url = `${this.apiUrl}/reports/release-track-coverage`;
+    return this.http
+      .get<ReleaseTrackCoverageReport>(url)
+      .pipe(
+        catchError(this.handleError_raise<ReleaseTrackCoverageReport>()),
+        share()
+      );
+  }
+
+  /**
+   * Retrieve groups of parallel relationships between the same source/target/type
+   */
+  public getParallelRelationships(): Observable<any> {
+    const url = `${this.apiUrl}/reports/parallel-relationships`;
+    return this.http.get(url).pipe(
+      tap(results =>
+        logger.log('retrieved parallel relationships report', results)
+      ),
+      catchError(this.handleError_continue([])), // on error, trigger the error notification and continue operation without crashing (returns empty item)
+      share() // multicast so that multiple subscribers don't trigger the call twice. THIS MUST BE THE LAST LINE OF THE PIPE
+    );
   }
 }
 

@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core';
 import { EditorService } from '../editor/editor.service';
 import { RestApiConnectorService } from '../connectors/rest-api/rest-api-connector.service';
-import { environment } from 'src/environments/environment';
+import { getRuntimeConfiguration } from 'src/configuration/runtime-configuration';
 import { AttackTypeToRoute } from 'src/app/utils/type-mappings';
 @Injectable({
   providedIn: 'root',
@@ -9,12 +9,12 @@ import { AttackTypeToRoute } from 'src/app/utils/type-mappings';
 export class WebsiteIntegrationService {
   // returns the actual integration url
   public get websiteIntegrationUrl(): string {
-    return environment.integrations.attack_website.url;
+    return getRuntimeConfiguration().attackWebsiteUrl;
   }
 
   // reads if the integration is enabled
   public get websiteIntegrationEnabled(): boolean {
-    return environment.integrations.attack_website.enabled;
+    return getRuntimeConfiguration().attackWebsiteEnabled;
   }
 
   // tracks the current URL, stixID, and validity of the URL

@@ -5,7 +5,7 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 import { Observable, of } from 'rxjs';
 import { catchError, share, map, concatMap } from 'rxjs/operators';
 import { UserAccount } from 'src/app/classes/authn/user-account';
-import { environment } from '../../../../environments/environment';
+import { getRuntimeConfiguration } from 'src/configuration/runtime-configuration';
 import { ApiConnector } from '../api-connector';
 import { Role } from 'src/app/classes/authn/role';
 import { Router } from '@angular/router';
@@ -29,7 +29,7 @@ export class AuthenticationService extends ApiConnector {
   ];
   public inactiveRoles: Role[] = [Role.NONE];
   private get apiUrl(): string {
-    return environment.integrations.rest_api.url;
+    return getRuntimeConfiguration().apiUrl;
   }
   public onLogin = new EventEmitter(); // event emitter for admin organization identity pop-up
 

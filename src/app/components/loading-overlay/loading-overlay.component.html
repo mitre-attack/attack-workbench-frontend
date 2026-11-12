@@ -1,6 +1,35 @@
 <div class="loading">
-  <div class="spinner-wrapper">
+  <div
+    class="spinner-wrapper"
+    *ngIf="!showProgress && phaseProgress.length === 0">
     <mat-spinner diameter="50" color="primary"></mat-spinner>
   </div>
+
+  <!-- Single progress bar -->
+  <div
+    class="progress-wrapper"
+    *ngIf="showProgress && phaseProgress.length === 0">
+    <mat-progress-bar mode="determinate" color="primary" [value]="progress">
+    </mat-progress-bar>
+    <div class="progress-text">{{ progress }}%</div>
+  </div>
+
+  <!-- Multi-phase progress bars -->
+  <div class="multi-phase-progress" *ngIf="phaseProgress.length > 0">
+    <div class="phase-progress-item" *ngFor="let phase of phaseProgress">
+      <div class="phase-label" [class.active]="phase.active">
+        {{ phase.label }}
+      </div>
+      <div class="phase-bar-container">
+        <mat-progress-bar
+          mode="determinate"
+          [color]="phase.active ? 'primary' : 'accent'"
+          [value]="phase.progress">
+        </mat-progress-bar>
+        <div class="phase-progress-text">{{ phase.progress }}%</div>
+      </div>
+    </div>
+  </div>
+
   <div class="text-label" *ngIf="message">{{ message }}</div>
 </div>

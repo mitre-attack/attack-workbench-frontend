@@ -1,5 +1,4 @@
 @use '../../../../../style/globals';
-@use '../../../../../style/colors';
 
 .subtype-view {
   @extend .labelled-box;
@@ -7,29 +6,7 @@
   .content {
     overflow-x: auto;
   }
-  .subtype-table {
-    width: 100%;
-    padding: 8px;
-    .light & {
-      background-color: colors.color(light);
-    }
-    .dark & {
-      background-color: colors.color(dark);
-    }
-    tr.mat-mdc-header-row {
-      height: 25px;
-    }
-    .mat-mdc-cell,
-    .mat-mdc-header-cell {
-      padding: 0 10px;
-      .light & {
-        border-color: colors.border-color(light);
-      }
-      .dark & {
-        border-color: colors.border-color(dark);
-      }
-    }
-  }
+
   .subtype-markdown {
     p {
       padding: 0;

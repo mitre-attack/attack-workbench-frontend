@@ -50,6 +50,9 @@
       <app-asset-view
         *ngIf="objectType === 'asset'"
         [config]="buildConfig()"></app-asset-view>
+      <app-identity-view
+        *ngIf="objectType === 'identity'"
+        [config]="buildConfig()"></app-identity-view>
       <app-marking-definition-view
         *ngIf="objectType === 'marking-definition'"
         [config]="buildConfig()"></app-marking-definition-view>

@@ -240,9 +240,11 @@ export class RelationshipViewComponent extends StixViewPage implements OnInit {
    * @param {any} obj the raw STIX object
    */
   public navigateTo(obj: any): void {
-    if (
-      !(obj?.stix?.type && obj?.stix?.id && StixTypeToAttackType[obj.stix.type])
-    ) {
+    if (!(
+      obj?.stix?.type &&
+      obj?.stix?.id &&
+      StixTypeToAttackType[obj.stix.type]
+    )) {
       console.warn('Invalid object passed to navigateTo:', obj);
       return;
     }

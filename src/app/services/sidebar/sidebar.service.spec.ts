@@ -1,12 +1,15 @@
+import { NO_ERRORS_SCHEMA } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 
 import { SidebarService } from './sidebar.service';
 
-describe('SidebarManagerService', () => {
-  let service: SidebarManagerService;
+describe('SidebarService', () => {
+  let service: SidebarService;
 
   beforeEach(() => {
-    TestBed.configureTestingModule({});
+    TestBed.configureTestingModule({
+      schemas: [NO_ERRORS_SCHEMA],
+    });
     service = TestBed.inject(SidebarService);
   });
 

@@ -19,6 +19,7 @@ import { AuthenticationService } from '../../services/connectors/authentication/
 import { Status } from 'src/app/classes/authn/status';
 import { Team } from 'src/app/classes/authn/team';
 import { SelectionModel } from '@angular/cdk/collections';
+import { UserAccountEventsService } from 'src/app/services/user-account-events/user-account-events.service';
 
 @Component({
   selector: 'app-users-list',
@@ -72,7 +73,8 @@ export class UsersListComponent implements OnInit {
 
   constructor(
     private restAPIConnector: RestApiConnectorService,
-    private authenticationService: AuthenticationService
+    private authenticationService: AuthenticationService,
+    private userAccountEvents: UserAccountEventsService
   ) {
     this.filterOptions = [
       {
@@ -204,6 +206,7 @@ export class UsersListComponent implements OnInit {
         : Status.INACTIVE;
       const subscription = user.save(this.restAPIConnector).subscribe({
         complete: () => {
+          this.userAccountEvents.notifyUserAccountsChanged();
           this.applyControls(); // refresh list
           subscription.unsubscribe();
         },
@@ -228,6 +231,7 @@ export class UsersListComponent implements OnInit {
 
       const subscription = user.save(this.restAPIConnector).subscribe({
         complete: () => {
+          this.userAccountEvents.notifyUserAccountsChanged();
           this.applyControls(); // refresh list
           subscription.unsubscribe();
         },

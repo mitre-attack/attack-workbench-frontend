@@ -1,0 +1,117 @@
+@use '../../../../style/globals';
+@use '../../../../style/colors';
+
+.validation-bypasses-page {
+  .input-group {
+    font-size: 16px;
+    width: 100%;
+    display: flex;
+    flex-direction: row;
+
+    .search {
+      flex-grow: 1;
+    }
+
+    .mat-mdc-form-field-subscript-wrapper {
+      display: none;
+    }
+  }
+
+  .table-container {
+    max-width: 88em;
+    margin: 0 auto;
+    border-radius: 4px;
+
+    .dark & {
+      border: 1px solid colors.border-color(dark);
+    }
+
+    .light & {
+      border: 1px solid colors.border-color(light);
+    }
+
+    .scroll-container {
+      width: 100%;
+      overflow: auto;
+      max-width: 100%;
+      display: flex;
+      flex-direction: column;
+
+      .dark & {
+        border-bottom: 1px solid colors.border-color(dark);
+      }
+
+      .light & {
+        border-bottom: 1px solid colors.border-color(light);
+      }
+
+      table {
+        flex: 1 0 auto;
+        width: 100%;
+
+        th,
+        td {
+          .light & {
+            background: colors.color(light);
+            border-color: colors.border-color(light);
+          }
+
+          .dark & {
+            background: colors.color(dark);
+            border-color: colors.border-color(dark);
+          }
+        }
+
+        th {
+          font-size: 18px;
+          @extend .text-label;
+        }
+
+        tr.element-row:not(.expanded):hover {
+          .light & td {
+            background: colors.color-alternate(light);
+          }
+
+          .dark & td {
+            background: colors.color-alternate(dark);
+          }
+        }
+
+        .mat-mdc-cell + .mat-mdc-cell,
+        .mat-mdc-header-cell + .mat-mdc-header-cell {
+          padding-left: 12px;
+        }
+
+        .path-cell {
+          min-width: 14em;
+          font-family: monospace;
+        }
+
+        .warning-cell {
+          min-width: 18em;
+          max-width: 34em;
+          white-space: normal;
+        }
+
+        .action-cell {
+          width: 96px;
+          white-space: nowrap;
+        }
+      }
+    }
+  }
+
+  .behavior-label {
+    white-space: nowrap;
+
+    &.inactive {
+      .light & {
+        color: colors.on-color-deemphasis(light);
+      }
+
+      .dark & {
+        color: colors.on-color-deemphasis(dark);
+      }
+    }
+  }
+}

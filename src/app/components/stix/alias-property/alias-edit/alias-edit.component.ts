@@ -56,4 +56,12 @@ export class AliasEditComponent implements OnInit {
     });
     obj.external_references.deserialize(references);
   }
+
+  // When displaying aliases for software, groups and campaigns, filter out the object's name from the aliases list
+  public get visibleAliases(): string[] {
+    const object = this.config.object as StixObject;
+    const aliases = object?.[this.config.field] ?? [];
+    const name = 'name' in object ? object.name : undefined;
+    return aliases.filter(alias => alias !== name);
+  }
 }

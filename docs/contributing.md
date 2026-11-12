@@ -35,3 +35,9 @@ By making a contribution to this project, I certify that:
     maintained indefinitely and may be redistributed consistent with
     this project or the open source license(s) involved.
 ```
+
+## Unit tests
+
+Run `npm test` for the unit suite or `npm run test:coverage` for the coverage run used in CI.
+
+For Angular tests using `createAsyncObservable`, use `fakeAsync` and `flush` to finish finite asynchronous initialization and save operations before making assertions. Fixed-duration sleeps do not guarantee that nested timers have completed. The SaveDialog candidate-enrollment regression uses this approach to verify enrollment in both the existing and newly selected tracks before the dialog closes.

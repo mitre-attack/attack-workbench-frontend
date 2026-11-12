@@ -1,0 +1,421 @@
+@use '../../../style/colors';
+@use '../../../style/typography';
+
+.virtual-snapshot-contents {
+  display: block;
+  min-width: 0;
+  padding: 8px 0 24px;
+
+  .back-button {
+    margin: 0 0 20px -12px;
+  }
+  .snapshot-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 24px;
+    margin-bottom: 24px;
+  }
+  .snapshot-heading {
+    min-width: 0;
+  }
+  .eyebrow {
+    margin-bottom: 8px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    @include colors.theme-text-deemphasis;
+  }
+  .title-line {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px;
+    h2 {
+      margin: 0 8px 0 0;
+      font-size: 26px;
+      line-height: 1.3;
+      overflow-wrap: anywhere;
+    }
+  }
+  .snapshot-label,
+  .latest-label {
+    padding: 4px 9px;
+    border: 1px solid;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 600;
+    white-space: nowrap;
+    @include colors.theme-border-color;
+  }
+  .snapshot-label {
+    @include colors.theme-property(
+      background,
+      rgba(colors.color(mitre-light-blue), 0.1),
+      rgba(colors.color(mitre-blue), 0.07)
+    );
+    @include colors.theme-property(
+      color,
+      colors.color(mitre-light-blue),
+      colors.color(mitre-blue)
+    );
+  }
+  .latest-label {
+    @include colors.theme-text-deemphasis;
+  }
+  .snapshot-intro {
+    margin: 12px 0 0;
+    line-height: 1.6;
+    @include colors.theme-text-deemphasis;
+  }
+  .object-count {
+    min-width: 126px;
+    flex: 0 0 auto;
+    padding: 14px 18px;
+    border: 1px solid;
+    border-radius: 8px;
+    text-align: center;
+    @include colors.theme-border-color;
+    @include colors.theme-property(
+      background,
+      rgba(colors.color(mitre-light-blue), 0.06),
+      rgba(colors.color(mitre-blue), 0.035)
+    );
+    strong {
+      display: block;
+      font-size: 30px;
+      line-height: 1.2;
+    }
+    span {
+      display: block;
+      margin-top: 5px;
+      font-size: 12px;
+      @include colors.theme-text-deemphasis;
+    }
+  }
+  .snapshot-identity {
+    display: grid;
+    grid-template-columns: minmax(240px, 0.8fr) minmax(0, 1.8fr);
+    gap: 16px 32px;
+    padding: 18px 20px;
+    margin: 0 0 24px;
+    border: 1px solid;
+    border-left: 3px solid colors.color(mitre-blue);
+    border-radius: 4px;
+    @include colors.theme-border-color;
+    dt {
+      margin-bottom: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      @include colors.theme-text-deemphasis;
+    }
+    dd {
+      margin: 0;
+      font-size: 12px;
+      font-family: typography.$mono-font;
+      overflow-wrap: anywhere;
+    }
+  }
+  .contents-summary {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 20px;
+    margin: 0 0 24px;
+  }
+  .coverage-note {
+    display: flex;
+    flex: 1 1 420px;
+    align-items: flex-start;
+    gap: 12px;
+    > .mat-icon {
+      flex: 0 0 auto;
+      margin-top: 1px;
+      @include colors.theme-text-deemphasis;
+    }
+    strong {
+      font-size: 14px;
+    }
+    p {
+      margin: 5px 0 0;
+      font-size: 13px;
+      line-height: 1.6;
+      @include colors.theme-text-deemphasis;
+    }
+    .coverage-limit {
+      max-width: 850px;
+    }
+  }
+  .quarantine-button {
+    flex: 0 0 auto;
+  }
+  .contents-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+  }
+  .search-field {
+    flex: 1 1 300px;
+    min-width: 0;
+  }
+  .type-field,
+  .source-field {
+    flex: 1 1 220px;
+    min-width: 0;
+  }
+  .results-summary {
+    margin: 12px 0;
+    font-size: 12px;
+    @include colors.theme-text-deemphasis;
+  }
+  .table-shell {
+    width: 100%;
+    overflow-x: auto;
+    border: 1px solid;
+    border-radius: 6px;
+    @include colors.theme-border-color;
+  }
+  .contents-table {
+    width: 100%;
+    min-width: 820px;
+    border-collapse: collapse;
+    font-size: 13px;
+    th,
+    td {
+      padding: 16px;
+      text-align: left;
+      vertical-align: top;
+    }
+    th {
+      font-size: 12px;
+      font-weight: 700;
+      white-space: nowrap;
+      @include colors.theme-property(
+        background,
+        rgba(colors.on-color(dark), 0.05),
+        rgba(colors.color(mitre-black), 0.035)
+      );
+    }
+    td {
+      border-top: 1px solid;
+      @include colors.theme-border-color;
+    }
+    .object-cell {
+      width: 46%;
+      min-width: 285px;
+      max-width: 520px;
+    }
+    .object-cell > strong {
+      font-size: 14px;
+      overflow-wrap: anywhere;
+    }
+    .object-context {
+      display: block;
+      margin-top: 5px;
+      overflow-wrap: anywhere;
+      line-height: 1.5;
+    }
+    .object-id {
+      display: block;
+      margin-top: 7px;
+      font-family: typography.$mono-font;
+      font-size: 11px;
+      overflow-wrap: anywhere;
+      @include colors.theme-text-deemphasis;
+    }
+    .stix-type {
+      white-space: nowrap;
+      font-family: typography.$mono-font;
+      font-size: 11px;
+    }
+    .object-role {
+      display: block;
+      margin-top: 6px;
+      font-size: 11px;
+      line-height: 1.6;
+      @include colors.theme-text-deemphasis;
+    }
+    .object-sources {
+      display: block;
+      margin-top: 7px;
+      font-size: 12px;
+      line-height: 1.5;
+      overflow-wrap: anywhere;
+      @include colors.theme-text-deemphasis;
+    }
+    .revision-cell {
+      font-family: typography.$mono-font;
+      font-size: 11px;
+      white-space: nowrap;
+    }
+    .revision-cell small {
+      display: block;
+      margin-top: 6px;
+      @include colors.theme-text-deemphasis;
+    }
+    .inspect-cell {
+      width: 220px;
+      min-width: 200px;
+      padding: 8px;
+    }
+    .row-actions {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 4px;
+      a,
+      button {
+        height: auto;
+        min-height: 36px;
+        padding-top: 6px;
+        padding-bottom: 6px;
+        text-align: left;
+        white-space: normal;
+      }
+    }
+    .preview-error {
+      max-width: 260px;
+      margin: 8px;
+      font-size: 12px;
+      line-height: 1.5;
+      overflow-wrap: anywhere;
+    }
+    .pointer-only {
+      display: block;
+      padding: 8px;
+      font-size: 11px;
+      line-height: 1.6;
+      @include colors.theme-text-deemphasis;
+    }
+    .expanded-row {
+      @include colors.theme-property(
+        background,
+        rgba(colors.color(mitre-light-blue), 0.04),
+        rgba(colors.color(mitre-blue), 0.025)
+      );
+    }
+    .json-row td {
+      padding: 0 16px 16px;
+      border-top: 0;
+    }
+  }
+  .json-header {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 20px;
+    padding: 12px 0;
+    font-size: 12px;
+    span {
+      @include colors.theme-text-deemphasis;
+    }
+  }
+  pre {
+    max-height: 420px;
+    overflow: auto;
+    box-sizing: border-box;
+    margin: 0;
+    padding: 18px;
+    border: 1px solid;
+    border-radius: 4px;
+    font-size: 12px;
+    line-height: 1.65;
+    tab-size: 2;
+    @include colors.theme-border-color;
+    @include colors.theme-property(
+      background,
+      colors.color(mitre-black),
+      colors.color(mitre-silver)
+    );
+    code {
+      font-family: typography.$mono-font;
+    }
+  }
+  .mat-mdc-paginator {
+    background: transparent;
+  }
+  .state-panel {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    padding: 48px 24px;
+    text-align: center;
+    border: 1px solid;
+    border-radius: 6px;
+    @include colors.theme-border-color;
+    h3 {
+      margin: 4px 0 0;
+      font-size: 18px;
+    }
+    p {
+      max-width: 640px;
+      margin: 0 0 8px;
+      line-height: 1.6;
+      @include colors.theme-text-deemphasis;
+    }
+    > .mat-icon {
+      width: 32px;
+      height: 32px;
+      font-size: 32px;
+    }
+  }
+  .error-panel > .mat-icon {
+    color: colors.color(error);
+  }
+  .visually-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  @media (max-width: 760px) {
+    .snapshot-header {
+      gap: 16px;
+    }
+    .title-line h2 {
+      font-size: 22px;
+    }
+    .object-count {
+      min-width: 82px;
+      padding: 12px;
+      strong {
+        font-size: 26px;
+      }
+    }
+    .snapshot-identity {
+      grid-template-columns: 1fr;
+      gap: 16px;
+    }
+    .contents-toolbar {
+      flex-direction: column;
+      gap: 12px;
+    }
+    .search-field,
+    .type-field,
+    .source-field {
+      flex-basis: auto;
+    }
+    .quarantine-button {
+      width: 100%;
+    }
+  }
+  @media (max-width: 480px) {
+    .snapshot-header {
+      flex-direction: column;
+    }
+    .object-count {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      span {
+        margin: 0;
+      }
+    }
+  }
+}

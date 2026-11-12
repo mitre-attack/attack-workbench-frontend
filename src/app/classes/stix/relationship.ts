@@ -1,22 +1,24 @@
-import { Observable, of } from 'rxjs';
-import { map, switchMap } from 'rxjs/operators';
-import { RestApiConnectorService } from 'src/app/services/connectors/rest-api/rest-api-connector.service';
-import { ValidationData } from '../serializable';
-import { StixObject } from './stix-object';
-import { logger } from '../../utils/logger';
+import { concat, defer, Observable, of } from 'rxjs';
+import { last, map, switchMap } from 'rxjs/operators';
 import {
   Asset,
   Campaign,
   DataComponent,
   DataSource,
+  DetectionStrategy,
   Group,
   Matrix,
   Mitigation,
   Software,
   Tactic,
   Technique,
-  DetectionStrategy,
 } from 'src/app/classes/stix';
+import { RestApiConnectorService } from 'src/app/services/connectors/rest-api/rest-api-connector.service';
+import { ReleaseTracksConnectorService } from 'src/app/services/connectors/rest-api/release-tracks.service';
+import { logger } from '../../utils/logger';
+import { ValidationData } from '../serializable';
+import { StixObject } from './stix-object';
+import { WorkflowStatus, WorkflowStatusType } from 'src/app/utils/types';
 
 export class Relationship extends StixObject {
   public source_ref = '';
@@ -43,6 +45,9 @@ export class Relationship extends StixObject {
   protected get attackIDValidator() {
     return null;
   } // relationships have no ATT&CK ID
+
+  // override StixObject excludedFields
+  protected excludedFields = ['x_mitre_version'];
 
   /**
    * Creates and returns the deserialized object
@@ -379,6 +384,9 @@ export class Relationship extends StixObject {
     rep.stix.source_ref = this.source_ref;
     rep.stix.target_ref = this.target_ref;
 
+    // Strip properties that are empty strs + lists
+    rep.stix = this.filterObject(rep.stix);
+
     return rep;
   }
 
@@ -478,7 +486,8 @@ export class Relationship extends StixObject {
    * @returns {Observable<ValidationData>} the validation warnings and errors once validation is complete.
    */
   public validate(
-    restAPIService: RestApiConnectorService
+    restAPIService: RestApiConnectorService,
+    tempWorkflowState?: WorkflowStatusType
   ): Observable<ValidationData> {
     return this.base_validate(restAPIService).pipe(
       map(result => {
@@ -611,33 +620,38 @@ export class Relationship extends StixObject {
    * @returns {Observable} of the post
    */
   public save(
-    restAPIService: RestApiConnectorService
+    restAPIService: RestApiConnectorService,
+    _releaseTracksService?: ReleaseTracksConnectorService
   ): Observable<Relationship> {
     if (!this.workflow) {
       // Initialize the workflow object if it doesn't exist
-      this.workflow = { state: '' };
+      this.workflow = { state: WorkflowStatus.WorkInProgress };
     }
-    this.workflow.state = 'work-in-progress';
-    const postObservable = restAPIService.postRelationship(this);
-    const subscription = postObservable.subscribe({
-      next: result => {
-        this.deserialize(result.serialize());
+    this.workflow.state = WorkflowStatus.WorkInProgress;
+    return restAPIService.postRelationship(this).pipe(
+      switchMap(result => {
+        this.hydrateFromResponse(result);
         const source_object = this.getObject(
           this.source_object.stix.type,
           this.source_object
         );
-        this.updateSourceTargetObject(restAPIService, source_object);
         const target_object = this.getObject(
           this.target_object.stix.type,
           this.target_object
         );
-        this.updateSourceTargetObject(restAPIService, target_object);
-      },
-      complete: () => {
-        subscription.unsubscribe();
-      },
-    });
-    return postObservable;
+        return concat(
+          defer(() =>
+            this.updateSourceTargetObject(restAPIService, source_object)
+          ),
+          defer(() =>
+            this.updateSourceTargetObject(restAPIService, target_object)
+          )
+        ).pipe(
+          last(),
+          map(() => result)
+        );
+      })
+    );
   }
 
   /**
@@ -665,7 +679,7 @@ export class Relationship extends StixObject {
     const putObservable = restAPIService.putRelationship(this);
     const subscription = putObservable.subscribe({
       next: result => {
-        this.deserialize(result.serialize());
+        this.hydrateFromResponse(result);
       },
       complete: () => {
         subscription.unsubscribe();
@@ -675,7 +689,9 @@ export class Relationship extends StixObject {
   }
 
   /**
-   * Helper function to update the workflow status of the source object of the relationship,
+   * Resets a related object's workflow state to WIP in place. Workflow state
+   * is workspace metadata, not STIX content, so a PUT never changes a sealed
+   * revision and never creates a new object revision.
    * @param restAPIService the rest api service
    * @param object the relationship source object
    */
@@ -686,20 +702,9 @@ export class Relationship extends StixObject {
     // Check if the workflow object exists
     if (!object.workflow) {
       // Initialize the workflow object if it doesn't exist
-      object.workflow = { state: '' };
+      object.workflow = { state: WorkflowStatus.WorkInProgress };
     }
-    object.workflow.state = 'work-in-progress';
-    object.update(restAPIService).subscribe({
-      next: response => {
-        console.log('Object updated successfully:', response);
-        window.location.reload();
-      },
-      error: error => {
-        console.error('Error updating object:', error);
-      },
-      complete: () => {
-        console.log('Complete');
-      },
-    });
+    object.workflow.state = WorkflowStatus.WorkInProgress;
+    return object.update(restAPIService);
   }
 }

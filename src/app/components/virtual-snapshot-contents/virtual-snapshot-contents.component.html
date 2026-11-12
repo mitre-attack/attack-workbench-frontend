@@ -1,0 +1,374 @@
+<section
+  class="virtual-snapshot-contents"
+  aria-labelledby="snapshot-contents-title"
+  [attr.aria-busy]="loading">
+  <button mat-button type="button" class="back-button" (click)="back.emit()">
+    <mat-icon aria-hidden="true">arrow_back</mat-icon>
+    Back to Releases
+  </button>
+
+  <header class="snapshot-header">
+    <div class="snapshot-heading">
+      <div class="eyebrow">Virtual track · Snapshot contents</div>
+      <div class="title-line">
+        <h2 id="snapshot-contents-title">
+          {{ title || workbench?.name || 'Snapshot' }}
+        </h2>
+        <span
+          *ngIf="workbench"
+          class="snapshot-label"
+          [class.tagged]="workbench.version">
+          {{ workbench.version ? 'Tagged · ' + workbench.version : 'Draft' }}
+        </span>
+        <span *ngIf="isLatest" class="latest-label">Latest snapshot</span>
+      </div>
+      <p class="snapshot-intro">
+        Inspect the manifest-selected graph for this exact snapshot, not the
+        latest workspace objects.
+      </p>
+    </div>
+    <div *ngIf="workbench && !loading" class="object-count">
+      <strong>{{ rows.length | number }}</strong>
+      <span>{{
+        workbench.content_manifest_entries
+          ? 'listed objects'
+          : 'exported objects'
+      }}</span>
+    </div>
+  </header>
+
+  <dl class="snapshot-identity">
+    <div>
+      <dt>Exact snapshot revision</dt>
+      <dd>
+        <time [attr.datetime]="modified">{{ modified }}</time>
+      </dd>
+    </div>
+    <div>
+      <dt>Content manifest</dt>
+      <dd>
+        {{
+          workbench?.content_manifest_id ||
+            (loading ? 'Loading…' : 'Not supplied by the snapshot response')
+        }}
+      </dd>
+    </div>
+  </dl>
+
+  <div *ngIf="loading" class="state-panel" role="status" aria-live="polite">
+    <mat-spinner diameter="32"></mat-spinner>
+    <h3>Loading exact snapshot contents</h3>
+    <p>Retrieving its metadata and manifest-selected STIX 2.1 export.</p>
+  </div>
+
+  <div *ngIf="error" class="state-panel error-panel" role="alert">
+    <mat-icon aria-hidden="true">error_outline</mat-icon>
+    <h3>Snapshot contents unavailable</h3>
+    <p>{{ error }}</p>
+    <button mat-stroked-button type="button" (click)="load()">
+      <mat-icon aria-hidden="true">refresh</mat-icon>Retry
+    </button>
+  </div>
+
+  <ng-container *ngIf="workbench && !loading && !error">
+    <div class="contents-summary">
+      <div class="coverage-note">
+        <mat-icon aria-hidden="true">account_tree</mat-icon>
+        <div>
+          <strong>{{
+            workbench.content_manifest_entries
+              ? 'Manifest entries and exported graph'
+              : 'Exported graph'
+          }}</strong>
+          <p>
+            Includes relationships and supporting objects. The generated
+            collection projection is excluded.
+          </p>
+          <p *ngIf="workbench.content_manifest_entries">
+            {{ exportedCount | number }} exported objects, plus any non-exported
+            manifest dependencies. Render-only entries support LinkById
+            citations and are not shipped in the bundle.
+          </p>
+          <p *ngIf="!workbench.content_manifest_entries" class="coverage-limit">
+            This API does not expose the complete manifest entry list.
+            <ng-container
+              *ngIf="
+                workbench.linkTargetCount !== undefined;
+                else unknownRenderCount
+              "
+              >{{ workbench.linkTargetCount | number }} non-exported LinkById
+              render dependencies are not listed.</ng-container
+            >
+            <ng-template #unknownRenderCount
+              >Non-exported LinkById render dependencies are not
+              listed.</ng-template
+            >
+            The count above is the exported graph, not the complete manifest.
+          </p>
+          <p *ngIf="unrecordedSourceCount" class="coverage-limit">
+            Source tracks were not recorded for
+            {{ unrecordedSourceCount | number }} listed objects. Their origin is
+            shown as “Source not recorded”; current track membership is not used
+            to infer snapshot provenance.
+          </p>
+        </div>
+      </div>
+      <button
+        *ngIf="showQuarantine"
+        mat-stroked-button
+        type="button"
+        class="quarantine-button"
+        (click)="openQuarantine()">
+        <mat-icon aria-hidden="true">difference</mat-icon>
+        View Quarantined Objects
+      </button>
+    </div>
+
+    <div class="contents-toolbar">
+      <mat-form-field
+        appearance="outline"
+        subscriptSizing="dynamic"
+        class="search-field">
+        <mat-label>Search snapshot contents</mat-label>
+        <mat-icon matPrefix aria-hidden="true">search</mat-icon>
+        <input
+          matInput
+          [(ngModel)]="query"
+          (ngModelChange)="applyFilters()"
+          placeholder="Name, STIX ID, ATT&CK ID, or revision"
+          autocomplete="off" />
+        <button
+          *ngIf="query"
+          mat-icon-button
+          matSuffix
+          type="button"
+          aria-label="Clear search"
+          (click)="query = ''; applyFilters()">
+          <mat-icon aria-hidden="true">close</mat-icon>
+        </button>
+      </mat-form-field>
+      <mat-form-field
+        appearance="outline"
+        subscriptSizing="dynamic"
+        class="type-field">
+        <mat-label>STIX type</mat-label>
+        <mat-select
+          [(ngModel)]="selectedType"
+          (selectionChange)="applyFilters()">
+          <mat-option value="">All object types</mat-option>
+          <mat-option *ngFor="let type of types" [value]="type">{{
+            type
+          }}</mat-option>
+        </mat-select>
+      </mat-form-field>
+      <mat-form-field
+        appearance="outline"
+        subscriptSizing="dynamic"
+        class="source-field">
+        <mat-label>Source track</mat-label>
+        <mat-select
+          [(ngModel)]="selectedSourceTrack"
+          (selectionChange)="applyFilters()">
+          <mat-option value="">All source tracks</mat-option>
+          <mat-option
+            *ngFor="let track of sourceTracks"
+            [value]="'track:' + track.track_id">
+            {{ sourceTrackLabels.get(track.track_id) }}
+          </mat-option>
+          <mat-option *ngIf="unrecordedSourceCount" value="unrecorded">
+            Source not recorded
+          </mat-option>
+        </mat-select>
+      </mat-form-field>
+    </div>
+    <p class="results-summary" role="status" aria-live="polite">
+      {{ filteredRows.length | number }} of {{ rows.length | number }} objects ·
+      Read-only exact revisions
+    </p>
+
+    <div
+      *ngIf="filteredRows.length; else emptyContents"
+      class="table-shell"
+      tabindex="0"
+      role="region"
+      aria-label="Snapshot objects; scroll horizontally on smaller screens">
+      <table class="contents-table">
+        <caption class="visually-hidden">
+          Exact snapshot objects, including relationships, supporting objects,
+          and available manifest dependencies
+        </caption>
+        <thead>
+          <tr>
+            <th scope="col">Object</th>
+            <th scope="col">STIX type / role</th>
+            <th scope="col">Exact revision</th>
+            <th scope="col">Inspect</th>
+          </tr>
+        </thead>
+        <tbody>
+          <ng-container
+            *ngFor="let row of pageRows; let index = index; trackBy: trackRow">
+            <tr [class.expanded-row]="expandedKey === row.key">
+              <td class="object-cell">
+                <strong>{{ row.name }}</strong>
+                <span *ngIf="row.context" class="object-context">{{
+                  row.context
+                }}</span>
+                <code class="object-id">{{ row.id }}</code>
+                <span class="object-sources">
+                  <ng-container
+                    *ngIf="row.sourceTracks.length; else unknownSource">
+                    Source:
+                    <ng-container
+                      *ngFor="let track of row.sourceTracks; let last = last">
+                      <span [title]="track.track_id">{{
+                        sourceTrackLabels.get(track.track_id)
+                      }}</span
+                      >{{ last ? '' : ' · ' }}
+                    </ng-container>
+                  </ng-container>
+                  <ng-template #unknownSource>Source not recorded</ng-template>
+                </span>
+              </td>
+              <td>
+                <span class="stix-type">{{ row.type }}</span
+                ><span class="object-role">{{ row.roles.join(' · ') }}</span>
+              </td>
+              <td class="revision-cell">
+                <time
+                  *ngIf="row.modified; else unversioned"
+                  [attr.datetime]="row.modified"
+                  >{{ row.modified }}</time
+                >
+                <ng-template #unversioned
+                  ><span>Unversioned</span
+                  ><small *ngIf="row.object?.created"
+                    >Created {{ row.object?.created }}</small
+                  ></ng-template
+                >
+              </td>
+              <td class="inspect-cell">
+                <div class="row-actions">
+                  <a
+                    *ngIf="row.libraryRoute; else noLibraryRoute"
+                    mat-button
+                    [routerLink]="row.libraryRoute"
+                    target="_blank"
+                    rel="noopener noreferrer">
+                    <mat-icon aria-hidden="true">open_in_new</mat-icon>
+                    View in Object Library
+                  </a>
+                  <ng-template #noLibraryRoute>
+                    <span class="pointer-only">
+                      Object Library navigation is unavailable for this
+                      reference.
+                    </span>
+                  </ng-template>
+                  <button
+                    mat-button
+                    type="button"
+                    (click)="preview(row)"
+                    [disabled]="row.previewLoading"
+                    [attr.aria-label]="
+                      'Preview exact snapshot object ' + row.id
+                    ">
+                    <mat-icon aria-hidden="true">visibility</mat-icon>
+                    {{
+                      row.previewLoading
+                        ? 'Loading preview…'
+                        : row.previewError
+                          ? 'Retry Preview'
+                          : 'Preview'
+                    }}
+                  </button>
+                  <button
+                    *ngIf="row.object; else pointerOnly"
+                    mat-button
+                    type="button"
+                    (click)="toggleJson(row)"
+                    [attr.aria-expanded]="expandedKey === row.key"
+                    [attr.aria-controls]="
+                      expandedKey === row.key ? 'snapshot-json-' + index : null
+                    "
+                    [attr.aria-label]="
+                      (expandedKey === row.key ? 'Hide' : 'View') +
+                      ' exact JSON for ' +
+                      row.id
+                    ">
+                    <mat-icon aria-hidden="true">{{
+                      expandedKey === row.key ? 'expand_less' : 'data_object'
+                    }}</mat-icon>
+                    {{ expandedKey === row.key ? 'Hide JSON' : 'View JSON' }}
+                  </button>
+                  <ng-template #pointerOnly
+                    ><span class="pointer-only"
+                      >Exact reference<br />Payload not supplied</span
+                    ></ng-template
+                  >
+                </div>
+                <p *ngIf="row.previewError" class="preview-error" role="alert">
+                  {{ row.previewError }}
+                </p>
+              </td>
+            </tr>
+            <tr *ngIf="expandedKey === row.key" class="json-row">
+              <td colspan="4">
+                <div class="json-header">
+                  <strong>Exact revision · Read-only JSON</strong
+                  ><span>{{
+                    row.roles.includes('Exported')
+                      ? 'STIX 2.1 export representation'
+                      : 'Manifest dependency payload'
+                  }}</span>
+                </div>
+                <pre
+                  [id]="'snapshot-json-' + index"
+                  tabindex="0"
+                  [attr.aria-label]="
+                    'Exact JSON for ' + row.id
+                  "><code>{{ expandedJson }}</code></pre>
+              </td>
+            </tr>
+          </ng-container>
+        </tbody>
+      </table>
+    </div>
+    <mat-paginator
+      *ngIf="rows.length"
+      [length]="filteredRows.length"
+      [pageIndex]="pageIndex"
+      [pageSize]="pageSize"
+      [pageSizeOptions]="[25, 50, 100]"
+      showFirstLastButtons
+      (page)="changePage($event)"
+      aria-label="Snapshot contents pages"></mat-paginator>
+    <ng-template #emptyContents>
+      <div class="state-panel empty-panel">
+        <mat-icon aria-hidden="true">{{
+          rows.length ? 'search_off' : 'folder_open'
+        }}</mat-icon>
+        <h3>
+          {{
+            rows.length
+              ? 'No matching objects'
+              : 'No exported objects in this snapshot'
+          }}
+        </h3>
+        <p>
+          {{
+            rows.length
+              ? 'Try a different name, identifier, STIX type, or source track. Nothing has been removed from the snapshot.'
+              : 'This snapshot’s export contains no objects beyond its generated collection projection.'
+          }}
+        </p>
+        <button
+          *ngIf="rows.length"
+          mat-stroked-button
+          type="button"
+          (click)="clearFilters()">
+          Clear filters
+        </button>
+      </div>
+    </ng-template>
+  </ng-container>
+</section>

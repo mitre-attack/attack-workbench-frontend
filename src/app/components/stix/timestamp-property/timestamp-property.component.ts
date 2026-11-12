@@ -23,9 +23,8 @@ export class TimestampPropertyComponent implements OnInit {
     return (
       this.config.field.includes('modified') &&
       this.config.object &&
-      'workflow' in this.config.object &&
-      this.config.object.workflow &&
-      'created_by_user_account' in this.config.object.workflow
+      'created_by_user_account' in this.config.object &&
+      !!this.config.object.created_by_user_account
     );
   }
 }

@@ -1,0 +1,76 @@
+<h2 mat-dialog-title>{{ title }}</h2>
+
+<form
+  class="validation-bypass-rule-dialog"
+  [formGroup]="form"
+  (ngSubmit)="confirm()">
+  <mat-dialog-content>
+    <div class="form-grid">
+      <mat-form-field appearance="outline" class="full-width">
+        <mat-label>field path</mat-label>
+        <input matInput formControlName="fieldPath" />
+        <mat-error
+          *ngIf="
+            hasError('fieldPath', 'required') ||
+            hasError('fieldPath', 'fieldPath')
+          ">
+          Field path is required
+        </mat-error>
+      </mat-form-field>
+
+      <mat-form-field appearance="outline">
+        <mat-label>error code</mat-label>
+        <input
+          matInput
+          formControlName="errorCode"
+          [matAutocomplete]="errorCodeOptions" />
+        <mat-autocomplete #errorCodeOptions="matAutocomplete">
+          <mat-option *ngFor="let errorCode of errorCodes" [value]="errorCode">
+            {{ errorCode }}
+          </mat-option>
+        </mat-autocomplete>
+        <mat-error *ngIf="hasError('errorCode', 'required')">
+          Error code is required
+        </mat-error>
+      </mat-form-field>
+
+      <mat-form-field appearance="outline">
+        <mat-label>STIX type</mat-label>
+        <input
+          matInput
+          formControlName="stixType"
+          [matAutocomplete]="stixTypeOptions" />
+        <mat-autocomplete #stixTypeOptions="matAutocomplete">
+          <mat-option *ngFor="let stixType of stixTypes" [value]="stixType">
+            {{ stixType }}
+          </mat-option>
+        </mat-autocomplete>
+        <mat-error *ngIf="hasError('stixType', 'required')">
+          STIX type is required
+        </mat-error>
+      </mat-form-field>
+
+      <div class="toggle-row">
+        <mat-slide-toggle formControlName="suppressError">
+          suppress error
+        </mat-slide-toggle>
+      </div>
+
+      <mat-form-field appearance="outline" class="full-width">
+        <mat-label>warning message</mat-label>
+        <textarea matInput rows="3" formControlName="warningMessage"></textarea>
+      </mat-form-field>
+    </div>
+  </mat-dialog-content>
+
+  <mat-dialog-actions align="end">
+    <button mat-button type="button" (click)="cancel()">cancel</button>
+    <button
+      mat-raised-button
+      color="primary"
+      type="submit"
+      [disabled]="form.invalid">
+      save
+    </button>
+  </mat-dialog-actions>
+</form>

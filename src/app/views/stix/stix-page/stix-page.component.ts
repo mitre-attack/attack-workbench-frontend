@@ -13,6 +13,7 @@ import { Observable, forkJoin } from 'rxjs';
 import {
   DetectionStrategy,
   Note,
+  Relationship,
   Software,
   StixObject,
 } from 'src/app/classes/stix';
@@ -75,7 +76,10 @@ export class StixPageComponent implements OnInit, OnDestroy {
    */
   public buildConfig(): StixViewConfig {
     return {
-      mode: this.editorService.editing ? 'edit' : 'view',
+      mode:
+        this.objectType !== 'relationship' && this.editorService.editing
+          ? 'edit'
+          : 'view',
       object: this.objects[0],
     };
   }
@@ -112,6 +116,7 @@ export class StixPageComponent implements OnInit, OnDestroy {
               ? this.oldAnalytics
               : undefined,
           versionAlreadyIncremented: versionChanged,
+          showWorkflow: this.editorService.hasWorkflow,
         },
         autoFocus: false, // prevent auto focus on form field
       });
@@ -143,6 +148,7 @@ export class StixPageComponent implements OnInit, OnDestroy {
       autoFocus: false,
       data: {
         collectionDelete: this.objectType == 'collection',
+        stixId: this.objects[0]?.stixID,
       },
     });
     const closeSubscription = prompt.afterClosed().subscribe({
@@ -339,8 +345,12 @@ export class StixPageComponent implements OnInit, OnDestroy {
         );
       else if (this.objectType == 'asset')
         objects$ = this.restApiService.getAsset(objectStixID);
+      else if (this.objectType == 'identity')
+        objects$ = this.restApiService.getIdentity(objectStixID);
       else if (this.objectType == 'marking-definition')
         objects$ = this.restApiService.getMarkingDefinition(objectStixID);
+      else if (this.objectType == 'relationship')
+        objects$ = this.restApiService.getRelationship(objectStixID);
       const subscription = objects$.subscribe({
         next: result => {
           this.updateBreadcrumbs(result, this.objectType);
@@ -431,6 +441,11 @@ export class StixPageComponent implements OnInit, OnDestroy {
         result[0].name
       );
       this.titleService.setTitle(result[0].name, false);
+    } else if (objectType == 'relationship') {
+      const relationship = result[0] as Relationship;
+      const label = `${relationship.source_name} ${relationship.relationship_type} ${relationship.target_name}`;
+      this.breadcrumbService.changeBreadcrumb(this.route.snapshot, label);
+      this.titleService.setTitle(label, false);
     } else if (objectType == 'marking-definition') {
       if ('definition_string' in result[0] && result[0].definition_string) {
         this.breadcrumbService.changeBreadcrumb(

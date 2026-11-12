@@ -1,0 +1,612 @@
+import {
+  Component,
+  OnDestroy,
+  OnInit,
+  ViewEncapsulation,
+  ViewChild,
+} from '@angular/core';
+import { MatDialog } from '@angular/material/dialog';
+import {
+  ReleaseTrackCoverageObject,
+  ReleaseTrackCoverageReport,
+  RestApiConnectorService,
+  UntrackedLatestRevision,
+} from 'src/app/services/connectors/rest-api/rest-api-connector.service';
+import { StixObject } from 'src/app/classes/stix/stix-object';
+import { StixListConfig } from 'src/app/components/stix/stix-list/stix-list.component';
+import { StixTypeToAttackType } from 'src/app/utils/type-mappings';
+import { StixListComponent } from 'src/app/components/stix/stix-list/stix-list.component';
+import { SelectionModel } from '@angular/cdk/collections';
+import { from, of, Subject } from 'rxjs';
+import {
+  concatMap,
+  finalize,
+  takeUntil,
+  takeWhile,
+  tap,
+  toArray,
+} from 'rxjs/operators';
+import { DeprecationService } from 'src/app/services/helpers/deprecation.service';
+import { ConfirmationDialogComponent } from 'src/app/components/confirmation-dialog/confirmation-dialog.component';
+import { Role } from 'src/app/classes/authn/role';
+import { ReleaseTrackType } from 'src/app/classes/release-tracks/enums';
+import { AuthenticationService } from 'src/app/services/connectors/authentication/authentication.service';
+import { ReleaseTracksConnectorService } from 'src/app/services/connectors/rest-api/release-tracks.service';
+
+interface CandidateEnrollmentTrack {
+  track_id: string;
+  name: string;
+}
+
+export interface CrossDomainRelationshipRow {
+  stixId: string;
+  relationshipType: string;
+  source: any;
+  target: any;
+  sourceId: string;
+  targetId: string;
+  sourceName: string;
+  targetName: string;
+  sourceDomains: string[];
+  targetDomains: string[];
+}
+
+interface ParallelRelationshipGroup {
+  key: string;
+  sourceRef: string;
+  targetRef: string;
+  relationshipType: string;
+  count: number;
+  relationships: any[];
+  stixObjects?: StixObject[];
+  selectedRelationship: string;
+  toDeprecate: string[];
+  selection?: SelectionModel<string>;
+}
+
+@Component({
+  selector: 'app-data-quality',
+  templateUrl: './data-quality.component.html',
+  styleUrls: ['./data-quality.component.scss'],
+  encapsulation: ViewEncapsulation.None,
+  standalone: false,
+})
+export class DataQualityComponent implements OnInit, OnDestroy {
+  constructor(
+    private reportService: RestApiConnectorService,
+    private dialog: MatDialog,
+    private deprecationService: DeprecationService,
+    private releaseTracks: ReleaseTracksConnectorService,
+    private authenticationService: AuthenticationService
+  ) {}
+
+  missingLinks: any[] = [];
+  missingLinkRows: { id: string; name: string }[] = [];
+  loadingMissingLinks = false;
+  error?: string;
+
+  parallelRelationships: ParallelRelationshipGroup[] = [];
+  loadingParallel = false;
+  parallelError?: string;
+
+  crossDomainRelationships: CrossDomainRelationshipRow[] = [];
+  objectsWithoutDomains: any[] = [];
+  loadingDomainConsistency = false;
+  domainConsistencyError?: string;
+
+  untrackedLatestRevisions: UntrackedLatestRevision[] = [];
+  neverEnrolledObjects: ReleaseTrackCoverageObject[] = [];
+  readonly coverageObjectTypes = StixTypeToAttackType;
+  readonly untrackedColumns = [
+    'attackID',
+    'name',
+    'type',
+    'modified',
+    'lastEnrolled',
+    'releaseTracks',
+    'unenrolledCount',
+    'enroll',
+  ];
+  readonly neverEnrolledColumns = [
+    'attackID',
+    'name',
+    'type',
+    'created',
+    'modified',
+    'version',
+    'enroll',
+  ];
+  untrackedPage = { pageIndex: 0, pageSize: 10 };
+  neverEnrolledPage = { pageIndex: 0, pageSize: 10 };
+  untrackedLatestRevisionCount = 0;
+  neverEnrolledObjectCount = 0;
+  loadingReleaseTrackCoverage = false;
+  releaseTrackCoverageError?: string;
+  standardTracks: CandidateEnrollmentTrack[] = [];
+  loadingStandardTracks = false;
+  standardTracksError?: string;
+  enrollingObjectId?: string;
+  enrollmentError?: { objectId: string; message: string };
+  enrollmentFeedback?: string;
+  enrollmentRefreshError?: string;
+  private readonly destroy$ = new Subject<void>();
+
+  stixRelationshipConfig: StixListConfig = {
+    type: 'relationship',
+    stixObjects: [],
+    clickBehavior: 'none',
+    showFilters: false,
+    showDeprecatedFilter: true,
+    compactRelationshipColumns: true,
+  };
+
+  @ViewChild('relationshipList') relationshipList: StixListComponent;
+
+  ngOnInit(): void {
+    this.loadParallelRelationships();
+    this.loadMissingLinks();
+    this.loadDomainConsistency();
+    this.loadReleaseTrackCoverage();
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
+  }
+
+  get canEnrollCandidates(): boolean {
+    return this.authenticationService.isAuthorized([
+      Role.ADMIN,
+      Role.TEAM_LEAD,
+    ]);
+  }
+
+  loadCandidateTracks(): void {
+    if (!this.canEnrollCandidates || this.loadingStandardTracks) return;
+    this.loadingStandardTracks = true;
+    this.standardTracks = [];
+    this.standardTracksError = undefined;
+    this.releaseTracks
+      .listReleaseTracks({ type: ReleaseTrackType.Standard })
+      .pipe(
+        takeUntil(this.destroy$),
+        finalize(() => (this.loadingStandardTracks = false))
+      )
+      .subscribe({
+        next: response => {
+          // This connector returns null on HTTP failure; that is not an empty list.
+          if (!response || !Array.isArray(response.data)) {
+            this.standardTracksError =
+              'Available release tracks could not be loaded.';
+            return;
+          }
+          this.standardTracks = response.data
+            .filter(
+              track =>
+                track.type === ReleaseTrackType.Standard && track.track_id
+            )
+            .map(track => ({
+              track_id: track.track_id,
+              name: track.name || track.track_id,
+            }))
+            .sort((left, right) => left.name.localeCompare(right.name));
+        },
+        error: () => {
+          this.standardTracksError =
+            'Available release tracks could not be loaded.';
+        },
+      });
+  }
+
+  enrollCandidate(
+    row: ReleaseTrackCoverageObject,
+    track: CandidateEnrollmentTrack
+  ): void {
+    if (
+      !this.canEnrollCandidates ||
+      this.enrollingObjectId ||
+      this.loadingReleaseTrackCoverage ||
+      this.enrollmentRefreshError ||
+      !this.standardTracks.some(
+        available => available.track_id === track.track_id
+      )
+    )
+      return;
+
+    this.enrollingObjectId = row.stix.id;
+    this.enrollmentError = undefined;
+    this.enrollmentFeedback = undefined;
+    let enrollmentCompleted = false;
+    this.releaseTracks
+      // An ID-only reference follows latest, matching the existing membership workflow.
+      .addCandidates(track.track_id, [row.stix.id])
+      .pipe(
+        tap(() => (enrollmentCompleted = true)),
+        concatMap(() => this.reportService.getReleaseTrackCoverageReport()),
+        takeUntil(this.destroy$),
+        finalize(() => (this.enrollingObjectId = undefined))
+      )
+      .subscribe({
+        next: report => {
+          this.applyCoverageReport(report, false);
+          this.enrollmentFeedback = `Candidate request completed for ${row.workspace.attack_id || row.stix.id} in ${track.name}.`;
+        },
+        error: error => {
+          if (enrollmentCompleted) {
+            this.enrollmentRefreshError =
+              'Enrollment succeeded, but the reports could not be refreshed. Refresh them before enrolling another object.';
+          } else {
+            this.enrollmentError = {
+              objectId: row.stix.id,
+              message:
+                typeof error?.error?.message === 'string'
+                  ? error.error.message
+                  : typeof error?.error === 'string'
+                    ? error.error
+                    : 'The object could not be added to the release track.',
+            };
+          }
+        },
+      });
+  }
+
+  private applyCoverageReport(
+    report: ReleaseTrackCoverageReport,
+    resetPages: boolean
+  ): void {
+    this.untrackedLatestRevisions = report.untracked_latest_revisions;
+    this.neverEnrolledObjects = report.never_enrolled_objects;
+    this.untrackedLatestRevisionCount =
+      report.summary.untracked_latest_revision_count;
+    this.neverEnrolledObjectCount = report.summary.never_enrolled_object_count;
+    this.enrollmentRefreshError = undefined;
+    this.untrackedPage = {
+      ...this.untrackedPage,
+      pageIndex: resetPages
+        ? 0
+        : Math.min(
+            this.untrackedPage.pageIndex,
+            Math.max(
+              0,
+              Math.ceil(
+                this.untrackedLatestRevisions.length /
+                  this.untrackedPage.pageSize
+              ) - 1
+            )
+          ),
+    };
+    this.neverEnrolledPage = {
+      ...this.neverEnrolledPage,
+      pageIndex: resetPages
+        ? 0
+        : Math.min(
+            this.neverEnrolledPage.pageIndex,
+            Math.max(
+              0,
+              Math.ceil(
+                this.neverEnrolledObjects.length /
+                  this.neverEnrolledPage.pageSize
+              ) - 1
+            )
+          ),
+    };
+  }
+
+  loadReleaseTrackCoverage(): void {
+    this.loadingReleaseTrackCoverage = true;
+    this.releaseTrackCoverageError = undefined;
+    this.reportService
+      .getReleaseTrackCoverageReport()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: report => {
+          this.applyCoverageReport(report, true);
+          this.loadingReleaseTrackCoverage = false;
+        },
+        error: err => {
+          this.releaseTrackCoverageError =
+            'Failed to load release-track coverage report';
+          this.loadingReleaseTrackCoverage = false;
+          console.error(err);
+        },
+      });
+  }
+
+  /**
+   * Release-track bundles only ship a relationship when both endpoints are
+   * members of the same track, so endpoints that share no domain can never be
+   * published together.
+   */
+  loadDomainConsistency(): void {
+    this.loadingDomainConsistency = true;
+    this.reportService.getDomainConsistencyReport().subscribe({
+      next: report => {
+        this.crossDomainRelationships = (
+          report?.cross_domain_relationships ?? []
+        ).map((entry: any) => this.mapCrossDomainRelationship(entry));
+        this.objectsWithoutDomains = report?.objects_without_domains ?? [];
+        this.loadingDomainConsistency = false;
+        this.domainConsistencyError = undefined;
+      },
+      error: err => {
+        this.domainConsistencyError =
+          'Failed to load domain consistency report';
+        this.loadingDomainConsistency = false;
+        console.error(err);
+      },
+    });
+  }
+
+  private mapCrossDomainRelationship(entry: any): CrossDomainRelationshipRow {
+    const source = entry?.source_object;
+    const target = entry?.target_object;
+    const attackId = (object: any) =>
+      object?.workspace?.attack_id ||
+      object?.stix?.external_references?.[0]?.external_id ||
+      object?.stix?.id ||
+      '';
+    return {
+      stixId: entry?.stix?.id,
+      relationshipType: entry?.stix?.relationship_type,
+      source,
+      target,
+      sourceId: attackId(source),
+      targetId: attackId(target),
+      sourceName: source?.stix?.name || '',
+      targetName: target?.stix?.name || '',
+      sourceDomains: entry?.source_domains ?? [],
+      targetDomains: entry?.target_domains ?? [],
+    };
+  }
+
+  // Use stix-list for objects without domains with id and name columns
+  stixConfigForObjectsWithoutDomains(): StixListConfig {
+    return {
+      type: 'relationship', // use relationship so stix-list table styling matches
+      stixObjects: (this.objectsWithoutDomains || []).map(item => {
+        const s = item?.stix || item;
+        return {
+          stixID: s.id,
+          attackType: StixTypeToAttackType[s.type],
+          type: s.type,
+          attackID: item?.workspace?.attack_id || '',
+          name: s.name || s.id,
+        } as any;
+      }),
+      columnsPreset: 'id-name',
+      showControls: false,
+      showFilters: false,
+      showDeprecatedFilter: false,
+      clickBehavior: 'linkToObjectPage',
+    };
+  }
+
+  private transformParallelRelationships(
+    raw: Record<string, any[]>
+  ): ParallelRelationshipGroup[] {
+    return Object.entries(raw).map(([key, relationships]) => {
+      const byNewest = [...relationships].sort((a, b) => {
+        const ac = a.stix?.created;
+        const bc = b.stix?.created;
+        return bc - ac;
+      });
+      const selectedRelationship =
+        byNewest[0].stix.id ?? relationships[0].stix.id;
+      const toDeprecate = relationships
+        .map(r => r.stix.id)
+        .filter(id => id !== selectedRelationship);
+      const selection = new SelectionModel<string>(false);
+      if (selectedRelationship) selection.toggle(selectedRelationship);
+
+      const first = relationships[0].stix;
+      return {
+        key,
+        sourceRef: first?.source_ref,
+        targetRef: first?.target_ref,
+        relationshipType: first?.relationship_type,
+        count: relationships.length,
+        relationships,
+        selectedRelationship,
+        toDeprecate,
+        selection,
+      };
+    });
+  }
+
+  // Build a link to the workbench object page using STIX->ATT&CK mapping
+  objectLink(item: any): any[] {
+    const id = item.stix.id;
+    const stixType = item.stix.type as keyof typeof StixTypeToAttackType;
+    const attackType = StixTypeToAttackType[stixType];
+    return ['/', attackType, id];
+  }
+
+  loadMissingLinks(): void {
+    this.loadingMissingLinks = true;
+    this.reportService.getMissingLinkById().subscribe({
+      next: data => {
+        // update later to also display relationship missing link by ids
+        this.missingLinks = Array.isArray(data)
+          ? data.filter(item => {
+              const type = item.stix.type;
+              return type !== 'relationship';
+            })
+          : [];
+        this.missingLinkRows = this.buildMissingLinkRows();
+        this.loadingMissingLinks = false;
+      },
+      error: err => {
+        this.error = 'Failed to load report';
+        this.loadingMissingLinks = false;
+        console.error(err);
+      },
+    });
+  }
+
+  loadParallelRelationships(): void {
+    this.loadingParallel = true;
+
+    this.reportService.getParallelRelationships().subscribe({
+      next: rawData => {
+        this.parallelRelationships =
+          this.transformParallelRelationships(rawData);
+
+        this.parallelRelationships.forEach(group => {
+          group.stixObjects = this.buildStixObjectsForGroup(group);
+        });
+        this.loadingParallel = false;
+        this.parallelError = undefined;
+      },
+      error: err => {
+        this.parallelError = 'Failed to load parallel relationships report';
+        this.loadingParallel = false;
+        console.error(err);
+      },
+    });
+  }
+
+  // Build a StixList-compatible array for a given group
+  buildStixObjectsForGroup(group: ParallelRelationshipGroup): StixObject[] {
+    if (!group || !Array.isArray(group.relationships)) return [] as any;
+    return group.relationships.map(r => this.mapRelationshipToRow(r)) as any;
+  }
+
+  // Use existing config and override only the stixObjects and hide controls in panels
+  stixConfigForGroup(group: ParallelRelationshipGroup): StixListConfig {
+    return {
+      ...this.stixRelationshipConfig,
+      stixObjects: group.stixObjects || this.buildStixObjectsForGroup(group),
+      showControls: false,
+      select: 'one',
+      selectionModel: group.selection,
+    };
+  }
+
+  // Build stix objects for missing links
+  buildMissingLinkObjects(): StixObject[] {
+    return (this.missingLinks || []).map(item => {
+      const s = item?.stix || item;
+      return {
+        stixID: s.id,
+        attackType: StixTypeToAttackType[s.type],
+        type: s.type,
+        attackID: s.external_references?.[0]?.external_id || '',
+        name: s.name || s.external_references?.[0]?.external_id || s.id,
+      } as any;
+    });
+  }
+
+  // Use stix-list for missing links with a 2 columns - id and name
+  stixConfigForMissingLinks(): StixListConfig {
+    return {
+      type: 'relationship', // use relationship so stix-list table styling matches
+      stixObjects: this.buildMissingLinkObjects(),
+      columnsPreset: 'id-name',
+      showControls: false,
+      showFilters: false,
+      showDeprecatedFilter: false,
+      clickBehavior: 'linkToObjectPage',
+    };
+  }
+
+  private mapRelationshipToRow(r: any): StixObject {
+    const stix = r.stix;
+    return {
+      stixID: stix.id,
+      type: 'relationship',
+      source_ref: stix.source_ref || '',
+      target_ref: stix.target_ref || '',
+      source_name: r.source_object.stix.name || '',
+      target_name: r.target_object.stix.name || '',
+      source_ID: r.source_object.stix.external_references[0].external_id || '',
+      target_ID: r.target_object.stix.external_references[0].external_id || '',
+      relationship_type: stix.relationship_type,
+      description: stix.description || '',
+      created: stix.created || undefined,
+      modified: stix.modified || undefined,
+      revoked: r?.revoked,
+      deprecated: r?.x_mitre_deprecated,
+    } as any;
+  }
+  // Build rows for missing links table and display id and name
+  buildMissingLinkRows(): { id: string; name: string }[] {
+    return (this.missingLinks || []).map(item => {
+      const id =
+        item?.stix.external_references?.[0]?.external_id || item?.stix.id || '';
+      const name = item?.stix.name || '';
+      return { id, name };
+    });
+  }
+
+  // Handle selection change from stix-list radios
+  onGroupSelect(element: StixObject, group: ParallelRelationshipGroup): void {
+    if (!group || !group.selection) return;
+    const stixId = element.stixID;
+    if (!stixId) return;
+    group.selection.clear();
+    group.selection.select(stixId);
+    group.selectedRelationship = stixId;
+    group.toDeprecate = group.relationships
+      .map(r => r.stix.id)
+      .filter(id => id && id !== group.selectedRelationship);
+    group.stixObjects = this.buildStixObjectsForGroup(group);
+  }
+
+  // Deprecate non-selected relationships for a group
+  deprecateOthers(group: ParallelRelationshipGroup): void {
+    if (this.loadingParallel || !group || !group.toDeprecate?.length) return;
+
+    const confirmationPrompt = this.dialog.open(ConfirmationDialogComponent, {
+      maxWidth: '35em',
+      data: {
+        message:
+          'All selected relationships in this group will be deprecated. Do you want to continue?',
+      },
+      autoFocus: false, // prevents auto focus on toolbar buttons
+    });
+
+    confirmationPrompt.afterClosed().subscribe({
+      next: result => {
+        if (!result) return; // user cancelled
+
+        const ids = [...group.toDeprecate];
+        this.loadingParallel = true;
+        from(ids)
+          .pipe(
+            concatMap(id =>
+              this.reportService.getRelationship(id).pipe(
+                concatMap(versions => {
+                  const relationship = versions[0];
+                  if (!relationship)
+                    throw new Error(`Could not load relationship ${id}.`);
+                  if (relationship.deprecated) return of(true);
+                  return this.deprecationService.deprecate(relationship, true);
+                })
+              )
+            ),
+            takeWhile(saved => saved, true),
+            toArray(),
+            finalize(() => (this.loadingParallel = false))
+          )
+          .subscribe({
+            next: results => {
+              if (
+                results.length !== ids.length ||
+                results.some(saved => !saved)
+              )
+                return;
+              group.relationships = group.relationships.filter(
+                r => r.stix?.id === group.selectedRelationship
+              );
+              group.toDeprecate = [];
+              group.stixObjects = this.buildStixObjectsForGroup(group);
+              window.location.reload();
+            },
+            error: err => {
+              this.deprecationService.showError(err, true);
+            },
+          });
+      },
+    });
+  }
+}

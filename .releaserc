@@ -11,10 +11,6 @@
     {
       "name": "alpha",
       "prerelease": true
-    },
-    {
-      "name": "adm",
-      "prerelease": true
     }
   ],
   "plugins": [
@@ -29,7 +25,10 @@
         "dockerImage": "attack-workbench-frontend",
         "dockerFile": "Dockerfile",
         "dockerContext": ".",
-        "dockerPlatform": ["linux/amd64", "linux/arm64"],
+        "dockerPlatform": [
+          "linux/amd64",
+          "linux/arm64"
+        ],
         "dockerPublish": true,
         "dockerArgs": {
           "VERSION": "{{next.version}}",

@@ -1,4 +1,4 @@
-import { Component, Inject, OnInit, ViewEncapsulation } from '@angular/core';
+import { Component, Inject, ViewEncapsulation } from '@angular/core';
 import { MatDialogRef, MAT_DIALOG_DATA } from '@angular/material/dialog';
 
 @Component({
@@ -8,15 +8,11 @@ import { MatDialogRef, MAT_DIALOG_DATA } from '@angular/material/dialog';
   encapsulation: ViewEncapsulation.None,
   standalone: false,
 })
-export class MultipleChoiceDialogComponent implements OnInit {
+export class MultipleChoiceDialogComponent {
   constructor(
     public dialogRef: MatDialogRef<MultipleChoiceDialogComponent>,
     @Inject(MAT_DIALOG_DATA) public config: MultipleChoiceDialogConfig
   ) {}
-
-  ngOnInit(): void {
-    // intentionally left blank
-  }
 }
 
 export interface MultipleChoiceDialogConfig {
@@ -24,6 +20,7 @@ export interface MultipleChoiceDialogConfig {
   description?: string; //additional explanation
   choices: {
     label: string;
+    value?: string;
     description?: string;
   }[];
 }

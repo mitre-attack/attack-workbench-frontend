@@ -32,10 +32,14 @@
           <mat-select
             [formControl]="selectControl"
             [required]="config.required ? config.required : false">
-            @for (item of getOptions(); track item) {
-              <mat-option [value]="item" (onSelectionChange)="change($event)">{{
-                item
-              }}</mat-option>
+            @let enabledOptions = getEnabledOptions();
+            @for (item of getOptions(enabledOptions); track item) {
+              <mat-option
+                [value]="item"
+                [disabled]="!enabledOptions.has(item)"
+                (onSelectionChange)="change($event)"
+                >{{ item }}</mat-option
+              >
             }
           </mat-select>
         </mat-form-field>

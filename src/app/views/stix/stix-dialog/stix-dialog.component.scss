@@ -13,6 +13,7 @@
     }
   }
   width: 50em;
+  max-width: 100%;
   height: 100%;
   display: flex;
   flex-direction: column;
@@ -29,6 +30,9 @@
   .stix-content {
     display: flex;
     flex-direction: column;
+  }
+  .promote-button {
+    margin: 5px;
   }
   mat-drawer {
     .light & {

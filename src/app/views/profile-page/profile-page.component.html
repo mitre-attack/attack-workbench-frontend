@@ -1,8 +1,11 @@
 <div class="profile-page view-page grid spacing-16">
-  <!-- jdenticon -->
+  <!-- user avatar -->
   <div class="row">
     <div class="col">
-      <svg class="profile-icon" [data-jdenticon-value]="user.displayName"></svg>
+      <app-user-avatar
+        class="profile-icon"
+        [name]="user.displayName"
+        [size]="150"></app-user-avatar>
     </div>
   </div>
   <!-- display name -->

@@ -63,7 +63,7 @@ export class ListEditComponent implements OnInit, AfterContentChecked {
     permissions_required: 'x_mitre_permissions_required',
     collection_layers: 'x_mitre_collection_layers',
     data_sources: 'x_mitre_data_sources',
-    sectors: 'x_mitre_sectors',
+    sectors: 'sectors',
   };
   public domains = ['enterprise-attack', 'mobile-attack', 'ics-attack'];
 
@@ -288,53 +288,47 @@ export class ListEditComponent implements OnInit, AfterContentChecked {
     return this.config.object[this.config.field];
   }
 
-  /** Get allowed values for this field */
-  public getAllowedValues(): Set<string> {
-    if (this.config.field == 'domains') return new Set(this.domains);
-    if (!this.dataLoaded) {
-      this.selectControl.disable();
-      return null;
-    }
-
-    // filter values
-    const values = new Set<string>();
-    const property = this.allAllowedValues.properties.find(p => {
-      return p.propertyName == this.fieldToStix[this.config.field];
-    });
-    if (!property) {
-      // property not found
-      this.selectControl.disable();
-      return null;
-    }
-
-    if ('domains' in this.config.object) {
-      const object = this.config.object as any;
-      property.domains.forEach(domain => {
-        if (object.domains.includes(domain.domainName)) {
-          domain.allowedValues.forEach(values.add, values);
-        }
-      });
-    } else {
-      // domains not specified on object
-      property.domains.forEach(domain => {
-        domain.allowedValues.forEach(values.add, values);
-      });
-    }
-
-    // check for existing data
-    if (this.selectControl.value) {
-      this.selectControl.value.forEach(values.add, values);
-    }
-
-    if (!values.size) {
-      // disable field and reset selection
-      this.selectControl.disable();
-      this.selectControl.reset();
-      this.config.object[this.config.field] = [];
-    } else {
-      this.selectControl.enable(); // re-enable field
+  /** Include unavailable selections for display without offering them again. */
+  public getAllowedValues(values = this.getEnabledValues()): Set<string> {
+    values = new Set(values);
+    for (const selected of this.selectControl.value || []) values.add(selected);
+    const disabled =
+      !!this.config.disabled ||
+      (!this.dataLoaded && this.config.field !== 'domains');
+    if (disabled && this.selectControl.enabled) {
+      this.selectControl.disable({ emitEvent: false });
+    } else if (!disabled && this.selectControl.disabled) {
+      this.selectControl.enable({ emitEvent: false });
     }
     return values;
+  }
+
+  public getEnabledValues(): Set<string> {
+    if (this.config.field === 'domains') return new Set(this.domains);
+    const values = new Set<string>();
+    if (!this.dataLoaded) return values;
+    const property = this.allAllowedValues?.properties?.find(
+      p => p.propertyName === this.allowedValuesPropertyName()
+    );
+    const object = this.config.object;
+    for (const domain of property?.domains || []) {
+      if (
+        !('domains' in object) ||
+        (Array.isArray(object.domains) &&
+          object.domains.includes(domain.domainName))
+      ) {
+        domain.allowedValues.forEach(value => values.add(value));
+      }
+    }
+    return values;
+  }
+
+  private allowedValuesPropertyName(): string {
+    const object = this.config.object as StixObject;
+    if (object.attackType === 'asset' && this.config.field === 'sectors') {
+      return 'x_mitre_sectors';
+    }
+    return this.fieldToStix[this.config.field];
   }
 
   /** Add value to object property list */

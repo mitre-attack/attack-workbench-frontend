@@ -1,12 +1,33 @@
+import { provideHttpClient } from '@angular/common/http';
+import { NO_ERRORS_SCHEMA } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
-import { RouterTestingModule } from '@angular/router/testing';
+import { provideRouter } from '@angular/router';
+import { LoggerModule, NgxLoggerLevel } from 'ngx-logger';
+import { vi } from 'vitest';
 import { AppComponent } from './app.component';
 
 describe('AppComponent', () => {
   beforeEach(async () => {
+    // Mock window.matchMedia
+    Object.defineProperty(window, 'matchMedia', {
+      writable: true,
+      value: vi.fn().mockImplementation(query => ({
+        matches: false,
+        media: query,
+        onchange: null,
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        dispatchEvent: vi.fn(),
+      })),
+    });
+
     await TestBed.configureTestingModule({
-      imports: [RouterTestingModule],
+      imports: [LoggerModule.forRoot({ level: NgxLoggerLevel.OFF })],
       declarations: [AppComponent],
+      schemas: [NO_ERRORS_SCHEMA],
+      providers: [provideHttpClient(), provideRouter([])],
     }).compileComponents();
   });
 
@@ -14,20 +35,5 @@ describe('AppComponent', () => {
     const fixture = TestBed.createComponent(AppComponent);
     const app = fixture.componentInstance;
     expect(app).toBeTruthy();
-  });
-
-  it(`should have as title 'app'`, () => {
-    const fixture = TestBed.createComponent(AppComponent);
-    const app = fixture.componentInstance;
-    expect(app.title).toEqual('app');
-  });
-
-  it('should render title', () => {
-    const fixture = TestBed.createComponent(AppComponent);
-    fixture.detectChanges();
-    const compiled = fixture.nativeElement;
-    expect(compiled.querySelector('.content span').textContent).toContain(
-      'app app is running!'
-    );
   });
 });

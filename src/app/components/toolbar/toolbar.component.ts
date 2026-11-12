@@ -4,6 +4,7 @@ import {
   Output,
   EventEmitter,
   Input,
+  ViewChild,
 } from '@angular/core';
 import { Router } from '@angular/router';
 import { ValidationData } from 'src/app/classes/serializable';
@@ -11,6 +12,7 @@ import { AuthenticationService } from 'src/app/services/connectors/authenticatio
 import { EditorService } from 'src/app/services/editor/editor.service';
 import { SidebarService } from 'src/app/services/sidebar/sidebar.service';
 import { WebsiteIntegrationService } from 'src/app/services/website-integration/website-integration.service';
+import { ObjectStatusComponent } from '../object-status/object-status.component';
 
 @Component({
   selector: 'app-toolbar',
@@ -24,6 +26,8 @@ export class ToolbarComponent {
   @Output() public onToggleTheme = new EventEmitter();
   @Output() public onToggleSidebar = new EventEmitter();
   @Output() public onScrollTop = new EventEmitter();
+
+  @ViewChild(ObjectStatusComponent) public objectStatus?: ObjectStatusComponent;
 
   public validationData: ValidationData = null;
 
@@ -114,5 +118,12 @@ export class ToolbarComponent {
     this.router.navigateByUrl(
       `/collection/new?editing=true&groupId=${this.editorService.stixId}`
     );
+  }
+  public toggleRevoked() {
+    this.objectStatus?.revoke();
+  }
+
+  public toggleDeprecated() {
+    this.objectStatus?.toggleDeprecated();
   }
 }

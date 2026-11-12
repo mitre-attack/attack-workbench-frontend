@@ -1,0 +1,23 @@
+<div class="dictionary-diff labelled-box grow-to-row">
+  <div class="content">
+    <table mat-table [dataSource]="detailTable" class="property-table">
+      <ng-container
+        *ngFor="let column of columns; let i = index"
+        [matColumnDef]="column.name">
+        <th mat-header-cell *matHeaderCellDef>
+          {{ column.label || column.name | titlecase }}
+        </th>
+        <td mat-cell *matCellDef="let row">
+          <app-property-diff
+            [before]="valueToString(row.before, column.name)"
+            [after]="valueToString(row.after, column.name)">
+          </app-property-diff>
+        </td>
+      </ng-container>
+
+      <tr mat-header-row *matHeaderRowDef="columnNames"></tr>
+      <tr mat-row *matRowDef="let row; columns: columnNames"></tr>
+    </table>
+  </div>
+  <span class="labelled-box-label">{{ config.label }}</span>
+</div>

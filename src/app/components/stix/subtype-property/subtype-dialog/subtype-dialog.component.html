@@ -71,9 +71,10 @@
           </mat-chip-listbox>
         </mat-select-trigger>
         <mat-option
-          *ngFor="let item of allowedValues[field.name]"
+          *ngFor="let item of getOptions(field.name)"
           (onSelectionChange)="change($event, field.name)"
           [value]="item"
+          [disabled]="!allowedValues[field.name]?.includes(item)"
           >{{ item }}</mat-option
         >
       </mat-select>

@@ -1,0 +1,47 @@
+<div class="release-management list-page grid spacing-20">
+  <div class="list-page-header">
+    <h1>Release Management</h1>
+    <div class="button-group">
+      <button
+        mat-raised-button
+        class="extended-button"
+        color="primary"
+        (click)="openNewTrackDialog()">
+        <mat-icon>create</mat-icon>
+        <span class="text-label">new track</span>
+      </button>
+    </div>
+  </div>
+
+  <div class="mt-8">
+    <div class="cards-container">
+      <!-- Standard tracks -->
+      <section class="tracks-section standard-section">
+        <h2 class="section-header">
+          Release Tracks ({{ standardTracks.length }})
+        </h2>
+        <div class="cards-grid">
+          <app-release-track-card
+            *ngFor="let track of standardTracks"
+            [track]="track"
+            type="standard"
+            (viewTrack)="onViewTrack($event)"></app-release-track-card>
+        </div>
+      </section>
+
+      <!-- Virtual tracks -->
+      <section class="tracks-section virtual-section">
+        <h2 class="section-header">
+          Virtual Tracks ({{ virtualTracks.length }})
+        </h2>
+        <div class="cards-grid">
+          <app-release-track-card
+            *ngFor="let track of virtualTracks"
+            [track]="track"
+            type="virtual"
+            (viewTrack)="onViewTrack($event)"></app-release-track-card>
+        </div>
+      </section>
+    </div>
+  </div>
+</div>

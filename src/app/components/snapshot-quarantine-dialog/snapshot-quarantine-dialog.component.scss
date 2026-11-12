@@ -1,0 +1,224 @@
+@use '../../../style/colors';
+
+.snapshot-quarantine-dialog {
+  width: 100%;
+  min-width: 0;
+
+  .mat-mdc-dialog-content {
+    line-height: 1.5;
+  }
+
+  .snapshot-context {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-bottom: 20px;
+  }
+
+  code,
+  time,
+  h3 {
+    overflow-wrap: anywhere;
+  }
+
+  code,
+  time {
+    font-size: 0.9em;
+  }
+
+  .review-notice {
+    border-left: 3px solid colors.color(secondary);
+    padding: 12px 16px;
+    margin: 20px 0;
+  }
+
+  .conflict-group {
+    margin-top: 24px;
+
+    header {
+      margin-bottom: 12px;
+    }
+
+    h3 {
+      font-size: 1.05em;
+      font-weight: 600;
+      margin: 0 0 4px;
+    }
+
+    header > code,
+    .revision-count {
+      display: block;
+    }
+  }
+
+  .revision-count {
+    font-size: 0.85em;
+    margin-top: 4px;
+  }
+
+  .revision-list {
+    display: grid;
+    gap: 12px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: start;
+  }
+
+  .revision-card {
+    border: 1px solid;
+    border-radius: 6px;
+    padding: 12px;
+    min-width: 0;
+  }
+
+  .revision-label {
+    font-weight: 600;
+  }
+
+  .revision-details {
+    margin-top: 8px;
+  }
+
+  .revision-name {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 0 0 8px;
+  }
+
+  .revision-source {
+    display: grid;
+    grid-template-columns: 92px minmax(0, 1fr);
+    gap: 6px 12px;
+    font-size: 0.9em;
+    margin: 12px 0 0;
+
+    dt {
+      font-weight: 600;
+    }
+
+    dd {
+      margin: 0;
+      overflow-wrap: anywhere;
+    }
+
+    dd > span,
+    dd > code {
+      display: block;
+    }
+  }
+
+  .comparison-actions,
+  .revision-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px 8px;
+    margin-top: 12px;
+  }
+
+  .revision-loading,
+  .details-unavailable {
+    font-size: 0.85em;
+  }
+
+  .revision-error {
+    border-left: 3px solid colors.color(error);
+    padding-left: 12px;
+    overflow-wrap: anywhere;
+    font-size: 0.9em;
+  }
+
+  .revision-json pre {
+    box-sizing: border-box;
+    max-height: 360px;
+    max-width: 100%;
+    overflow: auto;
+    padding: 12px;
+    margin: 12px 0 0;
+    border: 1px solid;
+    border-radius: 4px;
+    font-size: 12px;
+    line-height: 1.5;
+    tab-size: 2;
+
+    code {
+      font-size: inherit;
+      white-space: pre;
+      overflow-wrap: normal;
+    }
+  }
+
+  .resolution-actions {
+    margin-top: 12px;
+  }
+
+  .resolution-error {
+    border-left: 3px solid colors.color(error);
+    padding: 12px 16px;
+    font-weight: 600;
+  }
+
+  .light & {
+    .revision-card {
+      border-color: colors.border-color(light);
+    }
+
+    .revision-card.selected {
+      border-color: colors.color(secondary);
+    }
+
+    .review-notice,
+    .revision-json pre {
+      background: colors.color-alternate(light);
+      border-color: colors.border-color(light);
+    }
+
+    .snapshot-context > span,
+    .revision-count {
+      color: colors.on-color-deemphasis(light);
+    }
+  }
+
+  .dark & {
+    .revision-card {
+      border-color: colors.border-color(dark);
+    }
+
+    .revision-card.selected,
+    .review-notice {
+      border-color: colors.color(mitre-light-blue);
+    }
+
+    .review-notice,
+    .revision-json pre {
+      background: colors.color-alternate(dark);
+      border-color: colors.border-color(dark);
+    }
+
+    .snapshot-context > span,
+    .revision-count {
+      color: colors.on-color-deemphasis(dark);
+    }
+  }
+
+  @media (max-width: 760px) {
+    .revision-list {
+      grid-template-columns: minmax(0, 1fr);
+    }
+  }
+
+  @media (max-width: 600px) {
+    .revision-source {
+      grid-template-columns: minmax(0, 1fr);
+      gap: 4px;
+
+      dd {
+        margin-bottom: 8px;
+      }
+    }
+
+    .resolution-actions button {
+      width: 100%;
+    }
+  }
+}

@@ -4,10 +4,10 @@ The ATT&CK Workbench is designed to integrate with a variety of tools. This page
 
 Many ATT&CK Workbench integrations require that specific fields or values are present on your custom STIX data to use it properly. Depending on what data you have some objects may not be shown in integrations. Objects may not show up in integrations if they:
 
--   Support ATT&CK IDs but do not have one assigned
--   Are revoked or deprecated
--   Support platforms or tactics but are not assigned to any
--   Support mappings to techniques but do not feature any mappings
+- Support ATT&CK IDs but do not have one assigned
+- Are revoked or deprecated
+- Support platforms or tactics but are not assigned to any
+- Support mappings to techniques but do not feature any mappings
 
 ## Workbench REST API URLs
 
@@ -170,4 +170,15 @@ Copy the files from output to your web server or use `python3 -m http.server [po
 If the data within the Workbench changes you will need to rebuild the site (from step 3) again; for this reason you may want to consider re-running your build and deploy pipeline at regular intervals using `cron` to keep the data synchronized with the contents of the Workbench.
 
 ### 5. Configure the ATT&CK Workbench
-Within the environment of the ATT&CK Workbench Frontend, you can set the url of the ATT&CK Website instance you wish to point to with the `environment.attack_website.url` property and enable the ATT&CK website integration with the `environment.attack_website.enabled` property.  Setting the url properly and enabling the integration will allow an option to view objects from the ATT&CK Workbench within the configured ATT&CK Website with a button found in the toolbar.
+
+Set these [frontend runtime settings](admin/configuration.md) in the frontend
+`.env` file or container environment:
+
+```dotenv
+WORKBENCH_FRONTEND_ATTACK_WEBSITE_ENABLED=true
+WORKBENCH_FRONTEND_ATTACK_WEBSITE_URL=https://your-attack-website.example
+```
+
+Restart the native development server or recreate the frontend container, then
+reload the browser. The toolbar button opens Workbench objects on that site;
+a frontend rebuild is unnecessary for container deployments.
