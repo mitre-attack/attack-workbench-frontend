@@ -1257,6 +1257,76 @@ describe('ReleaseTrackPageComponent', () => {
     );
   });
 
+  it.each([undefined, '2026-01-01T00:00:00.000Z'])(
+    'passes a relationship baseline when opening a candidate diff (%s)',
+    baseline => {
+      const candidate = {
+        object_ref: 'attack-pattern--candidate',
+        object_modified: '2026-02-01T00:00:00.000Z',
+      } as any;
+      const current = { type: 'attack-pattern' };
+      const prior = baseline ? { type: 'attack-pattern' } : null;
+      component.releaseTrack = {
+        candidates: [candidate],
+        staged: [],
+        members: baseline
+          ? [{ object_ref: candidate.object_ref, object_modified: baseline }]
+          : [],
+      } as any;
+      vi.spyOn(component as any, 'resolveCandidateDiffObjects').mockReturnValue(
+        of({ current, prior, expectedBaseline: !!baseline })
+      );
+      const openDiff = vi
+        .spyOn(component as any, 'openDiffDialog')
+        .mockImplementation(() => undefined);
+      component.onDiff(candidate);
+      expect(openDiff).toHaveBeenCalledWith(
+        current,
+        prior,
+        undefined,
+        baseline,
+        candidate
+      );
+    }
+  );
+
+  it.each(['promote', undefined])('handles diff close result %s', result => {
+    const candidate = { object_ref: 'attack-pattern--candidate' } as any;
+    component.releaseTrack = {
+      candidates: [candidate],
+      staged: [],
+      config: { auto_promote: false },
+    } as any;
+    vi.spyOn(component, 'canEditReleaseTrack', 'get').mockReturnValue(true);
+    const closed = new Subject<unknown>();
+    mockDialog.open.mockReturnValue({ afterClosed: () => closed });
+    const promote = vi
+      .spyOn(component, 'onPromote')
+      .mockImplementation(() => undefined);
+    (component as any).openDiffDialog(
+      {},
+      null,
+      undefined,
+      undefined,
+      candidate
+    );
+    const eligibility = mockDialog.open.mock.calls[0][1].data.canPromote;
+    expect(eligibility()).toBe(true);
+    component.releaseTrack.config.auto_promote = true;
+    expect(eligibility()).toBe(false);
+    component.releaseTrack.config.auto_promote = false;
+    component.releaseTrack.candidates = [];
+    expect(eligibility()).toBe(false);
+    component.releaseTrack.candidates = [candidate];
+    vi.spyOn(component, 'canEditReleaseTrack', 'get').mockReturnValue(false);
+    expect(eligibility()).toBe(false);
+    vi.spyOn(component, 'canEditReleaseTrack', 'get').mockReturnValue(true);
+    closed.next(result);
+    expect(promote).toHaveBeenCalledTimes(result === 'promote' ? 1 : 0);
+    if (result === 'promote')
+      expect(promote).toHaveBeenCalledWith(candidate.object_ref);
+  });
+
   it('should only show a diff for the latest pin when an object is both staged and a candidate', () => {
     const staged = {
       object_ref: 'attack-pattern--shared',

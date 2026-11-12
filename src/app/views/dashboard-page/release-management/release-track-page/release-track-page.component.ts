@@ -1787,7 +1787,8 @@ export class ReleaseTrackPageComponent implements OnInit, OnDestroy {
           current,
           prior,
           tier === 'staged' ? this.getDiffObjectModified(item) : undefined,
-          relationshipAddedAfter
+          relationshipAddedAfter,
+          tier === 'candidate' ? item : undefined
         );
       });
   }
@@ -3235,9 +3236,21 @@ export class ReleaseTrackPageComponent implements OnInit, OnDestroy {
     current: StixObject,
     prior: StixObject | null,
     relationshipCreatedBefore?: Date | string,
-    relationshipAddedAfter?: Date | string
+    relationshipAddedAfter?: Date | string,
+    candidate?: ReleaseTrackObjectItem
   ): void {
-    this.dialog.open(StixDialogComponent, {
+    const canPromote = () =>
+      !!candidate &&
+      this.canEditReleaseTrack &&
+      !this.autoPromotionEnabled &&
+      this.getDiffTier(candidate) === 'candidate' &&
+      (this.releaseTrack?.candidates || []).some(
+        entry =>
+          entry.object_ref === candidate.object_ref &&
+          String(entry.object_modified) === String(candidate.object_modified)
+      ) &&
+      this.shouldShowDiff(candidate);
+    const dialogRef = this.dialog.open(StixDialogComponent, {
       data: {
         object: [current, prior],
         mode: 'diff',
@@ -3245,10 +3258,19 @@ export class ReleaseTrackPageComponent implements OnInit, OnDestroy {
         sidebarControl: 'disable',
         relationshipCreatedBefore,
         relationshipAddedAfter,
+        canPromote,
       },
       maxHeight: '75vh',
       autoFocus: false,
     });
+    dialogRef
+      .afterClosed()
+      .pipe(take(1), takeUntil(this.cancelRequests$))
+      .subscribe(result => {
+        if (result === 'promote' && canPromote()) {
+          this.onPromote(candidate.object_ref);
+        }
+      });
   }
 
   private getObjectStatus(item: ReleaseTrackObjectItem): WorkflowStatusType {

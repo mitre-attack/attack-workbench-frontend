@@ -24,6 +24,14 @@
             </button>
           </div>
           <div class="spacer"></div>
+          <button
+            *ngIf="canPromote"
+            mat-stroked-button
+            type="button"
+            (click)="promote()">
+            <mat-icon>arrow_forward</mat-icon>
+            Promote
+          </button>
           <ng-container *ngIf="config.editable">
             <div class="section">
               <button

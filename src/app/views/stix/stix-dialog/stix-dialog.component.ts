@@ -32,7 +32,8 @@ import { StixTypeToClass } from 'src/app/utils/class-mappings';
 export class StixDialogComponent implements OnInit {
   constructor(
     public dialogRef: MatDialogRef<StixDialogComponent>,
-    @Inject(MAT_DIALOG_DATA) public _config: StixViewConfig,
+    @Inject(MAT_DIALOG_DATA)
+    public _config: StixViewConfig & { canPromote?: () => boolean },
     public restApiService: RestApiConnectorService,
     private releaseTracksService: ReleaseTracksConnectorService,
     public editorService: EditorService,
@@ -46,6 +47,18 @@ export class StixDialogComponent implements OnInit {
       this.authenticationService.canEdit()
     )
       this.startEditing();
+  }
+
+  public get canPromote(): boolean {
+    return (
+      this._config.mode === 'diff' &&
+      this.authenticationService.canEdit() &&
+      !!this._config.canPromote?.()
+    );
+  }
+
+  public promote(): void {
+    if (this.canPromote) this.dialogRef.close('promote');
   }
 
   public get canDelete(): boolean {
