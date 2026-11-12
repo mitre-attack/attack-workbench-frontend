@@ -83,7 +83,7 @@ export const routes: Routes = [
             ],
           },
           {
-            path: 'overview',
+            path: 'data-graphs',
             data: {
               breadcrumb: 'data graphs',
               title: 'Data Graphs',

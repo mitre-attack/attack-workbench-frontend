@@ -173,7 +173,7 @@ describe('NavigationComponent', () => {
     expect(component.dashboardItems[1]).toEqual(
       expect.objectContaining({
         label: 'Data Graphs',
-        path: '/dashboard/overview',
+        path: '/dashboard/data-graphs',
         exact: true,
       })
     );
@@ -294,14 +294,14 @@ describe('NavigationComponent', () => {
     const indexRoute = dashboardRoute?.children?.find(
       route => route.path === ''
     );
-    const overviewRoute = dashboardRoute?.children?.find(
-      route => route.path === 'overview'
+    const dataGraphsRoute = dashboardRoute?.children?.find(
+      route => route.path === 'data-graphs'
     );
 
     expect(indexRoute?.redirectTo).toBe('release-management');
     expect(indexRoute?.pathMatch).toBe('full');
-    expect(overviewRoute?.data?.breadcrumb).toBe('data graphs');
-    expect(overviewRoute?.data?.title).toBe('Data Graphs');
+    expect(dataGraphsRoute?.data?.breadcrumb).toBe('data graphs');
+    expect(dataGraphsRoute?.data?.title).toBe('Data Graphs');
   });
 
   it('should build documentation links', () => {
