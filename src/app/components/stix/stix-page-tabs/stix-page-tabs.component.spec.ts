@@ -9,6 +9,8 @@ import { NoopAnimationsModule } from '@angular/platform-browser/animations';
 import { StixViewConfig } from 'src/app/views/stix/stix-view-page';
 import { ExternalReferences } from 'src/app/classes/external-references';
 import { VersionNumber } from 'src/app/classes/version-number';
+import { ReleaseReviewDialogComponent } from '../../release-review-dialog/release-review-dialog.component';
+import { HistoryTimelineComponent } from './history-timeline/history-timeline.component';
 import { StixPageTabsComponent } from './stix-page-tabs.component';
 
 @Component({
@@ -261,5 +263,127 @@ describe('StixPageTabsComponent', () => {
     expect(response.observed).toBe(true);
     component.ngOnDestroy();
     expect(response.observed).toBe(false);
+  });
+
+  it.each(['Review', 'History'])(
+    'marks relationship additions from the %s entry point',
+    entry => {
+      const current = {
+        type: 'attack-pattern',
+        stixID: 'attack-pattern--example',
+        modified: new Date('2026-10-19T14:00:00Z'),
+      } as any;
+      const prior = { ...current, modified: new Date('2026-10-18T14:00:00Z') };
+      const api = TestBed.inject(RestApiConnectorService);
+      vi.mocked(api.getRelatedTo).mockReturnValue(
+        of({
+          data: [
+            {
+              created: new Date('2026-10-18T18:00:00Z'),
+              modified: new Date('2026-10-18T18:00:00Z'),
+            },
+          ],
+        } as any)
+      );
+      const component = new StixPageTabsComponent(api);
+      if (entry === 'Review') {
+        component.config = new ReleaseReviewDialogComponent(null as any, {
+          items: [{ item: {} as any, current, prior }],
+        }).config;
+      } else {
+        const open = vi.fn();
+        HistoryTimelineComponent.prototype.preview.call(
+          { dialog: { open } } as any,
+          current,
+          prior
+        );
+        component.config = open.mock.calls[0][1].data;
+        expect(component.config.relationshipCreatedBefore).toEqual(
+          current.modified
+        );
+      }
+      const tab = {
+        label: 'Mitigations',
+        template: null,
+        relationshipQuery: {
+          targetRef: current.stixID,
+          relationshipType: 'mitigates',
+        },
+      };
+      component.customTabs = [tab];
+      component.ngOnChanges();
+      expect(component.tabHasChanges(tab)).toBe(true);
+      component.ngOnDestroy();
+    }
+  );
+
+  it.each(['Review', 'History'])(
+    'treats relationships as additions when %s has no prior revision',
+    entry => {
+      const current = {
+        type: 'attack-pattern',
+        stixID: 'attack-pattern--new',
+        modified: new Date('2026-10-19T14:00:00Z'),
+      } as any;
+      const component = new StixPageTabsComponent(
+        TestBed.inject(RestApiConnectorService)
+      );
+      if (entry === 'Review') {
+        component.config = new ReleaseReviewDialogComponent(null as any, {
+          items: [{ item: {} as any, current, prior: null }],
+        }).config;
+      } else {
+        const open = vi.fn();
+        HistoryTimelineComponent.prototype.preview.call(
+          { dialog: { open } } as any,
+          current,
+          null
+        );
+        component.config = open.mock.calls[0][1].data;
+      }
+      const tab = {
+        label: 'Mitigations',
+        template: null,
+        relatedObjects: [
+          { created: current.modified, modified: current.modified } as any,
+        ],
+      };
+      expect(component.tabHasChanges(tab)).toBe(true);
+    }
+  );
+
+  it('uses preloaded tab data without extra requests and responds to refreshed lists', () => {
+    const api = TestBed.inject(RestApiConnectorService);
+    const component = new StixPageTabsComponent(api);
+    component.config = {
+      mode: 'diff',
+      object: [] as any,
+      relationshipAddedAfter: '2026-10-18T14:00:00Z',
+      relationshipCreatedBefore: '2026-10-19T14:00:00Z',
+    };
+    const tab = {
+      label: 'Techniques',
+      template: null,
+      relatedObjects: [
+        {
+          created: new Date('2026-10-18T18:00:00Z'),
+          modified: new Date('2026-10-18T18:00:00Z'),
+        } as any,
+      ],
+    };
+    component.customTabs = [tab];
+    component.ngOnChanges();
+    expect(component.tabHasChanges(tab)).toBe(true);
+    expect(api.getRelatedTo).not.toHaveBeenCalled();
+    tab.relatedObjects = [
+      {
+        created: new Date('2026-10-20T14:00:00Z'),
+        modified: new Date('2026-10-20T14:00:00Z'),
+      } as any,
+    ];
+    expect(component.tabHasChanges(tab)).toBe(false);
+    tab.relatedObjects = [];
+    expect(component.tabHasChanges(tab)).toBe(false);
+    component.ngOnDestroy();
   });
 });

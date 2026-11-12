@@ -14,6 +14,7 @@ import {
 import { forkJoin, of, Subscription } from 'rxjs';
 import { catchError, map } from 'rxjs/operators';
 import { RestApiConnectorService } from 'src/app/services/connectors/rest-api/rest-api-connector.service';
+import { StixObject } from 'src/app/classes/stix/stix-object';
 import { StixViewConfig } from 'src/app/views/stix/stix-view-page';
 
 interface CustomTab {
@@ -23,6 +24,8 @@ interface CustomTab {
   diffFields?: string[];
   /** Match the relationship table inside the tab without loading its lazy content. */
   relationshipQuery?: Parameters<RestApiConnectorService['getRelatedTo']>[0];
+  /** Reuse objects already loaded by the page, such as Data Source lists. */
+  relatedObjects?: StixObject[];
 }
 
 @Component({
@@ -93,21 +96,7 @@ export class StixPageTabsComponent implements OnChanges, OnDestroy {
           })
           .pipe(
             map(result =>
-              result.data.some(relationship => {
-                const created = new Date(relationship.created).getTime();
-                const modified = new Date(relationship.modified).getTime();
-                // Use the same date boundaries as the relationship table's row markers.
-                return (
-                  Number.isFinite(created) &&
-                  created <= before &&
-                  (created > after ||
-                    (created <= after &&
-                      Number.isFinite(modified) &&
-                      modified > after))
-                );
-              })
-                ? tab.label
-                : null
+              this.hasRelatedChanges(result.data) ? tab.label : null
             ),
             catchError(() => of(null))
           )
@@ -125,8 +114,31 @@ export class StixPageTabsComponent implements OnChanges, OnDestroy {
 
   public tabHasChanges(tab: CustomTab): boolean {
     return (
-      this.hasChanges(tab.diffFields) || this.relationshipChanges.has(tab.label)
+      this.hasChanges(tab.diffFields) ||
+      this.relationshipChanges.has(tab.label) ||
+      this.hasRelatedChanges(tab.relatedObjects)
     );
+  }
+
+  private hasRelatedChanges(objects: StixObject[] = []): boolean {
+    if (this.config?.mode !== 'diff' || !this.config.relationshipAddedAfter)
+      return false;
+    const after = new Date(this.config.relationshipAddedAfter).getTime();
+    const before = this.config.relationshipCreatedBefore
+      ? new Date(this.config.relationshipCreatedBefore).getTime()
+      : Infinity;
+    if (!Number.isFinite(after) || Number.isNaN(before)) return false;
+    // Match the relationship table's added/updated markers and staged cutoff.
+    return objects.some(object => {
+      const created = new Date(object.created).getTime();
+      const modified = new Date(object.modified).getTime();
+      return (
+        Number.isFinite(created) &&
+        created <= before &&
+        (created > after ||
+          (created <= after && Number.isFinite(modified) && modified > after))
+      );
+    });
   }
 
   public hasChanges(fields: string[] = []): boolean {

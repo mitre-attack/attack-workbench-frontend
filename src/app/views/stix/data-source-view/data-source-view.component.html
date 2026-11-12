@@ -25,8 +25,16 @@
       'platforms',
     ]"
     [customTabs]="[
-      { label: 'Data Components', template: componentsTpl },
-      { label: 'Techniques', template: techniquesTpl },
+      {
+        label: 'Data Components',
+        template: componentsTpl,
+        relatedObjects: dataComponents,
+      },
+      {
+        label: 'Techniques',
+        template: techniquesTpl,
+        relatedObjects: techniquesDetected,
+      },
     ]">
   </app-stix-page-tabs>
 
