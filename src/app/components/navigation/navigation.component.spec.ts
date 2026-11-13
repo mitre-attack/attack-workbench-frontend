@@ -165,15 +165,15 @@ describe('NavigationComponent', () => {
 
   it('should build dashboard links with admin links grouped separately', () => {
     expect(component.dashboardItems.map(item => item.label)).toEqual([
-      'Overview',
       'Release Management',
+      'Data Graphs',
       'Teams',
       'Data Quality',
     ]);
-    expect(component.dashboardItems[0]).toEqual(
+    expect(component.dashboardItems[1]).toEqual(
       expect.objectContaining({
-        label: 'Overview',
-        path: '/dashboard/overview',
+        label: 'Data Graphs',
+        path: '/dashboard/data-graphs',
         exact: true,
       })
     );
@@ -287,21 +287,21 @@ describe('NavigationComponent', () => {
     ).toBeFalsy();
   });
 
-  it('should redirect the dashboard index to overview', () => {
+  it('should redirect the dashboard index to release management', () => {
     const dashboardRoute = routes[0]?.children?.find(
       route => route.path === 'dashboard'
     );
     const indexRoute = dashboardRoute?.children?.find(
       route => route.path === ''
     );
-    const overviewRoute = dashboardRoute?.children?.find(
-      route => route.path === 'overview'
+    const dataGraphsRoute = dashboardRoute?.children?.find(
+      route => route.path === 'data-graphs'
     );
 
-    expect(indexRoute?.redirectTo).toBe('overview');
+    expect(indexRoute?.redirectTo).toBe('release-management');
     expect(indexRoute?.pathMatch).toBe('full');
-    expect(overviewRoute?.data?.breadcrumb).toBe('overview');
-    expect(overviewRoute?.data?.title).toBe('Knowledge Base Overview');
+    expect(dataGraphsRoute?.data?.breadcrumb).toBe('data graphs');
+    expect(dataGraphsRoute?.data?.title).toBe('Data Graphs');
   });
 
   it('should build documentation links', () => {

@@ -18,13 +18,84 @@
   <app-stix-page-tabs
     [config]="config"
     [detailsTemplate]="detailsTpl"
+    [detailsFields]="[
+      'attackID',
+      'version',
+      'capec_ids',
+      'contributors',
+      'data_sources',
+      'defense_bypassed',
+      'description',
+      'domains',
+      'effective_permissions',
+      'external_references',
+      'impact_type',
+      'is_subtechnique',
+      'mtc_ids',
+      'permissions_required',
+      'platforms',
+      'supports_remote',
+      'system_requirements',
+      'tactic_type',
+      'tactics',
+    ]"
     [customTabs]="[
-      { label: 'Sub-techniques', template: subtechTpl },
-      { label: 'Procedure Examples', template: proceduresTpl },
-      { label: 'Mitigations', template: mitigationsTpl },
-      { label: 'Detection Strategies', template: detectsTpl },
-      { label: 'Campaigns', template: campaignsTpl },
-      { label: 'Assets', template: assetsTpl },
+      {
+        label: 'Sub-techniques',
+        template: subtechTpl,
+        relationshipQuery: {
+          targetRef: technique.is_subtechnique
+            ? technique.parentTechnique?.stixID
+            : technique.stixID,
+          relationshipType: 'subtechnique-of',
+          excludeSourceRefs: technique.is_subtechnique
+            ? [technique.stixID]
+            : [],
+        },
+      },
+      {
+        label: 'Procedure Examples',
+        template: proceduresTpl,
+        relationshipQuery: {
+          targetRef: technique.stixID,
+          relationshipType: 'uses',
+        },
+      },
+      {
+        label: 'Mitigations',
+        template: mitigationsTpl,
+        relationshipQuery: {
+          targetRef: technique.stixID,
+          relationshipType: 'mitigates',
+        },
+      },
+      {
+        label: 'Detection Strategies',
+        template: detectsTpl,
+        relationshipQuery: {
+          targetRef: technique.stixID,
+          relationshipType: 'detects',
+          sourceType: 'detection-strategy',
+        },
+      },
+      {
+        label: 'Campaigns',
+        template: campaignsTpl,
+        relationshipQuery: {
+          targetRef: technique.stixID,
+          sourceType: 'campaign',
+          relationshipType: 'uses',
+        },
+      },
+      {
+        label: 'Assets',
+        template: assetsTpl,
+        relationshipQuery: {
+          sourceRef: technique.stixID,
+          targetType: 'asset',
+          relationshipType: 'targets',
+        },
+      },
     ]">
   </app-stix-page-tabs>
 
