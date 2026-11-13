@@ -13,10 +13,43 @@
   <app-stix-page-tabs
     [config]="config"
     [detailsTemplate]="detailsTpl"
+    [detailsFields]="[
+      'attackID',
+      'version',
+      'aliases',
+      'contributors',
+      'description',
+      'domains',
+      'external_references',
+    ]"
     [customTabs]="[
-      { label: 'Techniques', template: techniqueTpl },
-      { label: 'Campaigns', template: campaignTpl },
-      { label: 'Software', template: softwareTpl },
+      {
+        label: 'Techniques',
+        template: techniqueTpl,
+        relationshipQuery: {
+          sourceRef: group.stixID,
+          targetType: 'technique',
+          relationshipType: 'uses',
+        },
+      },
+      {
+        label: 'Campaigns',
+        template: campaignTpl,
+        relationshipQuery: {
+          targetRef: group.stixID,
+          sourceType: 'campaign',
+          relationshipType: 'attributed-to',
+        },
+      },
+      {
+        label: 'Software',
+        template: softwareTpl,
+        relationshipQuery: {
+          sourceRef: group.stixID,
+          targetType: 'software',
+          relationshipType: 'uses',
+        },
+      },
     ]">
   </app-stix-page-tabs>
 

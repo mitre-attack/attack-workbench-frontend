@@ -67,6 +67,8 @@ export class ReleaseReviewDialogComponent {
     return {
       mode: 'diff',
       object: [this.reviewItem.current, this.reviewItem.prior],
+      // Without a released revision, all existing relationships are additions.
+      relationshipAddedAfter: this.reviewItem.prior?.modified ?? new Date(0),
       editable: false,
       sidebarControl: 'disable',
       showRelationships: false,

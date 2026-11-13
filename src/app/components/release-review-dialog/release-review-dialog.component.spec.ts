@@ -64,6 +64,7 @@ describe('ReleaseReviewDialogComponent', () => {
     expect(component.config).toEqual({
       mode: 'diff',
       object: [component.reviewItem.current, component.reviewItem.prior],
+      relationshipAddedAfter: new Date(0),
       editable: false,
       sidebarControl: 'disable',
       showRelationships: false,

@@ -13,7 +13,24 @@
   <app-stix-page-tabs
     [config]="config"
     [detailsTemplate]="detailsTpl"
-    [customTabs]="[{ label: 'Techniques', template: techniquesTpl }]">
+    [detailsFields]="[
+      'attackID',
+      'version',
+      'description',
+      'domains',
+      'external_references',
+      'securityControls',
+    ]"
+    [customTabs]="[
+      {
+        label: 'Techniques',
+        template: techniquesTpl,
+        relationshipQuery: {
+          sourceRef: mitigation.stixID,
+          relationshipType: 'mitigates',
+        },
+      },
+    ]">
   </app-stix-page-tabs>
 
   <ng-template #detailsTpl>
