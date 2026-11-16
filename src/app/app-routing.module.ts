@@ -53,15 +53,7 @@ export const routes: Routes = [
           {
             path: '',
             pathMatch: 'full',
-            redirectTo: 'overview',
-          },
-          {
-            path: 'overview',
-            data: {
-              breadcrumb: 'overview',
-              title: 'Knowledge Base Overview',
-            },
-            component: DashboardPageComponent,
+            redirectTo: 'release-management',
           },
           {
             path: 'release-management',
@@ -89,6 +81,14 @@ export const routes: Routes = [
                 component: ReleaseTrackPageComponent,
               },
             ],
+          },
+          {
+            path: 'data-graphs',
+            data: {
+              breadcrumb: 'data graphs',
+              title: 'Data Graphs',
+            },
+            component: DashboardPageComponent,
           },
           {
             path: 'teams',

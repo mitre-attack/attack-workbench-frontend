@@ -315,7 +315,7 @@ export class NavigationComponent implements OnInit, OnDestroy {
       .map(route => ({
         label: this.titleCase(route.data?.breadcrumb || (route.path as string)),
         path: this.dashboardPath(route),
-        exact: route.path === '' || route.path === 'overview',
+        exact: route.path === '' || route.path === 'data-graphs',
       }));
   }
 

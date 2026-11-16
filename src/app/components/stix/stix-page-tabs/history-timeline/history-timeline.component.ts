@@ -297,6 +297,8 @@ export class HistoryTimelineComponent implements OnInit, OnDestroy {
     this.dialog.open(StixDialogComponent, {
       data: {
         object: [sdo, prior_sdo],
+        relationshipAddedAfter: prior_sdo?.modified ?? new Date(0),
+        relationshipCreatedBefore: sdo.modified,
         mode: 'diff',
         editable: false,
         sidebarControl: 'disable',

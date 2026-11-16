@@ -1757,7 +1757,7 @@ export class ReleaseTrackPageComponent implements OnInit, OnDestroy {
           this.findMemberEntry(item.object_ref))
         : this.findMemberEntry(item.object_ref);
     const relationshipAddedAfter =
-      this.getDiffObjectModified(relationshipBaseline);
+      this.getDiffObjectModified(relationshipBaseline) ?? new Date(0);
     diff
       .pipe(take(1), takeUntil(this.cancelRequests$))
       .subscribe(({ current, prior, expectedBaseline }) => {
