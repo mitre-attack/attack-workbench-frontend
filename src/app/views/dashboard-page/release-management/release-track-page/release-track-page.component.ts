@@ -67,6 +67,11 @@ import {
   UpdateMetadataPayload,
 } from 'src/app/classes/release-tracks';
 import { StixObject } from 'src/app/classes/stix';
+import { Collection } from 'src/app/classes/stix/collection';
+import {
+  indexAttackReleaseDiffs,
+  ReleaseTrackDiffOption,
+} from 'src/app/classes/release-track-diff';
 import { Note } from 'src/app/classes/stix/note';
 import { Role } from 'src/app/classes/authn/role';
 import { AddDialogComponent } from 'src/app/components/add-dialog/add-dialog.component';
@@ -562,6 +567,7 @@ export class ReleaseTrackPageComponent implements OnInit, OnDestroy {
       if (this.id) {
         this.getReleaseTrack();
         this.getConfig();
+        this.loadDiffReleases();
       }
     });
 
@@ -1127,6 +1133,7 @@ export class ReleaseTrackPageComponent implements OnInit, OnDestroy {
     );
     this.syncAliasControl();
     this.hydrateDynamicEntryDates();
+    this.indexDiffReleases();
 
     this.breadcrumbService.changeBreadcrumb(
       this.route.snapshot,
@@ -1723,72 +1730,50 @@ export class ReleaseTrackPageComponent implements OnInit, OnDestroy {
     this.router.navigate([viewUrl]);
   }
 
-  public onDiff(item: ReleaseTrackObjectItem): void {
-    if (!item?.object_ref) {
-      this.snackbar.open(
-        'Unable to determine which object to compare.',
-        undefined,
-        {
-          duration: 3000,
-        }
-      );
-      return;
-    }
-
+  /**
+   * Validate the selected comparison, load both object versions, and open the
+   * diff dialog. Show a message if either version cannot be loaded.
+   *
+   * @param item The object entry whose comparison menu was opened.
+   * @param option The comparison choice selected by the user.
+   */
+  public onDiff(
+    item: ReleaseTrackObjectItem,
+    option: ReleaseTrackDiffOption
+  ): void {
+    // Resolve against the current menu so a stale selection cannot fetch a
+    // different object's revision or an obsolete lane baseline.
+    const selected = this.getDiffOptions(item).find(
+      entry => entry.id === option?.id
+    );
+    if (!selected) return;
     const tier = this.getDiffTier(item);
-    if (!tier) {
-      this.snackbar.open(
-        'Unable to determine which lane to compare.',
-        undefined,
-        {
-          duration: 3000,
-        }
-      );
-      return;
-    }
-
-    const diff =
-      tier === 'candidate'
-        ? this.resolveCandidateDiffObjects(item)
-        : this.resolveStagedDiffObjects(item);
-    const relationshipBaseline =
-      tier === 'candidate'
-        ? (this.findStagedEntry(item.object_ref) ??
-          this.findMemberEntry(item.object_ref))
-        : this.findMemberEntry(item.object_ref);
-    const relationshipAddedAfter =
-      this.getDiffObjectModified(relationshipBaseline);
-    diff
+    this.resolveDiffObjects(item, selected.baseline)
       .pipe(take(1), takeUntil(this.cancelRequests$))
-      .subscribe(({ current, prior, expectedBaseline }) => {
-        if (!current) {
-          this.snackbar.open(
-            'Unable to load the current object version.',
-            undefined,
-            {
-              duration: 3000,
-            }
+      .subscribe({
+        next: ({ current, prior }) => {
+          if (!current || !prior) {
+            this.snackbar.open(
+              'Unable to load the selected object versions.',
+              undefined,
+              { duration: 4000 }
+            );
+            return;
+          }
+          this.openDiffDialog(
+            current,
+            prior,
+            tier === 'staged' ? this.getDiffObjectModified(item) : undefined,
+            selected.baseline.object_modified
           );
-          return;
-        }
-
-        if (expectedBaseline && !prior) {
+        },
+        error: () => {
           this.snackbar.open(
-            'Unable to load the comparison baseline version.',
+            'Unable to load the selected comparison. Try again.',
             undefined,
-            {
-              duration: 3000,
-            }
+            { duration: 4000 }
           );
-          return;
-        }
-
-        this.openDiffDialog(
-          current,
-          prior,
-          tier === 'staged' ? this.getDiffObjectModified(item) : undefined,
-          relationshipAddedAfter
-        );
+        },
       });
   }
 
@@ -1883,50 +1868,143 @@ export class ReleaseTrackPageComponent implements OnInit, OnDestroy {
     return this.autoPromotionEnabled && !lane.isReleasedMembers;
   }
 
+  public diffReleasesLoading = false;
+  public diffReleasesError = false;
+  private diffCollections: Collection[] = [];
+  private attackReleaseDiffs = new Map<string, ReleaseTrackDiffOption[]>();
+  private diffReleaseRequest = 0;
+
   /**
-   * When different revisions of an object occupy both workflow tiers, only the
-   * newest pin can present a non-misleading relationship diff.
+   * Load all collection versions and rebuild the ATT&CK release comparison
+   * lookup. Update loading/error state for the UI and ignore responses from
+   * requests superseded by a newer attempt. Also used by the Retry button.
    */
-  public shouldShowDiff(item: ReleaseTrackObjectItem): boolean {
-    if (!item?.object_ref) return true;
-
-    const staged = (this.releaseTrack?.staged || []).filter(
-      entry => entry.object_ref === item.object_ref
-    );
-    const candidates = (this.releaseTrack?.candidates || []).filter(
-      entry => entry.object_ref === item.object_ref
-    );
-
-    if (!staged.length || !candidates.length) return true;
-
-    const itemModified = this.getModifiedTimestamp(item.object_modified);
-    const pins = [...staged, ...candidates].map(entry =>
-      this.getModifiedTimestamp(entry.object_modified)
-    );
-    if (
-      !Number.isFinite(itemModified) ||
-      pins.some(time => !Number.isFinite(time))
-    ) {
-      return true;
-    }
-
-    return itemModified === Math.max(...pins);
+  public loadDiffReleases(): void {
+    const request = ++this.diffReleaseRequest;
+    this.diffReleasesLoading = true;
+    this.diffReleasesError = false;
+    this.diffCollections = [];
+    this.attackReleaseDiffs.clear();
+    this.restApiConnectorService
+      .getAllCollections({ versions: 'all' })
+      .pipe(take(1), takeUntil(this.cancelRequests$))
+      .subscribe({
+        next: result => {
+          if (request !== this.diffReleaseRequest) return;
+          this.diffCollections = result.data as Collection[];
+          this.indexDiffReleases();
+          this.diffReleasesLoading = false;
+        },
+        error: () => {
+          if (request !== this.diffReleaseRequest) return;
+          this.diffReleasesLoading = false;
+          this.diffReleasesError = true;
+        },
+      });
   }
 
+  /**
+   * Rebuild attackReleaseDiffs from the loaded collections for objects currently
+   * in Candidates or Staged. Repeated object references are indexed only once.
+   */
+  private indexDiffReleases(): void {
+    const entries: ReleaseTrackObjectItem[] = [
+      ...(this.releaseTrack?.candidates ?? []),
+      ...(this.releaseTrack?.staged ?? []),
+    ];
+    this.attackReleaseDiffs = indexAttackReleaseDiffs(
+      this.diffCollections,
+      new Set(entries.map(item => item.object_ref))
+    );
+  }
+
+  /**
+   * Build the comparison menu for a candidate or staged object. Candidates can
+   * compare with Staged and Members; staged objects can compare with Members.
+   * Imported ATT&CK release choices follow the workflow choices.
+   *
+   * @param item The object entry displayed by the card.
+   * @returns Available comparison choices, or an empty array for an unsupported entry.
+   */
+  public getDiffOptions(
+    item: ReleaseTrackObjectItem
+  ): ReleaseTrackDiffOption[] {
+    const tier = this.getDiffTier(item);
+    if (!item?.object_ref || !tier) return [];
+    const options: ReleaseTrackDiffOption[] = [];
+    if (tier === 'candidate') {
+      const stagedOption = this.createTierDiffOption(
+        'staged',
+        'Staged',
+        this.findStagedEntry(item.object_ref)
+      );
+      if (stagedOption) options.push(stagedOption);
+    }
+    const memberOption = this.createTierDiffOption(
+      'member',
+      'Members',
+      this.findMemberEntry(item.object_ref)
+    );
+    if (memberOption) options.push(memberOption);
+    return [
+      ...options,
+      ...(this.attackReleaseDiffs.get(item.object_ref) ?? []),
+    ];
+  }
+
+  /**
+   * Create a comparison choice for a staged or member baseline. The baseline
+   * must identify an exact object version using a valid modified timestamp.
+   *
+   * @param kind The baseline's workflow tier, also used as the option ID.
+   * @param label The text displayed in the comparison menu.
+   * @param entry The baseline entry, or null if absent from that tier.
+   * @returns The comparison choice, or null if the baseline is missing or invalid.
+   */
+  private createTierDiffOption(
+    kind: 'staged' | 'member',
+    label: string,
+    entry: ReleaseTrackObjectItem | null
+  ): ReleaseTrackDiffOption | null {
+    const modified = this.getDiffObjectModified(entry);
+    if (!entry || !modified || modified === 'latest') return null;
+    if (!Number.isFinite(new Date(modified).getTime())) return null;
+    return {
+      id: kind,
+      label,
+      kind,
+      baseline: { object_ref: entry.object_ref, object_modified: modified },
+    };
+  }
+
+  /**
+   * Check whether an object has at least one available comparison baseline.
+   *
+   * @param item The object entry displayed by the card.
+   * @returns Whether the card's Diff action can be enabled.
+   */
+  public shouldShowDiff(item: ReleaseTrackObjectItem): boolean {
+    return this.getDiffOptions(item).length > 0;
+  }
+
+  /**
+   * Explain why a card has no comparison choices, including loading failures.
+   *
+   * @param item The object entry displayed by the card.
+   * @returns The disabled-action explanation, or null if a comparison is available.
+   */
   public getDiffUnavailableMessage(
     item: ReleaseTrackObjectItem
   ): string | null {
-    return this.shouldShowDiff(item)
-      ? null
-      : 'A newer revision of this object is available in the release track. View its diff instead.';
+    if (this.shouldShowDiff(item)) return null;
+    if (this.diffReleasesLoading) return 'Loading comparison versions…';
+    if (this.diffReleasesError)
+      return 'Unable to load ATT&CK comparison versions. Retry above.';
+    return 'No comparison version available';
   }
 
   public toggleReleasedMembers(): void {
     this.showReleasedMembers = !this.showReleasedMembers;
-  }
-
-  private getModifiedTimestamp(value?: Date | string): number {
-    return value ? new Date(value).getTime() : Number.NaN;
   }
 
   public onEditDescription(): void {
@@ -3054,9 +3132,21 @@ export class ReleaseTrackPageComponent implements OnInit, OnDestroy {
     return item?.object_ref ? 'candidate' : null;
   }
 
+  /**
+   * Determine an entry's comparison tier, checking its exact lane instance
+   * before falling back to the existing release-track tier lookup.
+   *
+   * @param item The object entry whose lane is needed.
+   * @returns Candidate or staged, or null for members and unsupported entries.
+   */
   private getDiffTier(
     item: ReleaseTrackObjectItem
   ): 'candidate' | 'staged' | null {
+    if (this.releaseTrack?.candidates?.some(entry => entry === item))
+      return 'candidate';
+    if (this.releaseTrack?.staged?.some(entry => entry === item))
+      return 'staged';
+    if (this.releaseTrack?.members?.some(entry => entry === item)) return null;
     return this.getReleaseTrackTier(item);
   }
 
@@ -3078,44 +3168,6 @@ export class ReleaseTrackPageComponent implements OnInit, OnDestroy {
     item: ReleaseTrackObjectItem | null
   ): Date | string | undefined {
     return item?.resolved_object_modified ?? item?.object_modified;
-  }
-
-  private resolveCandidateDiffObjects(
-    item: ReleaseTrackObjectItem
-  ): Observable<{
-    current: StixObject | null;
-    prior: StixObject | null;
-    expectedBaseline: boolean;
-  }> {
-    const stagedEntry = this.findStagedEntry(item.object_ref);
-    const memberEntry = stagedEntry
-      ? null
-      : this.findMemberEntry(item.object_ref);
-    const baselineEntry = stagedEntry ?? memberEntry;
-
-    return this.resolveDiffObjects(item, baselineEntry).pipe(
-      map(({ current, prior }) => ({
-        current,
-        prior,
-        expectedBaseline: !!baselineEntry,
-      }))
-    );
-  }
-
-  private resolveStagedDiffObjects(item: ReleaseTrackObjectItem): Observable<{
-    current: StixObject | null;
-    prior: StixObject | null;
-    expectedBaseline: boolean;
-  }> {
-    const memberEntry = this.findMemberEntry(item.object_ref);
-
-    return this.resolveDiffObjects(item, memberEntry).pipe(
-      map(({ current, prior }) => ({
-        current,
-        prior,
-        expectedBaseline: !!memberEntry,
-      }))
-    );
   }
 
   private resolveDiffObjects(

@@ -3,6 +3,7 @@ import { Component, EventEmitter, Input, Output } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
 import { MatIconModule } from '@angular/material/icon';
+import { MatMenuModule } from '@angular/material/menu';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import moment from 'moment';
 import { MarkdownModule } from 'ngx-markdown';
@@ -10,6 +11,7 @@ import { StixTypeToAttackType } from 'src/app/utils/type-mappings';
 import { StixType, WorkflowStatusType } from 'src/app/utils/types';
 import { UserAvatarComponent } from '../user-avatar/user-avatar.component';
 import type { TierEntryModifiedByUser } from 'src/app/classes/release-tracks';
+import { ReleaseTrackDiffOption } from 'src/app/classes/release-track-diff';
 
 export interface ReleaseTrackObjectItem {
   object_ref: string;
@@ -34,6 +36,7 @@ export interface ReleaseTrackObjectItem {
     MatButtonModule,
     MatCardModule,
     MatIconModule,
+    MatMenuModule,
     MatTooltipModule,
     MarkdownModule,
     UserAvatarComponent,
@@ -49,10 +52,16 @@ export class ReleaseTrackObjectCardComponent {
   @Input() showDiff = true;
   @Input() diffDisabled = false;
   @Input() diffDisabledMessage = '';
+  @Input() diffOptions: ReleaseTrackDiffOption[] = [];
+  @Input() diffLoading = false;
+  @Input() diffError = false;
   @Input() showModifiedMeta = true;
 
   @Output() viewObject = new EventEmitter<ReleaseTrackObjectItem>();
-  @Output() diffObject = new EventEmitter<ReleaseTrackObjectItem>();
+  @Output() diffObject = new EventEmitter<{
+    item: ReleaseTrackObjectItem;
+    option: ReleaseTrackDiffOption;
+  }>();
 
   public get title(): string {
     return (
@@ -118,8 +127,30 @@ export class ReleaseTrackObjectCardComponent {
     this.viewObject.emit(this.item);
   }
 
-  public onDiff(): void {
-    this.diffObject.emit(this.item);
+  /**
+   * Emit the card's object and the selected comparison choice. Ignore selections
+   * when comparisons are disabled or the option is no longer available.
+   *
+   * @param option The comparison choice clicked in the menu.
+   */
+  public onDiff(option: ReleaseTrackDiffOption): void {
+    const selected = this.diffOptions.find(entry => entry.id === option.id);
+    if (this.diffDisabled || !selected) return;
+    this.diffObject.emit({ item: this.item, option: selected });
+  }
+
+  /**
+   * Identify menu entries so Angular can preserve them when the list updates.
+   *
+   * @param _index The entry's list position, supplied by Angular and unused here.
+   * @param option The comparison choice being rendered.
+   * @returns The option's stable ID; this does not select the option.
+   */
+  public trackDiffOption(
+    _index: number,
+    option: ReleaseTrackDiffOption
+  ): string {
+    return option.id;
   }
 
   private get fallbackObjectLabel(): string {

@@ -1,3 +1,8 @@
+import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { provideHttpClient } from '@angular/common/http';
+import { NoopAnimationsModule } from '@angular/platform-browser/animations';
+import { MarkdownModule } from 'ngx-markdown';
+import { ReleaseTrackDiffOption } from 'src/app/classes/release-track-diff';
 import { ReleaseTrackObjectCardComponent } from './release-track-object-card.component';
 
 describe('ReleaseTrackObjectCardComponent', () => {
@@ -81,5 +86,73 @@ describe('ReleaseTrackObjectCardComponent', () => {
     };
 
     expect(component.modifiedByName).toBe('Release Reviewer');
+  });
+});
+
+describe('ReleaseTrackObjectCardComponent comparison menu', () => {
+  let fixture: ComponentFixture<ReleaseTrackObjectCardComponent>;
+  const baseline = {
+    object_ref: 'attack-pattern--example',
+    object_modified: '2025-01-01T00:00:00.000Z',
+  };
+  const options: ReleaseTrackDiffOption[] = [
+    { id: 'staged', kind: 'staged', label: 'Staged', baseline },
+    {
+      id: 'release',
+      kind: 'attack-release',
+      label: 'Enterprise ATT&CK v18.0',
+      baseline,
+    },
+  ];
+
+  beforeEach(async () => {
+    await TestBed.configureTestingModule({
+      imports: [
+        ReleaseTrackObjectCardComponent,
+        NoopAnimationsModule,
+        MarkdownModule.forRoot(),
+      ],
+      providers: [provideHttpClient()],
+    }).compileComponents();
+    fixture = TestBed.createComponent(ReleaseTrackObjectCardComponent);
+    fixture.componentInstance.item = {
+      object_ref: baseline.object_ref,
+      name: 'Example',
+    };
+    fixture.componentInstance.showDescription = false;
+    fixture.componentInstance.diffOptions = options;
+    fixture.detectChanges();
+  });
+
+  afterEach(() => {
+    fixture.destroy();
+    document
+      .querySelectorAll('.cdk-overlay-container')
+      .forEach(element => element.remove());
+    TestBed.resetTestingModule();
+  });
+
+  it('opens a menu before emitting and emits the selected baseline', async () => {
+    const emit = vi.spyOn(fixture.componentInstance.diffObject, 'emit');
+    const trigger: HTMLButtonElement = fixture.nativeElement.querySelector(
+      '[aria-haspopup="menu"]'
+    );
+    expect(trigger.getAttribute('aria-label')).toContain('Compare Example');
+    trigger.click();
+    fixture.detectChanges();
+    await fixture.whenStable();
+    expect(emit).not.toHaveBeenCalled();
+    const entries = document.querySelectorAll<HTMLButtonElement>(
+      '.cdk-overlay-container [role="menuitem"]'
+    );
+    expect(Array.from(entries).map(entry => entry.textContent.trim())).toEqual([
+      'Staged',
+      'Enterprise ATT&CK v18.0',
+    ]);
+    entries[1].click();
+    expect(emit).toHaveBeenCalledWith({
+      item: fixture.componentInstance.item,
+      option: options[1],
+    });
   });
 });

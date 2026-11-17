@@ -104,6 +104,11 @@
     (back)="onBackToReleases()"
     (resolved)="onQuarantineResolved()"></app-virtual-snapshot-contents>
 
+  <p *ngIf="diffReleasesError && !isVirtualReleaseTrack" role="status">
+    Unable to load imported ATT&CK releases for comparison.
+    <button mat-button type="button" (click)="loadDiffReleases()">Retry</button>
+  </p>
+
   <app-stix-page-tabs
     *ngIf="releaseTrack && !(isVirtualReleaseTrack && selectedSnapshotModified)"
     [detailsTemplate]="isVirtualReleaseTrack ? historyTpl : detailsTpl"
@@ -327,12 +332,15 @@
       [cardType]="lane.type"
       [laneStatus]="getLaneStatus(item, lane)"
       [showDescription]="shouldShowLaneDescription(lane)"
-      [showDiff]="!canReviewAndApprove(item, lane)"
+      [showDiff]="lane.type !== 'member'"
+      [diffOptions]="getDiffOptions(item)"
+      [diffLoading]="diffReleasesLoading"
+      [diffError]="diffReleasesError"
       [diffDisabled]="!shouldShowDiff(item)"
       [diffDisabledMessage]="getDiffUnavailableMessage(item) || ''"
       [showModifiedMeta]="true"
       (viewObject)="onView($event.object_ref)"
-      (diffObject)="onDiff($event)">
+      (diffObject)="onDiff($event.item, $event.option)">
       <app-status-chip
         card-header-action
         [status]="getLaneStatus(item, lane)"></app-status-chip>

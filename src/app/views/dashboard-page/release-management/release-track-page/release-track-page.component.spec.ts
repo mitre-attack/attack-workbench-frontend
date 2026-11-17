@@ -166,6 +166,7 @@ describe('ReleaseTrackPageComponent', () => {
     };
     mockRestApiConnector = {
       getAllObjects: vi.fn(() => of(createPaginatedResponse([]))),
+      getAllCollections: vi.fn(() => of(createPaginatedResponse([]))),
       postNote: vi.fn(() => of({})),
       triggerBrowserDownload: vi.fn(),
     };
@@ -1257,31 +1258,154 @@ describe('ReleaseTrackPageComponent', () => {
     );
   });
 
-  it('should only show a diff for the latest pin when an object is both staged and a candidate', () => {
-    const staged = {
-      object_ref: 'attack-pattern--shared',
-      object_modified: '2026-01-01T00:00:00.000Z',
-    } as any;
-    const candidate = {
-      object_ref: 'attack-pattern--shared',
-      object_modified: '2026-02-01T00:00:00.000Z',
-    } as any;
-    const unrelatedCandidate = {
-      object_ref: 'attack-pattern--candidate-only',
-      object_modified: '2026-01-01T00:00:00.000Z',
-    } as any;
-    component.releaseTrack = {
-      staged: [staged],
-      candidates: [candidate, unrelatedCandidate],
-    } as any;
+  describe('comparison menu', () => {
+    const objectRef = 'attack-pattern--shared';
+    const memberModified = '2025-01-01T00:00:00.000Z';
+    const stagedModified = '2026-01-01T00:00:00.000Z';
+    const candidateModified = '2026-02-01T00:00:00.000Z';
+    let candidate: any;
+    let staged: any;
+    let member: any;
+    const release = {
+      stixID: 'x-mitre-collection--enterprise',
+      name: 'Enterprise ATT&CK',
+      version: '18.0',
+      imported: new Date('2026-03-01'),
+      modified: new Date('2025-10-01'),
+      contents: [
+        { object_ref: objectRef, object_modified: new Date('2024-01-01') },
+      ],
+    };
 
-    expect(component.shouldShowDiff(staged)).toBe(false);
-    expect(component.shouldShowDiff(candidate)).toBe(true);
-    expect(component.shouldShowDiff(unrelatedCandidate)).toBe(true);
-    expect(component.getDiffUnavailableMessage(staged)).toBe(
-      'A newer revision of this object is available in the release track. View its diff instead.'
-    );
-    expect(component.getDiffUnavailableMessage(candidate)).toBeNull();
+    beforeEach(() => {
+      candidate = { object_ref: objectRef, object_modified: candidateModified };
+      staged = { object_ref: objectRef, object_modified: stagedModified };
+      member = { object_ref: objectRef, object_modified: memberModified };
+      component.releaseTrack = {
+        candidates: [candidate],
+        staged: [staged],
+        members: [member],
+      } as any;
+      mockRestApiConnector.getAllCollections.mockReturnValue(
+        of(createPaginatedResponse([release]))
+      );
+      component.loadDiffReleases();
+    });
+
+    it('offers all candidate baselines and only member/release baselines for staged', () => {
+      expect(
+        component.getDiffOptions(candidate).map(option => option.label)
+      ).toEqual(['Staged', 'Members', 'Enterprise ATT&CK v18.0']);
+      expect(
+        component.getDiffOptions(staged).map(option => option.label)
+      ).toEqual(['Members', 'Enterprise ATT&CK v18.0']);
+      expect(component.getDiffOptions(member)).toEqual([]);
+      component.releaseTrack.staged = [];
+      component.releaseTrack.members = [];
+      expect(
+        component.getDiffOptions(candidate).map(option => option.kind)
+      ).toEqual(['attack-release']);
+      expect(component.shouldShowDiff(candidate)).toBe(true);
+    });
+
+    it('fetches the selected exact release revision and keeps staged relationship bounds', () => {
+      vi.spyOn(component as any, 'fetchObjectVersion').mockImplementation(
+        (_id, modified) => of({ modified })
+      );
+      const option = component
+        .getDiffOptions(staged)
+        .find(entry => entry.kind === 'attack-release')!;
+      component.onDiff(staged, option);
+      expect(mockDialog.open).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({
+          data: expect.objectContaining({
+            object: [
+              { modified: stagedModified },
+              { modified: release.contents[0].object_modified },
+            ],
+            relationshipCreatedBefore: stagedModified,
+            relationshipAddedAfter: release.contents[0].object_modified,
+          }),
+        })
+      );
+    });
+
+    it('uses the selected member even when a staged baseline exists', () => {
+      const fetch = vi
+        .spyOn(component as any, 'fetchObjectVersion')
+        .mockImplementation((_id, modified) => of({ modified }));
+      component.onDiff(candidate, component.getDiffOptions(candidate)[1]);
+      expect(fetch).toHaveBeenCalledWith(objectRef, memberModified);
+      expect(fetch).not.toHaveBeenCalledWith(objectRef, stagedModified);
+    });
+
+    it('does not substitute latest when a historical version is missing or fails', () => {
+      const fetch = vi
+        .spyOn(component as any, 'fetchObjectVersion')
+        .mockReturnValue(of(null));
+      component.onDiff(candidate, component.getDiffOptions(candidate)[2]);
+      expect(mockDialog.open).not.toHaveBeenCalled();
+      expect(mockSnackbar.open).toHaveBeenCalled();
+      fetch.mockReturnValue(throwError(() => new Error('missing baseline')));
+      component.onDiff(candidate, component.getDiffOptions(candidate)[2]);
+      expect(mockDialog.open).not.toHaveBeenCalled();
+      expect(mockSnackbar.open).toHaveBeenCalledTimes(2);
+    });
+
+    it('distinguishes loading, failure, and no history, and retries release loading', () => {
+      const pending = new Subject<any>();
+      const newObject = { object_ref: 'attack-pattern--new' };
+      mockRestApiConnector.getAllCollections.mockReturnValue(pending);
+      component.loadDiffReleases();
+      expect(component.getDiffUnavailableMessage(newObject)).toBe(
+        'Loading comparison versions…'
+      );
+      pending.error(new Error('network'));
+      expect(component.diffReleasesError).toBe(true);
+      expect(component.getDiffUnavailableMessage(newObject)).toContain(
+        'Unable to load'
+      );
+      mockRestApiConnector.getAllCollections.mockReturnValue(
+        of(createPaginatedResponse([]))
+      );
+      component.loadDiffReleases();
+      expect(component.diffReleasesError).toBe(false);
+      expect(component.shouldShowDiff(newObject)).toBe(false);
+      expect(component.getDiffUnavailableMessage(newObject)).toBe(
+        'No comparison version available'
+      );
+    });
+
+    it('ignores stale lookup results and stale menu selections', () => {
+      const pending = new Subject<any>();
+      mockRestApiConnector.getAllCollections.mockReturnValue(pending);
+      component.loadDiffReleases();
+      mockRestApiConnector.getAllCollections.mockReturnValue(
+        of(createPaginatedResponse([]))
+      );
+      component.loadDiffReleases();
+      pending.next(createPaginatedResponse([release]));
+      expect(
+        component.getDiffOptions(candidate).map(option => option.kind)
+      ).toEqual(['staged', 'member']);
+      const stagedOption = component.getDiffOptions(candidate)[0];
+      component.releaseTrack.staged = [];
+      const fetch = vi.spyOn(component as any, 'fetchObjectVersion');
+      component.onDiff(candidate, stagedOption);
+      expect(fetch).not.toHaveBeenCalled();
+    });
+
+    it('waits for a resolved pin before offering a dynamic member baseline', () => {
+      member.object_modified = 'latest';
+      expect(
+        component.getDiffOptions(staged).map(option => option.kind)
+      ).toEqual(['attack-release']);
+      member.resolved_object_modified = memberModified;
+      expect(component.getDiffOptions(staged)[0].baseline.object_modified).toBe(
+        memberModified
+      );
+    });
   });
 
   it('should delete the release track after confirmation', () => {

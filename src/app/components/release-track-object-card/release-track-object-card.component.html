@@ -56,13 +56,29 @@
 
         <ng-container *ngIf="showDiff">
           <button
-            *ngIf="!diffDisabled; else disabledDiff"
+            *ngIf="!diffDisabled && diffOptions.length; else disabledDiff"
             mat-stroked-button
             type="button"
-            (click)="onDiff()">
+            [matMenuTriggerFor]="diffMenu"
+            [attr.aria-label]="'Compare ' + title + ' with another version'">
             <mat-icon>difference</mat-icon>
             Diff
+            <mat-icon iconPositionEnd>arrow_drop_down</mat-icon>
           </button>
+          <mat-menu #diffMenu="matMenu">
+            <button
+              *ngFor="let option of diffOptions; trackBy: trackDiffOption"
+              mat-menu-item
+              (click)="onDiff(option)">
+              {{ option.label }}
+            </button>
+            <button *ngIf="diffLoading" mat-menu-item disabled>
+              Loading ATT&CK releases…
+            </button>
+            <button *ngIf="diffError" mat-menu-item disabled>
+              ATT&CK releases unavailable
+            </button>
+          </mat-menu>
           <ng-template #disabledDiff>
             <span [matTooltip]="diffDisabledMessage" tabindex="0">
               <button mat-stroked-button type="button" disabled>
