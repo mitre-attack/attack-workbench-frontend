@@ -1284,7 +1284,7 @@ describe('ReleaseTrackPageComponent', () => {
         current,
         prior,
         undefined,
-        baseline,
+        baseline ?? new Date(0),
         candidate
       );
     }

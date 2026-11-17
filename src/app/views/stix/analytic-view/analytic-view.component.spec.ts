@@ -1,5 +1,10 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
+import { CommonModule } from '@angular/common';
+import { MatTabsModule } from '@angular/material/tabs';
+import { NoopAnimationsModule } from '@angular/platform-browser/animations';
+import { Analytic } from 'src/app/classes/stix';
+import { StixPageTabsComponent } from 'src/app/components/stix/stix-page-tabs/stix-page-tabs.component';
 import { NO_ERRORS_SCHEMA } from '@angular/core';
 
 import { AnalyticViewComponent } from './analytic-view.component';
@@ -20,7 +25,8 @@ describe('AnalyticViewComponent', () => {
     });
 
     await TestBed.configureTestingModule({
-      declarations: [AnalyticViewComponent],
+      declarations: [AnalyticViewComponent, StixPageTabsComponent],
+      imports: [CommonModule, MatTabsModule, NoopAnimationsModule],
       schemas: [NO_ERRORS_SCHEMA],
       providers: [
         provideHttpClient(),
@@ -35,5 +41,25 @@ describe('AnalyticViewComponent', () => {
 
   it('should create', () => {
     expect(component).toBeTruthy();
+  });
+
+  it('ignores detection strategy data hidden in diff mode but marks visible changes', async () => {
+    const current = new Analytic();
+    current.firstInitialized = false;
+    const prior = new Analytic();
+    current.relatedDetections = [
+      { stixID: 'x-mitre-detection-strategy--example', name: 'A strategy' },
+    ] as any;
+    component.config = { mode: 'diff', object: [current, prior] };
+    fixture.detectChanges();
+    await fixture.whenStable();
+    expect(
+      fixture.nativeElement.querySelector('.tab-change-indicator')
+    ).toBeNull();
+    current.description = 'A visible description change';
+    fixture.detectChanges();
+    expect(
+      fixture.nativeElement.querySelector('.tab-change-indicator')
+    ).not.toBeNull();
   });
 });
