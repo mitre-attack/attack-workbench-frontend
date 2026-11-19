@@ -18,6 +18,16 @@
     display: inline-block;
   }
 
+  .tab-change-indicator {
+    display: inline-block;
+    flex-shrink: 0;
+    width: 8px;
+    height: 8px;
+    margin-left: 8px;
+    border-radius: 50%;
+    background-color: colors.color(warn);
+  }
+
   .details-tpl-wrapper {
     margin-top: 20px;
   }

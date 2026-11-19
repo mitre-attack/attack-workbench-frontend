@@ -1263,6 +1263,38 @@ describe('ReleaseTrackPageComponent', () => {
     );
   });
 
+  it.each([undefined, '2026-01-01T00:00:00.000Z'])(
+    'passes a relationship baseline when opening a candidate diff (%s)',
+    baseline => {
+      const candidate = {
+        object_ref: 'attack-pattern--candidate',
+        object_modified: '2026-02-01T00:00:00.000Z',
+      } as any;
+      const current = { type: 'attack-pattern' };
+      const prior = baseline ? { type: 'attack-pattern' } : null;
+      component.releaseTrack = {
+        candidates: [candidate],
+        staged: [],
+        members: baseline
+          ? [{ object_ref: candidate.object_ref, object_modified: baseline }]
+          : [],
+      } as any;
+      vi.spyOn(component as any, 'resolveCandidateDiffObjects').mockReturnValue(
+        of({ current, prior, expectedBaseline: !!baseline })
+      );
+      const openDiff = vi
+        .spyOn(component as any, 'openDiffDialog')
+        .mockImplementation(() => undefined);
+      component.onDiff(candidate);
+      expect(openDiff).toHaveBeenCalledWith(
+        current,
+        prior,
+        undefined,
+        baseline ?? new Date(0)
+      );
+    }
+  );
+
   it('should only show a diff for the latest pin when an object is both staged and a candidate', () => {
     const staged = {
       object_ref: 'attack-pattern--shared',

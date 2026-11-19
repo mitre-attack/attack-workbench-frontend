@@ -6,6 +6,12 @@
   <mat-tab>
     <ng-template mat-tab-label>
       <span class="nav-tab-label">{{ detailsLabel | uppercase }}</span>
+      <span
+        *ngIf="hasChanges(detailsFields)"
+        class="tab-change-indicator"
+        role="img"
+        aria-label="Contains changes"
+        title="Contains changes"></span>
     </ng-template>
     <ng-template matTabContent>
       <div class="details-tpl-wrapper">
@@ -18,6 +24,12 @@
     <mat-tab>
       <ng-template mat-tab-label>
         <span class="nav-tab-label">{{ tab.label | uppercase }}</span>
+        <span
+          *ngIf="tabHasChanges(tab)"
+          class="tab-change-indicator"
+          role="img"
+          aria-label="Contains changes"
+          title="Contains changes"></span>
       </ng-template>
       <ng-template matTabContent>
         <ng-container *ngTemplateOutlet="tab.template"></ng-container>
