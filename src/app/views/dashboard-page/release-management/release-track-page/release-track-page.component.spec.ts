@@ -1284,10 +1284,48 @@ describe('ReleaseTrackPageComponent', () => {
         current,
         prior,
         undefined,
-        baseline ?? new Date(0)
+        baseline ?? new Date(0),
+        candidate
       );
     }
   );
+
+  it.each(['promote', undefined])('handles diff close result %s', result => {
+    const candidate = { object_ref: 'attack-pattern--candidate' } as any;
+    component.releaseTrack = {
+      candidates: [candidate],
+      staged: [],
+      config: { auto_promote: false },
+    } as any;
+    vi.spyOn(component, 'canEditReleaseTrack', 'get').mockReturnValue(true);
+    const closed = new Subject<unknown>();
+    mockDialog.open.mockReturnValue({ afterClosed: () => closed });
+    const promote = vi
+      .spyOn(component, 'onPromote')
+      .mockImplementation(() => undefined);
+    (component as any).openDiffDialog(
+      {},
+      null,
+      undefined,
+      undefined,
+      candidate
+    );
+    const eligibility = mockDialog.open.mock.calls[0][1].data.canPromote;
+    expect(eligibility()).toBe(true);
+    component.releaseTrack.config.auto_promote = true;
+    expect(eligibility()).toBe(false);
+    component.releaseTrack.config.auto_promote = false;
+    component.releaseTrack.candidates = [];
+    expect(eligibility()).toBe(false);
+    component.releaseTrack.candidates = [candidate];
+    vi.spyOn(component, 'canEditReleaseTrack', 'get').mockReturnValue(false);
+    expect(eligibility()).toBe(false);
+    vi.spyOn(component, 'canEditReleaseTrack', 'get').mockReturnValue(true);
+    closed.next(result);
+    expect(promote).toHaveBeenCalledTimes(result === 'promote' ? 1 : 0);
+    if (result === 'promote')
+      expect(promote).toHaveBeenCalledWith(candidate.object_ref);
+  });
 
   it('should only show a diff for the latest pin when an object is both staged and a candidate', () => {
     const staged = {

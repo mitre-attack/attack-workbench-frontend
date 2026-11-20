@@ -50,7 +50,7 @@ describe('StixDialogComponent', () => {
           provide: MAT_DIALOG_DATA,
           useValue: { mode: 'view', object: {} as any },
         },
-        { provide: MatDialogRef, useValue: {} },
+        { provide: MatDialogRef, useValue: { close: vi.fn() } },
       ],
     }).compileComponents();
   });
@@ -68,6 +68,34 @@ describe('StixDialogComponent', () => {
     };
 
     expect(component.config.editable).toBe(false);
+  });
+
+  it('promotes only an eligible diff and rechecks eligibility on click', () => {
+    const eligible = vi.fn(() => true);
+    component._config = { mode: 'diff', object: [], canPromote: eligible };
+    const close = TestBed.inject(MatDialogRef).close;
+    expect(component.canPromote).toBe(true);
+    component.promote();
+    expect(close).toHaveBeenCalledWith('promote');
+    vi.mocked(close).mockClear();
+    eligible.mockReturnValue(false);
+    component.promote();
+    expect(close).not.toHaveBeenCalled();
+    expect(component.canPromote).toBe(false);
+  });
+
+  it('hides promotion in ordinary views and for readers', () => {
+    component._config = {
+      mode: 'view',
+      object: {},
+      canPromote: () => true,
+    } as any;
+    expect(component.canPromote).toBe(false);
+    component._config.mode = 'diff';
+    vi.spyOn(TestBed.inject(AuthenticationService), 'canEdit').mockReturnValue(
+      false
+    );
+    expect(component.canPromote).toBe(false);
   });
 
   it('uses the shared lifecycle check for data components and relationships', () => {

@@ -31,6 +31,9 @@
     display: flex;
     flex-direction: column;
   }
+  .promote-button {
+    margin: 5px;
+  }
   mat-drawer {
     .light & {
       border-left: 1px solid colors.border-color(light) !important;
