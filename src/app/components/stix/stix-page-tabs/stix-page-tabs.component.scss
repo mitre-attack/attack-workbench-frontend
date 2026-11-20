@@ -2,6 +2,30 @@
 @use '../../../../style/globals.scss';
 
 .stix-page-tabs {
+  &.stix-page-tabs-diff {
+    // Keep every comparison section visible, including in narrow dialogs.
+    > .mat-mdc-tab-header .mat-mdc-tab-labels {
+      flex-wrap: wrap;
+    }
+
+    > .mat-mdc-tab-header .mat-mdc-tab {
+      flex: 1 0 auto;
+      max-width: 100%;
+      height: auto;
+      min-height: 48px;
+      padding: 12px 16px;
+
+      .mdc-tab__text-label {
+        min-width: 0;
+      }
+
+      .nav-tab-label {
+        white-space: normal;
+        overflow-wrap: anywhere;
+      }
+    }
+  }
+
   .mat-mdc-tab-header {
     .dark & {
       border-bottom: 1px solid colors.border-color(dark) !important;

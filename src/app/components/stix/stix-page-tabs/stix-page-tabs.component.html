@@ -2,6 +2,8 @@
   dynamicHeight
   mat-stretch-tabs
   class="stix-page-tabs"
+  [class.stix-page-tabs-diff]="config?.mode === 'diff'"
+  [disablePagination]="config?.mode === 'diff'"
   (selectedIndexChange)="selectedIndexChange.emit($event)">
   <mat-tab>
     <ng-template mat-tab-label>
