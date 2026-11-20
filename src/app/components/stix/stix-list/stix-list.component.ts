@@ -916,7 +916,7 @@ export class StixListComponent implements OnInit, AfterViewInit, OnDestroy {
     this.data$ = of({
       data: paged,
       pagination: {
-        total: this.config.stixObjects.length,
+        total: filtered.length,
         offset: startIndex,
         limit: this.paginator ? this.paginator.pageSize : 0,
       },
@@ -999,6 +999,7 @@ export class StixListComponent implements OnInit, AfterViewInit, OnDestroy {
       this.data$ = this.restAPIConnectorService.getAllObjects({
         limit,
         offset,
+        excludeIDs: this.config.excludeIDs,
         state: filterStates.state,
         revoked: filterStates.revoked,
         deprecated: filterStates.deprecated,
